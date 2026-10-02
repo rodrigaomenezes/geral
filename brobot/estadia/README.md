@@ -103,6 +103,7 @@ A modelagem por eventos segue o documento ("o Estadia deve trabalhar com eventos
 
 O GitHub guarda o código, mas não executa servidores. Para ter um link público com HTTPS:
 
+- **Railway**: crie um serviço a partir deste repositório no GitHub e, em *Settings*, defina **Root Directory** = `brobot/estadia`. O `railway.json` e o `Dockerfile` cuidam do resto. Adicione um **Volume** com *mount path* `/data` para os dados sobreviverem a novos deploys, e a variável `ESTADIA_SECRET` com um valor aleatório. Em *Networking*, clique em *Generate Domain* para ter o link HTTPS.
 - **Render.com**: o arquivo `render.yaml` na raiz do repositório já está configurado. Em *New → Blueprint*, escolha este repositório. No plano gratuito os dados são apagados quando o serviço reinicia, o que serve para demonstração. Para guardar dados, adicione um disco persistente e aponte `ESTADIA_DATA` para ele.
 - **Docker** (qualquer provedor): `docker build -t estadia . && docker run -p 3000:3000 -v estadia-data:/data estadia`.
 
