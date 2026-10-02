@@ -39,6 +39,8 @@ Na primeira execução o sistema cria organizações, usuários e operações fi
 6. Abra `OP-2026-0003`, uma operação histórica com divergência e 6h20 de excedente. Gere o **dossiê**, clique em **Verificar integridade**, imprima ou salve em PDF e **encaminhe à advocacia**.
 7. Entre como Helena (advocacia) e mostre que ela só vê o que foi encaminhado.
 
+**Para repetir os testes:** entre como **Administrador → Administração → Reiniciar demonstração**. Tudo é apagado e os dados iniciais são recriados (todos precisam entrar de novo). Em produção real, desative com a variável `ESTADIA_DEMO_RESET=0`. Os registros em si nunca podem ser apagados individualmente: o log é imutável por regra de negócio.
+
 Para testar GPS e câmera de verdade no celular, o endereço precisa ser **HTTPS** (ou `localhost`). Pela rede local em `http://`, o navegador bloqueia o GPS e o evento é gravado com a observação "localização indisponível". Use a publicação descrita abaixo ou um túnel HTTPS (ex.: `cloudflared tunnel --url http://localhost:3000`).
 
 ## O que está implementado

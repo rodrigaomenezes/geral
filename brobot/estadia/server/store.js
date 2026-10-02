@@ -62,6 +62,19 @@ class EventStore extends EventEmitter {
     return { event: ev, duplicate: false };
   }
 
+  /** Apaga todos os dados (somente para reiniciar a demonstração). */
+  reset() {
+    fs.writeFileSync(this.file, '');
+    for (const sub of ['photos', 'dossies']) {
+      const d = path.join(this.dir, sub);
+      for (const f of fs.readdirSync(d)) fs.rmSync(path.join(d, f), { force: true });
+    }
+    this.events = [];
+    this.byClientId.clear();
+    this.lastHash = GENESIS;
+    this.emit('reset');
+  }
+
   forOp(opId) {
     return this.events.filter((e) => e.opId === opId);
   }

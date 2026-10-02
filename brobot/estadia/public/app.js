@@ -135,7 +135,8 @@
   function connectSSE() {
     if (sse || !S.token || !('EventSource' in window)) return;
     sse = new EventSource(`/api/stream?token=${encodeURIComponent(S.token)}`);
-    sse.onmessage = () => { clearTimeout(refreshT); refreshT = setTimeout(softRefresh, 250); };
+    sse.onmessage = (m) => {
+      try { if (JSON.parse(m.data).reset) { toast('A demonstração foi reiniciada. Entre novamente.'); setTimeout(logout, 1500); return; } } catch { /* mensagem comum */ } clearTimeout(refreshT); refreshT = setTimeout(softRefresh, 250); };
     sse.onerror = () => { sse.close(); sse = null; setTimeout(connectSSE, 5000); };
   }
 
@@ -682,6 +683,9 @@
     const [dirData, integ, ops] = await Promise.all([api('GET', '/api/admin/users'), api('GET', '/api/admin/integrity'), api('GET', '/api/operations')]);
     const main = $('#main');
     main.innerHTML = `<a href="#/" class="small">← Operações</a>
+      <div class="card" style="border-color:var(--crit)"><div class="card-h"><h2>Reiniciar demonstração</h2><span class="pill crit">apaga tudo</span></div>
+        <p class="small">Apaga todas as operações, registros, fotos e dossiês e recria os dados iniciais (OP-2026-0001 livre para um novo teste). Todos os usuários conectados precisarão entrar de novo.</p>
+        <div class="row" id="rst-row"><button class="btn danger" id="rst">Reiniciar demonstração</button></div></div>
       <div class="card"><div class="card-h"><h2>Integridade da cadeia de eventos</h2>${integ.ok ? '<span class="pill ok">Íntegra</span>' : '<span class="pill crit">Quebrada</span>'}</div>
         <p class="small">${integ.ok ? `${integ.eventos} eventos verificados. Último hash: <span class="mono">${esc(integ.ultimoHash.slice(0, 24))}…</span>` : `Falha no evento #${integ.seq}: ${esc(integ.motivo)}`}</p></div>
       <div class="card"><h2>Usuários</h2><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Organização</th></tr></thead><tbody>
@@ -695,6 +699,19 @@
           <div class="field"><label class="label" for="uf-p">Placa (TAC)</label><input id="uf-p"></div>
           <div class="field full"><button class="btn primary" type="submit">Criar usuário</button></div><p class="err field full" id="uf-err" hidden></p></form></details></div>
       <div class="card"><h2>Todas as operações</h2>${ops.map((o) => `<a class="row between small" href="#/op/${o.id}"><span class="mono">${esc(o.codigo)}</span><span>${esc(o.destinoNome)}</span>${statusPill(o)}</a>`).join('')}</div>`;
+    $('#rst').onclick = () => {
+      $('#rst-row').innerHTML = '<span class="small"><b>Tem certeza?</b> Isso não pode ser desfeito.</span><button class="btn danger" id="rst-yes">Sim, apagar e recriar</button><button class="btn" id="rst-no">Cancelar</button>';
+      $('#rst-no').onclick = () => viewAdmin();
+      $('#rst-yes').onclick = async () => {
+        try {
+          await api('POST', '/api/admin/reset-demo');
+          const db = await Q.open();
+          if (db) { await Q.tx('readwrite', (st) => st.clear()); } else Q.mem = [];
+          toast('Demonstração reiniciada. Entre novamente.');
+          setTimeout(logout, 1200);
+        } catch (err) { toast(err.message, true); }
+      };
+    };
     $('#uf').onsubmit = async (e) => {
       e.preventDefault();
       try { await api('POST', '/api/admin/users', { nome: $('#uf-n').value, email: $('#uf-e').value, senha: $('#uf-s').value, role: $('#uf-r').value, orgId: $('#uf-o').value, placa: $('#uf-p').value }); toast('Usuário criado.'); refresh(); }

@@ -114,9 +114,21 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   }
 
   // Apura automaticamente operações encerradas que ainda não têm apuração (ex.: dados semeados).
-  for (const id of store.opIds()) {
-    const st = stateOf(id);
-    if (st && st.encerrada && !st.apuracoes.length) recordApuracao(st);
+  function apurarPendentes() {
+    for (const id of store.opIds()) {
+      const st = stateOf(id);
+      if (st && st.encerrada && !st.apuracoes.length) recordApuracao(st);
+    }
+  }
+  apurarPendentes();
+
+  // Reinício da demonstração: apaga tudo e recria os dados iniciais.
+  const demoResetEnabled = process.env.ESTADIA_DEMO_RESET !== '0';
+  function resetDemo() {
+    store.reset();
+    dir.reset();
+    seed(dir, store, { quiet: true });
+    apurarPendentes();
   }
 
   // ---------- SSE ----------
@@ -126,6 +138,10 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     for (const s of streams) {
       if ((st && canSee(s.user, st)) || (!st && s.user.role === 'admin')) s.res.write(`data: ${JSON.stringify({ opId: ev.opId, type: ev.type })}\n\n`);
     }
+  });
+  store.on('reset', () => {
+    for (const s of streams) { s.res.write(`data: ${JSON.stringify({ reset: true })}\n\n`); s.res.end(); }
+    streams.clear();
   });
   const ping = setInterval(() => { for (const s of streams) s.res.write(': ping\n\n'); }, 25000);
   ping.unref();
@@ -319,6 +335,13 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       const owner = doc && store.events.find((e) => e.type === 'DOSSIE_GERADO' && e.payload.hash === m[1]);
       if (!owner || !canSee(user, stateOf(owner.opId))) return fail(res, 404, 'NAO_ENCONTRADO', 'Dossiê não encontrado.');
       return send(res, 200, doc);
+    }
+
+    if (p === '/api/admin/reset-demo' && req.method === 'POST') {
+      if (user.role !== 'admin') return fail(res, 403, 'SEM_PERMISSAO', 'Somente administradores.');
+      if (!demoResetEnabled) return fail(res, 403, 'DESATIVADO', 'O reinício da demonstração está desativado neste ambiente.');
+      resetDemo();
+      return send(res, 200, { ok: true, mensagem: 'Demonstração reiniciada.' });
     }
 
     if (p === '/api/admin/integrity') {

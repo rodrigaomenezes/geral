@@ -29,6 +29,11 @@ class Directory {
     this.data = fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8')) : { orgs: [], users: [] };
   }
 
+  reset() {
+    this.data = { orgs: [], users: [] };
+    this.save();
+  }
+
   get empty() {
     return this.data.users.length === 0;
   }

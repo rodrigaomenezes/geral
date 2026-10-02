@@ -164,3 +164,23 @@ test('cadeia de hash detecta adulteração do log', async () => {
     await t.close();
   }
 });
+
+test('administrador reinicia a demonstração e a operação volta a ficar livre', async () => {
+  const t = await boot();
+  try {
+    let joao = await t.login('joao@tac.demo');
+    assert.equal((await t.call('POST', '/api/operations/identify', { codigo: 'OP-2026-0001', placa: 'RTB4F27' }, joao)).status, 200);
+    const marina = await t.login('portaria@serraazul.demo');
+    assert.equal((await t.call('POST', '/api/admin/reset-demo', {}, marina)).status, 403);
+    const admin = await t.login('admin@brobot.demo');
+    assert.equal((await t.call('POST', '/api/admin/reset-demo', {}, admin)).status, 200);
+    assert.equal((await t.call('GET', '/api/operations', null, joao)).status, 401, 'sessões antigas expiram');
+    joao = await t.login('joao@tac.demo');
+    assert.deepEqual((await t.call('GET', '/api/operations', null, joao)).body, []);
+    const again = await t.call('POST', '/api/operations/identify', { codigo: 'OP-2026-0001', placa: 'RTB4F27' }, joao);
+    assert.equal(again.status, 200);
+    assert.equal(t.app.store.verify().ok, true);
+  } finally {
+    await t.close();
+  }
+});
