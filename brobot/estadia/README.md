@@ -5,6 +5,8 @@ Cliente: **Brobot Tecnologia** · Requisitos: **Menezes Gestão** · Versão **0
 
 Cada marco da operação (chegada, início, término, liberação, saída) é registrado com autor, horário, local e evidência. Depois a outra parte confirma ou contesta o registro, e tudo vira um dossiê digital rastreável.
 
+**Demonstração no ar:** https://estadia-production-1784.up.railway.app (Railway)
+
 ## Como rodar
 
 Requer apenas **Node.js 20 ou superior**. Não há dependências para instalar.
