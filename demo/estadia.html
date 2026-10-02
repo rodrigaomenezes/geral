@@ -1,0 +1,702 @@
+<title>Projeto Estadia</title>
+<meta name="description" content="Demonstração conceitual da plataforma Estadia: marcos logísticos, confirmações, apuração e dossiê digital.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: control strip over a three-pane "stage" (TAC phone · destination desk · timeline), then apuração + dossiê below. */
+:root{
+  --bg:#E9EDF1; --surface:#FFFFFF; --surface-2:#F4F6F8; --ink:#15212C; --muted:#5A6774; --line:#D3DAE1;
+  --accent:#F2A900; --accent-ink:#1A1405; --accent-soft:#FDF1D2;
+  --ok:#1C7F55; --ok-soft:#DDF1E7; --warn:#B86B00; --warn-soft:#FBEBD3; --crit:#B83A28; --crit-soft:#F8E0DB;
+  --sys:#2B62C9; --sys-soft:#DFE8FA; --bezel:#11181F; --screen:#F7F8FA;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E151C; --surface:#16202A; --surface-2:#1C2833; --ink:#E5EBF0; --muted:#93A1AE; --line:#283643;
+  --accent:#F5B829; --accent-ink:#1A1405; --accent-soft:#3A2E0F;
+  --ok:#4CC28C; --ok-soft:#14352A; --warn:#E8A33A; --warn-soft:#3A2A12; --crit:#EE7B66; --crit-soft:#3D1D18;
+  --sys:#7FA6F0; --sys-soft:#1A2A47; --bezel:#05080B; --screen:#121A22; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E151C; --surface:#16202A; --surface-2:#1C2833; --ink:#E5EBF0; --muted:#93A1AE; --line:#283643;
+  --accent:#F5B829; --accent-ink:#1A1405; --accent-soft:#3A2E0F;
+  --ok:#4CC28C; --ok-soft:#14352A; --warn:#E8A33A; --warn-soft:#3A2A12; --crit:#EE7B66; --crit-soft:#3D1D18;
+  --sys:#7FA6F0; --sys-soft:#1A2A47; --bezel:#05080B; --screen:#121A22; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;margin:0}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:20px;padding-block:22px 48px;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3,h4{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance;line-height:1.1}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.label{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,label:focus-within{outline:2px solid var(--sys);outline-offset:2px}
+
+/* Header */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.brand{display:flex;align-items:center;gap:14px}
+.mark{width:44px;height:44px;border-radius:8px;background:repeating-linear-gradient(135deg,var(--accent) 0 8px,var(--ink) 8px 16px);flex:none}
+.brand h1{font-size:36px;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.brand p{margin:0;color:var(--muted);max-width:60ch}
+.tag{font-family:var(--f-mono);font-size:11px;padding:3px 8px;border:1px dashed var(--muted);border-radius:4px;color:var(--muted);white-space:nowrap}
+
+/* Rail of milestones */
+.rail{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;overflow-x:auto}
+.rail ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(12,minmax(74px,1fr));gap:0;min-width:900px}
+.rail li{position:relative;padding-top:20px;font-size:11.5px;line-height:1.25;color:var(--muted);padding-right:6px}
+.rail li::before{content:"";position:absolute;top:5px;left:0;right:0;height:3px;background:var(--line)}
+.rail li::after{content:"";position:absolute;top:0;left:0;width:13px;height:13px;border-radius:50%;background:var(--surface);border:2px solid var(--line)}
+.rail li.done{color:var(--ink)}
+.rail li.done::before{background:var(--ink)}
+.rail li.done::after{background:var(--ink);border-color:var(--ink)}
+.rail li.div::after{background:var(--crit);border-color:var(--crit)}
+.rail li.now{color:var(--ink);font-weight:600}
+.rail li.now::after{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.rail .who{display:block;font-family:var(--f-mono);font-size:10px;color:var(--muted);font-weight:400;margin-top:2px}
+
+/* Controls */
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;border-radius:8px;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--crit);border-color:var(--crit)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.switch{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;user-select:none}
+.switch input{accent-color:var(--accent);width:16px;height:16px}
+.spacer{flex:1}
+.hint{color:var(--muted);font-size:13px}
+
+/* Stage */
+.stage{display:grid;grid-template-columns:340px minmax(0,1fr) minmax(0,1.15fr);gap:18px;align-items:start}
+.pane{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0;display:flex;flex-direction:column}
+.pane-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.pane-h h2{font-size:20px}
+.pane-b{padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+
+/* Phone */
+.phone-col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.phone-col .label{align-self:flex-start}
+.phone{width:100%;max-width:340px;background:var(--bezel);border-radius:38px;padding:12px;box-shadow:0 18px 40px -20px rgba(0,0,0,.45)}
+.screen{background:var(--screen);border-radius:28px;height:640px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.screen-in{flex:1;min-height:0;display:flex;flex-direction:column}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:10px 20px 6px;font-family:var(--f-mono);font-size:11px;color:var(--ink)}
+.sbar .net{display:inline-flex;gap:5px;align-items:center}
+.bars{display:inline-flex;gap:2px;align-items:flex-end;height:10px}
+.bars i{display:block;width:3px;background:var(--ink);border-radius:1px}
+.bars.off i{background:var(--line)}
+.app-h{padding:6px 18px 12px;display:flex;justify-content:space-between;align-items:center}
+.app-h strong{font-family:var(--f-display);font-size:22px;text-transform:uppercase;letter-spacing:.03em}
+.app-b{flex:1;overflow-y:auto;padding:0 14px 16px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.opcard .row{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}
+.opcard .row span:first-child{color:var(--muted)}
+.opcard h3{font-size:19px;margin-bottom:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pill.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.pill.sys{background:var(--sys-soft);color:var(--sys);border-color:transparent}
+.pill.acc{background:var(--accent-soft);color:var(--ink);border-color:transparent}
+.bigbtn{width:100%;border:0;border-radius:14px;padding:16px;background:var(--accent);color:var(--accent-ink);font-family:var(--f-display);font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;display:flex;flex-direction:column;align-items:center;gap:2px}
+.bigbtn small{font-family:var(--f-body);font-size:11.5px;font-weight:500;text-transform:none;letter-spacing:0;opacity:.8}
+.bigbtn[disabled]{background:var(--surface-2);color:var(--muted);cursor:default}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input{font-family:var(--f-mono);font-size:15px;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.capture{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:11px;text-align:center;color:var(--muted)}
+.capture div{border:1px dashed var(--line);border-radius:8px;padding:7px 4px}
+.capture b{display:block;color:var(--ink);font-family:var(--f-mono);font-weight:500;font-size:11.5px}
+.notif{background:var(--ink);color:var(--surface);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.notif p{margin:0;font-size:13px}
+.notif .btn{align-self:flex-start;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600;padding:7px 12px}
+.offline-banner{background:var(--warn-soft);color:var(--warn);font-size:12px;font-weight:600;padding:8px 12px;border-radius:10px}
+.mini{display:flex;flex-direction:column;gap:6px}
+.mini-i{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+.mini-i:last-child{border-bottom:0}
+.mini-i .t{font-family:var(--f-mono);color:var(--muted);font-size:11.5px}
+.syncdot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;flex:none}
+.syncdot.p{background:var(--warn);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.toast{position:absolute;left:14px;right:14px;bottom:14px;background:var(--ink);color:var(--surface);padding:10px 12px;border-radius:12px;font-size:12.5px;transform:translateY(130%);transition:transform .25s ease}
+.toast.show{transform:none}
+
+/* Destination desk */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{background:var(--surface-2);border-radius:8px;padding:10px 12px}
+.kpi b{display:block;font-family:var(--f-display);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.meter{position:relative;height:12px;border-radius:6px;background:var(--surface-2);overflow:visible;margin-top:22px}
+.meter .fill{position:absolute;inset:0 auto 0 0;border-radius:6px;background:var(--ok);transition:width .5s ease,background .3s}
+.meter .fill.over{background:linear-gradient(90deg,var(--ok) 0,var(--ok) var(--fr),var(--crit) var(--fr))}
+.meter .tick{position:absolute;top:-20px;bottom:-4px;width:0;border-left:2px dashed var(--ink)}
+.meter .tick span{position:absolute;top:-2px;left:5px;font-size:10.5px;font-family:var(--f-mono);white-space:nowrap;color:var(--muted)}
+.meter-scale{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);margin-top:4px}
+.pending{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pending.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.pending-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-2)}
+.pending-b{padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.evid{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:start}
+.evid img{width:100%;border-radius:6px;display:block;aspect-ratio:16/10;object-fit:cover}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;font-size:12.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--f-mono);font-size:12px;overflow-wrap:anywhere}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.divform{display:flex;flex-direction:column;gap:8px;background:var(--crit-soft);border-radius:8px;padding:10px 12px}
+.divform textarea{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--surface);color:var(--ink);resize:vertical;min-height:58px}
+.yard{width:100%;border-collapse:collapse;font-size:12.5px}
+.yard th{text-align:left;font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:6px 8px;border-bottom:1px solid var(--line)}
+.yard td{padding:8px;border-bottom:1px solid var(--line)}
+.yard tr.me td{background:var(--accent-soft)}
+.tablewrap{overflow-x:auto}
+
+/* Timeline */
+.tl{display:flex;flex-direction:column;gap:0;max-height:820px;overflow-y:auto;padding:16px}
+.tl-empty{color:var(--muted);padding:30px 6px;text-align:center}
+.ev{position:relative;padding:0 0 16px 26px}
+.ev::before{content:"";position:absolute;left:7px;top:6px;bottom:0;width:2px;background:var(--line)}
+.ev:last-child::before{display:none}
+.ev .dot{position:absolute;left:0;top:3px;width:16px;height:16px;border-radius:50%;border:3px solid var(--surface);background:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.ev.k-sistema .dot{background:var(--sys)}
+.ev.k-apuracao .dot{background:var(--accent)}
+.ev-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);display:flex;flex-direction:column;gap:6px}
+.ev.fresh .ev-card{animation:flash 1.4s ease}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.ev-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ev h4{font-size:17px}
+.ev .who{font-size:12.5px;color:var(--muted)}
+.ev .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+.ev .status{font-size:11.5px;color:var(--muted)}
+.ev .status b{color:var(--ink);font-weight:500}
+.ev .thumb{width:132px;border-radius:6px;display:block}
+.sub{margin-top:4px;border-left:3px solid var(--ok);background:var(--ok-soft);border-radius:0 8px 8px 0;padding:8px 10px;display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+.sub.div{border-left-color:var(--crit);background:var(--crit-soft)}
+.sub .ev-top{font-size:12px}
+.sub p{margin:0}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* Lower section */
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}
+.rule{border:1px dashed var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;display:flex;flex-direction:column;gap:4px}
+.big{font-family:var(--f-display);font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.calc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;font-size:13px}
+.calc .v{font-family:var(--f-mono);text-align:right}
+.calc .sep{grid-column:1/-1;border-top:1px solid var(--line);margin:4px 0}
+.note{font-size:12px;color:var(--muted);margin:0}
+.alt{display:flex;flex-direction:column;gap:6px}
+.alt-i{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:7px 10px;border-radius:6px;background:var(--surface-2)}
+.alt-i.sel{background:var(--accent-soft);font-weight:600}
+
+/* Dossiê */
+.doss-empty{color:var(--muted);text-align:center;padding:26px 10px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.doc{display:flex;flex-direction:column;gap:16px}
+.doc-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:10px}
+.doc-h h3{font-size:26px;text-transform:uppercase}
+.doc table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px}
+.doc th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);font-weight:600}
+.doc td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.doc td.mono{font-size:12px}
+.photos{display:flex;gap:10px;flex-wrap:wrap}
+.photos figure{margin:0;width:170px;font-size:11.5px;color:var(--muted)}
+.photos img{width:100%;border-radius:6px;display:block;margin-bottom:4px}
+.hash{font-family:var(--f-mono);font-size:11.5px;background:var(--surface-2);padding:8px 10px;border-radius:6px;overflow-wrap:anywhere}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.steps div{border-top:4px solid var(--line);padding-top:6px;font-size:12px;color:var(--muted)}
+.steps div.on{border-color:var(--ok);color:var(--ink);font-weight:600}
+.steps div b{display:block;font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted)}
+.disclaimer{font-size:12px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px;margin:0}
+
+.foot{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.foot .card h3{font-size:18px;margin-bottom:6px}
+.foot .card p{margin:0;font-size:13px;color:var(--muted)}
+
+@media (max-width:1180px){
+  .stage{grid-template-columns:340px minmax(0,1fr)}
+  .stage .tlpane{grid-column:1/-1}
+  .tl{max-height:none}
+}
+@media (max-width:820px){
+  .stage,.lower{grid-template-columns:minmax(0,1fr)}
+  .phone{max-width:360px}
+  .evid{grid-template-columns:minmax(0,1fr)}
+  .evid img{max-width:260px}
+  .brand h1{font-size:30px}
+  .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Estadia</h1>
+        <p>Plataforma de gestão e comprovação de eventos logísticos. Cada marco da carga e descarga é registrado, confirmado pela outra parte e vira evidência.</p>
+      </div>
+    </div>
+    <span class="tag">Demonstração conceitual · dados fictícios</span>
+  </header>
+
+  <nav class="rail" aria-label="Marcos operacionais"><ol id="rail"></ol></nav>
+
+  <div class="controls">
+    <button class="btn primary" id="next">Avançar próximo marco ▸</button>
+    <button class="btn" id="auto">▶ Reproduzir automaticamente</button>
+    <button class="btn ghost" id="reset">Reiniciar</button>
+    <label class="switch"><input type="checkbox" id="offline"> Celular sem sinal no pátio</label>
+    <label class="switch"><input type="checkbox" id="withDiv"> Destino contesta a chegada</label>
+    <span class="spacer"></span>
+    <span class="hint" id="hint"></span>
+  </div>
+
+  <section class="stage">
+    <div class="phone-col">
+      <span class="label">App do TAC · caminhoneiro</span>
+      <div class="phone"><div class="screen"><div class="screen-in" id="phone"></div><div class="toast" id="toast" role="status"></div></div></div>
+    </div>
+
+    <div class="pane">
+      <div class="pane-h"><h2>Painel do Destino</h2><span class="pill">CD Jundiaí · Atacadista Serra Azul</span></div>
+      <div class="pane-b" id="desk"></div>
+    </div>
+
+    <div class="pane tlpane">
+      <div class="pane-h"><h2>Linha do tempo da operação</h2><span class="pill" id="tlcount">0 eventos</span></div>
+      <div class="tl" id="tl"></div>
+    </div>
+  </section>
+
+  <section class="lower">
+    <div class="pane">
+      <div class="pane-h"><h2>Motor de apuração</h2><span class="pill" id="apstate">Aguardando chegada</span></div>
+      <div class="pane-b" id="apur"></div>
+    </div>
+    <div class="pane">
+      <div class="pane-h"><h2>Dossiê digital</h2><span class="pill" id="dostate">Não gerado</span></div>
+      <div class="pane-b" id="doss"></div>
+    </div>
+  </section>
+
+  <section class="foot" aria-label="Princípios do produto">
+    <div class="card"><h3>Evento, não status</h3><p>Cada marco tem registro próprio, autor, horário, local e evidência. Nada é sobrescrito.</p></div>
+    <div class="card"><h3>Registro ≠ confirmação</h3><p>Quem registra e quem confirma ficam separados. Uma confirmação nunca altera o horário original.</p></div>
+    <div class="card"><h3>Divergência ≠ fraude</h3><p>Contestações viram ocorrências para análise humana, preservando os dois lados.</p></div>
+    <div class="card"><h3>Fato ≠ interpretação</h3><p>A apuração mostra a regra e a versão usadas. A conclusão jurídica fica com a advocacia.</p></div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+const OP = {code:"OP-2026-004817", placa:"RTB-4F27", carga:28, origem:"Ribeirão Preto/SP", destino:"CD Jundiaí · Doca 7", embarcador:"Atacadista Serra Azul", nf:"NF-e 35261 000.184.552"};
+const TAC = {name:"João Batista Ferreira", role:"TAC · "+OP.placa};
+const PORT = {name:"Marina Coelho", role:"Portaria · CD Jundiaí"};
+const DOCA = {name:"Rafael Toledo", role:"Doca 7 · CD Jundiaí"};
+const RULE = {id:"ESTADIA-REF", ver:"v0.1-demo", franquia:5, valor:1.38};
+const GPS = {lat:-23.18571, lng:-46.89784};
+const m = (h,mm)=>h*60+mm;
+
+const STEPS = [
+  {id:"ident", actor:"tac", kind:"registro", short:"Operação identificada", title:"Operação identificada", t:m(6,4), who:TAC, after:"Identificada · em trânsito"},
+  {id:"chegada", actor:"tac", kind:"registro", short:"Chegada", title:"Chegada no destino", t:m(6,12), who:TAC, gps:true, photo:true, after:"Chegou · aguardando confirmação"},
+  {id:"chegada_c", actor:"dest", kind:"confirmacao", of:"chegada", short:"Chegada confirmada", title:"Chegada confirmada", t:m(6,20), who:PORT, after:"No pátio · aguardando doca"},
+  {id:"inicio", actor:"tac", kind:"registro", short:"Início descarga", title:"Início da descarga", t:m(10,48), who:TAC, gps:true, after:"Em descarga · aguardando confirmação"},
+  {id:"inicio_c", actor:"dest", kind:"confirmacao", of:"inicio", short:"Início confirmado", title:"Início confirmado", t:m(10,52), who:DOCA, after:"Em descarga"},
+  {id:"termino", actor:"tac", kind:"registro", short:"Término descarga", title:"Término da descarga", t:m(15,5), who:TAC, photo:true, after:"Descarga concluída · aguardando confirmação"},
+  {id:"termino_c", actor:"dest", kind:"confirmacao", of:"termino", short:"Término confirmado", title:"Término confirmado", t:m(15,10), who:DOCA, after:"Aguardando liberação"},
+  {id:"liberacao", actor:"dest", kind:"registro", short:"Liberação p/ viagem", title:"Liberação para viagem", t:m(17,32), who:PORT, after:"Liberado · aguardando ciência do TAC"},
+  {id:"liberacao_c", actor:"tac", kind:"confirmacao", of:"liberacao", short:"Ciência do TAC", title:"Ciência da liberação pelo TAC", t:m(17,35), who:TAC, after:"Liberado"},
+  {id:"saida", actor:"tac", kind:"registro", short:"Saída", title:"Saída do local", t:m(17,41), who:TAC, gps:true, after:"Encerrada no destino"},
+];
+const EXTRA = [{short:"Apuração", who:"Plataforma"},{short:"Dossiê digital", who:"Plataforma"}];
+
+const DESK_COPY = {
+  chegada_c:{h:"Confirmar chegada do veículo", ok:"Confirmar chegada", divText:"Veículo não localizado na portaria às 06:12. Entrada registrada na cancela às 06:31."},
+  inicio_c:{h:"Confirmar início da descarga", ok:"Confirmar início", divText:"Início efetivo na doca às 10:55, conforme apontamento da equipe."},
+  termino_c:{h:"Confirmar término da descarga", ok:"Confirmar término", divText:"Conferência de avarias concluída às 15:20."},
+  liberacao:{h:"Registrar liberação para viagem", ok:"Liberar veículo"},
+};
+const TAC_COPY = {
+  ident:{b:"Identificar operação", s:"Vincula você e o veículo à operação"},
+  chegada:{b:"Registrar chegada", s:"Captura data/hora, GPS e foto"},
+  inicio:{b:"Início da descarga", s:"Registrar o começo da operação"},
+  termino:{b:"Término da descarga", s:"Registrar fim + foto do baú"},
+  saida:{b:"Registrar saída", s:"Captura data/hora e GPS"},
+};
+
+let S;
+function fresh(){
+  return {i:0, events:[], offline:false, auto:null, dossie:null, fwd:0, divOpen:false, seq:0, lastFresh:null, hash:""};
+}
+const $ = s=>document.querySelector(s);
+const fmt = t=>{t=Math.round(t);return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0")};
+const dur = mins=>{mins=Math.max(0,Math.round(mins));return Math.floor(mins/60)+"h"+String(mins%60).padStart(2,"0")};
+const brl = v=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ev = id=>S.events.find(e=>e.stepId===id && e.kind!=="divergencia");
+const lastTime = ()=>S.events.reduce((a,e)=>Math.max(a,e.t,e.syncedAt||0),m(6,0));
+
+function photo(kind,t){
+  const sky = kind==="termino" ? "#9fb3c4" : "#c9d8e6";
+  const body = kind==="termino"
+    ? `<rect x="70" y="40" width="190" height="120" fill="#3b4652"/><rect x="80" y="50" width="170" height="100" fill="#20262d"/><rect x="85" y="130" width="160" height="18" fill="#2c343c"/><line x1="165" y1="50" x2="165" y2="150" stroke="#55606b" stroke-width="3"/>`
+    : `<rect x="0" y="150" width="320" height="50" fill="#5d6670"/><rect x="0" y="168" width="320" height="4" fill="#e8e1c8" stroke-dasharray="20 14"/>
+       <rect x="18" y="60" width="10" height="92" fill="#2a2f35"/><rect x="28" y="72" width="120" height="8" fill="#f2a900"/><rect x="40" y="72" width="12" height="8" fill="#1a1a1a"/><rect x="64" y="72" width="12" height="8" fill="#1a1a1a"/><rect x="88" y="72" width="12" height="8" fill="#1a1a1a"/><rect x="112" y="72" width="12" height="8" fill="#1a1a1a"/>
+       <rect x="150" y="70" width="128" height="72" rx="3" fill="#e6e9ec"/><rect x="150" y="70" width="128" height="10" fill="#cfd5db"/>
+       <rect x="278" y="92" width="34" height="50" rx="5" fill="#2f6db3"/><rect x="286" y="98" width="20" height="16" rx="2" fill="#bcd3ea"/>
+       <circle cx="176" cy="148" r="10" fill="#1d2126"/><circle cx="200" cy="148" r="10" fill="#1d2126"/><circle cx="296" cy="148" r="10" fill="#1d2126"/>
+       <rect x="226" y="120" width="44" height="12" fill="#f4f4f4" stroke="#1d2126"/><text x="248" y="129.5" font-size="8" text-anchor="middle" font-family="monospace" fill="#111">${OP.placa}</text>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200"><rect width="320" height="200" fill="${sky}"/>${body}
+    <rect x="0" y="178" width="320" height="22" fill="rgba(0,0,0,.62)"/><text x="8" y="193" font-size="10" font-family="monospace" fill="#fff">02/10/2026 ${fmt(t)}  ${GPS.lat.toFixed(5)}, ${GPS.lng.toFixed(5)}</text>
+    <circle cx="306" cy="12" r="5" fill="#e53935"/></svg>`;
+  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+}
+
+/* --- actions --- */
+function add(e){
+  e.uid = ++S.seq; S.events.push(e); S.lastFresh = e.uid; return e;
+}
+function statusNow(){
+  return S.i>0 ? STEPS[Math.min(S.i,STEPS.length)-1].after : "Em trânsito";
+}
+function perform(step, opts={}){
+  const before = statusNow();
+  let t = step.t;
+  if(step.of){ const o = ev(step.of); if(o && o.syncedAt) t = Math.max(t, o.syncedAt+2); }
+  t = Math.max(t, lastTime()+ (step.kind==="confirmacao"?1:0));
+  const offlineNow = step.actor==="tac" && S.offline;
+  const e = add({stepId:step.id, kind:step.kind, title:step.title, actor:step.actor, who:step.who, t, of:step.of||null,
+    gps:step.gps?{...GPS, acc: step.id==="saida"?12:8}:null, photo:step.photo?photo(step.id,t):null,
+    sync: offlineNow?"pendente":"ok", syncedAt:null, before, after:step.after});
+  if(opts.div){
+    const s = DESK_COPY[step.id];
+    add({stepId:step.id, kind:"divergencia", title:"Divergência registrada", actor:"dest", who:step.who, t:t, of:step.of,
+      note: opts.note || s.divText, sync:"ok", open:true});
+  }
+  S.i++;
+  if(step.id==="saida") analyse();
+  S.divOpen=false;
+  toast(offlineNow ? "Salvo no aparelho · será enviado quando houver sinal" : (step.actor==="tac" ? "Registro enviado · "+fmt(t) : null));
+  render();
+}
+function analyse(){
+  const lib = ev("liberacao"), sai = ev("saida"), che = ev("chegada"), ini = ev("inicio");
+  const t = lastTime()+1;
+  add({stepId:"auto", kind:"sistema", title:"Análise automática dos marcos", actor:"sys", who:{name:"Plataforma Estadia",role:"Motor de regras"}, t,
+    lines:[
+      "Sequência completa: 10 de 10 marcos registrados.",
+      "Espera até o início da descarga: "+dur(ini.t-che.t)+".",
+      "Liberação → saída: "+dur(sai.t-lib.t)+" (informativo, dentro do esperado).",
+      ...(S.events.some(e=>e.kind==="divergencia")?["1 ocorrência aberta para análise humana. Eventos originais preservados."]:[])
+    ]});
+  add({stepId:"apur", kind:"apuracao", title:"Apuração realizada", actor:"sys", who:{name:"Plataforma Estadia",role:"Regra "+RULE.id+" "+RULE.ver}, t:t, lines:[]});
+}
+function syncNow(){
+  const base = lastTime();
+  let k=0;
+  S.events.forEach(e=>{ if(e.sync==="pendente"){ e.sync="ok"; e.syncedAt = base + 4 + (k++); }});
+  S.offline=false; $("#offline").checked=false;
+  if(k) toast(k+" registro(s) sincronizado(s). Horário original preservado.");
+  render();
+}
+
+function blocked(){
+  const st = STEPS[S.i]; if(!st) return null;
+  if(st.actor==="dest"){
+    const pend = S.events.find(e=>e.sync==="pendente");
+    if(pend) return "Aguardando sincronização do celular do TAC";
+  }
+  if(st.actor==="tac" && st.of){
+    const o = ev(st.of); if(o && S.offline) return "TAC sem sinal: a liberação chega quando a conexão voltar";
+  }
+  return null;
+}
+async function next(){
+  const st = STEPS[S.i];
+  if(st){
+    if(blocked()){ syncNow(); return; }
+    const div = st.id==="chegada_c" && $("#withDiv").checked;
+    perform(st,{div});
+    return;
+  }
+  if(!S.dossie){ await genDossie(); return; }
+  if(S.fwd<4){ forward(); return; }
+  stopAuto();
+}
+async function genDossie(){
+  if(S.events.some(e=>e.sync==="pendente")) syncNow();
+  const payload = JSON.stringify(S.events.map(e=>({k:e.kind,s:e.stepId,t:e.t,w:e.who.name,sy:e.syncedAt||null})));
+  let hex="";
+  try{
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+    hex = [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+  }catch(_){ let h=0; for(const c of payload){h=(h*31+c.charCodeAt(0))>>>0;} hex=h.toString(16).padStart(8,"0").repeat(8); }
+  S.dossie = {at:lastTime()+2, hash:hex};
+  render();
+  document.getElementById("doss").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth", block:"nearest"});
+}
+function forward(){
+  S.fwd++;
+  if(S.fwd===1){ add({stepId:"fwd", kind:"sistema", title:"Dossiê encaminhado à advocacia", actor:"sys", who:{name:"Marina Coelho",role:"Responsável pela operação"}, t:S.dossie.at+3, lines:["Conteúdo congelado no momento do envio (hash registrado)."]}); }
+  render();
+}
+
+/* --- timers --- */
+let tId=null;
+function toast(msg){
+  const el = $("#toast"); if(!el || !msg) return;
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(tId); tId=setTimeout(()=>el.classList.remove("show"),2600);
+}
+function startAuto(){
+  if(S.auto) return stopAuto();
+  S.auto = setInterval(()=>{ if(S.fwd>=4) return stopAuto(); next(); }, 1500);
+  $("#auto").textContent="❚❚ Pausar";
+  next();
+}
+function stopAuto(){ clearInterval(S.auto); S.auto=null; $("#auto").textContent="▶ Reproduzir automaticamente"; }
+
+/* --- render --- */
+function render(){
+  renderRail(); renderPhone(); renderDesk(); renderTL(); renderApur(); renderDoss(); renderHint();
+}
+function renderRail(){
+  const all = STEPS.map(s=>({short:s.short, who: s.actor==="tac"?"TAC":"Destino", id:s.id})).concat(EXTRA);
+  const doneCount = S.i + (S.events.some(e=>e.kind==="apuracao")?1:0) + (S.dossie?1:0);
+  const hasDiv = id=>S.events.some(e=>e.kind==="divergencia" && e.stepId===id);
+  $("#rail").innerHTML = all.map((s,k)=>{
+    const cls = k<doneCount ? "done"+(hasDiv(s.id)?" div":"") : (k===doneCount?"now":"");
+    return `<li class="${cls}">${esc(s.short)}<span class="who">${esc(s.who)}</span></li>`;
+  }).join("");
+}
+function sbar(){
+  return `<div class="sbar"><span>${fmt(lastTime())}</span><span class="net">${S.offline?"sem sinal":"4G"} <span class="bars ${S.offline?"off":""}"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:10px"></i></span></span></div>`;
+}
+function renderPhone(){
+  const st = STEPS[S.i];
+  const pend = S.events.filter(e=>e.sync==="pendente").length;
+  let h = sbar() + `<div class="app-h"><strong>Estadia</strong><span class="pill ${pend?"warn":"ok"}">${pend?pend+" a enviar":"Sincronizado"}</span></div><div class="app-b">`;
+  if(S.offline) h += `<div class="offline-banner">Sem sinal. Seus registros ficam salvos no aparelho com o horário real do acontecimento.</div>`;
+  if(S.i===0){
+    h += `<div class="card"><h3 style="font-size:20px;margin-bottom:4px">Olá, João</h3><p style="margin:0;font-size:13px;color:var(--muted)">Identifique a operação pelo código da ordem de carga ou leia o QR do documento.</p></div>
+      <div class="field"><label class="label" for="opcode">Código da operação</label><input id="opcode" value="${OP.code}" readonly></div>
+      <button class="bigbtn" data-act="tac">${TAC_COPY.ident.b}<small>${TAC_COPY.ident.s}</small></button>`;
+  } else {
+    h += `<div class="card opcard"><div class="ev-top"><span class="label">${OP.code}</span><span class="pill acc">${esc(statusNow())}</span></div>
+      <h3>${esc(OP.destino)}</h3>
+      <div class="row"><span>Embarcador</span><span>${OP.embarcador}</span></div>
+      <div class="row"><span>Veículo</span><span class="mono">${OP.placa}</span></div>
+      <div class="row"><span>Carga</span><span class="mono">${OP.carga} t</span></div></div>`;
+    if(st && st.id==="liberacao_c" && !S.offline){
+      const lib = ev("liberacao");
+      h += `<div class="notif"><span class="label" style="color:var(--accent)">Liberação recebida</span><p>Você foi liberado para viagem às <b class="mono">${fmt(lib.t)}</b> por ${esc(lib.who.name)}.</p><button class="btn" data-act="tac">Confirmar ciência</button></div>`;
+    } else if(st && st.actor==="tac" && TAC_COPY[st.id]){
+      const c = TAC_COPY[st.id];
+      h += `<button class="bigbtn" data-act="tac">${c.b}<small>${c.s}</small></button>`;
+      if(st.id==="chegada"||st.id==="saida") h += `<div class="capture"><div>Data/hora<b>${fmt(Math.max(st.t,lastTime()))}</b></div><div>GPS<b>±8 m</b></div><div>${st.photo?"Câmera":"Foto"}<b>${st.photo?"obrigatória":"opcional"}</b></div></div>`;
+    } else if(st){
+      const msg = st.id==="liberacao_c" ? "Sem sinal: a liberação aparece quando a conexão voltar." : "Aguardando o destino: "+st.title.toLowerCase()+".";
+      h += `<button class="bigbtn" disabled>Aguardando<small>${esc(msg)}</small></button>`;
+    } else {
+      h += `<button class="bigbtn" disabled>Operação encerrada<small>Saída registrada. Boa viagem.</small></button>`;
+    }
+    const mine = S.events.filter(e=>e.actor==="tac");
+    h += `<div class="card"><span class="label">Meus registros</span><div class="mini">` + mine.slice().reverse().map(e=>
+      `<div class="mini-i"><span><span class="syncdot ${e.sync==="pendente"?"p":""}"></span> ${esc(e.title)}</span><span class="t">${fmt(e.t)}</span></div>`).join("") + `</div></div>`;
+  }
+  h += `</div>`;
+  $("#phone").innerHTML = h;
+}
+function permanence(){
+  const che = ev("chegada"); if(!che) return null;
+  const lib = ev("liberacao");
+  const end = lib ? lib.t : lastTime();
+  return {start:che.t, end, mins:end-che.t, closed:!!lib};
+}
+function renderDesk(){
+  const st = STEPS[S.i]; const p = permanence();
+  const fr = RULE.franquia*60, scale = 12*60;
+  let h = `<div class="kpis">
+    <div class="kpi"><span class="label">Veículo</span><b class="mono" style="font-family:var(--f-mono);font-size:20px">${OP.placa}</b><span class="hint">${S.i?esc(TAC.name):"não identificado"}</span></div>
+    <div class="kpi"><span class="label">Permanência</span><b>${p?dur(p.mins):"—"}</b><span class="hint">${p?(p.closed?"encerrada na liberação":"contando desde "+fmt(p.start)):"desde a chegada"}</span></div>
+    <div class="kpi"><span class="label">Franquia</span><b>${RULE.franquia}h00</b><span class="hint">${p&&p.mins>fr?`<span style="color:var(--crit);font-weight:600">excedida em ${dur(p.mins-fr)}</span>`:"parâmetro da regra"}</span></div>
+  </div>`;
+  const w = p?Math.min(100,p.mins/scale*100):0, frp = fr/scale*100;
+  h += `<div><div class="meter"><div class="fill ${p&&p.mins>fr?"over":""}" style="width:${w}%;--fr:${p?Math.min(100,fr/p.mins*100):100}%"></div><div class="tick" style="left:${frp}%"><span>franquia 5h</span></div></div>
+    <div class="meter-scale"><span>0h</span><span>3h</span><span>6h</span><span>9h</span><span>12h</span></div></div>`;
+
+  // pending action
+  if(st && st.actor==="dest"){
+    const c = DESK_COPY[st.id]; const b = blocked();
+    const src = st.of ? ev(st.of) : null;
+    h += `<div class="pending ${b?"":"active"}"><div class="pending-h"><strong>${esc(c.h)}</strong><span class="pill ${b?"warn":"acc"}">${b?"aguardando":"pendente"}</span></div><div class="pending-b">`;
+    if(b){
+      h += `<p class="note">${esc(b)}. O registro foi feito no celular às ${fmt(S.events.find(e=>e.sync==="pendente").t)} e ainda não chegou ao servidor.</p>`;
+    } else {
+      if(src){
+        h += `<div class="evid">${src.photo?`<img src="${src.photo}" alt="Foto do registro: ${esc(src.title)}">`:`<div class="kpi"><span class="label">Sem foto</span><span class="hint">Evento registrado sem imagem</span></div>`}
+          <dl class="kv"><dt>Registrado por</dt><dd>${esc(src.who.name)}</dd><dt>Horário</dt><dd>${fmt(src.t)}${src.syncedAt?` (recebido ${fmt(src.syncedAt)})`:""}</dd>
+          ${src.gps?`<dt>Local</dt><dd>${src.gps.lat.toFixed(5)}, ${src.gps.lng.toFixed(5)} ±${src.gps.acc} m</dd><dt>Cerca</dt><dd>dentro do raio do CD (140 m)</dd>`:""}</dl></div>`;
+      } else {
+        h += `<p class="note">Registre a liberação quando o veículo puder deixar o local. O TAC é notificado no app. Liberação e saída física são eventos diferentes.</p>`;
+      }
+      if(S.divOpen){
+        h += `<div class="divform"><label class="label" for="divtxt" style="color:var(--crit)">Descreva a divergência</label><textarea id="divtxt">${esc(c.divText)}</textarea>
+          <div class="actions"><button class="btn danger" data-act="div-save">Confirmar com divergência</button><button class="btn ghost" data-act="div-cancel">Cancelar</button></div>
+          <p class="note">O registro original do TAC é mantido. A divergência vira ocorrência para análise.</p></div>`;
+      } else {
+        h += `<div class="actions"><button class="btn primary" data-act="dest">${esc(c.ok)}</button>${src?`<button class="btn" data-act="div-open">Não reconheço este horário</button>`:""}</div>`;
+      }
+    }
+    h += `</div></div>`;
+  } else if(st){
+    h += `<div class="pending"><div class="pending-h"><strong>Nenhuma pendência para o destino</strong><span class="pill">aguardando TAC</span></div><div class="pending-b"><p class="note">Próximo marco: ${esc(st.title.toLowerCase())}, registrado pelo motorista no app.</p></div></div>`;
+  } else {
+    h += `<div class="pending"><div class="pending-h"><strong>Operação encerrada no destino</strong><span class="pill ok">concluída</span></div><div class="pending-b"><p class="note">Saída registrada às ${fmt(ev("saida").t)}. Apuração e dossiê disponíveis abaixo.</p></div></div>`;
+  }
+
+  const meStatus = S.i===0?"previsto 06:00":esc(statusNow());
+  h += `<div><span class="label">Pátio agora</span><div class="tablewrap"><table class="yard"><thead><tr><th>Placa</th><th>Operação</th><th>Situação</th></tr></thead><tbody>
+    <tr class="me"><td class="mono">${OP.placa}</td><td class="mono">${OP.code}</td><td>${meStatus}</td></tr>
+    <tr><td class="mono">QPE-2H91</td><td class="mono">OP-2026-004809</td><td>Em descarga · Doca 3</td></tr>
+    <tr><td class="mono">FJK-8C03</td><td class="mono">OP-2026-004822</td><td>Aguardando doca</td></tr>
+  </tbody></table></div></div>`;
+  $("#desk").innerHTML = h;
+}
+function chip(k){
+  return {registro:'<span class="pill">Registro</span>',confirmacao:'<span class="pill ok">Confirmação</span>',divergencia:'<span class="pill crit">Divergência</span>',sistema:'<span class="pill sys">Sistema</span>',apuracao:'<span class="pill acc">Apuração</span>'}[k];
+}
+function renderTL(){
+  const main = S.events.filter(e=>!e.of || e.kind==="registro");
+  $("#tlcount").textContent = S.events.length+" evento"+(S.events.length===1?"":"s");
+  if(!main.length){ $("#tl").innerHTML = `<div class="tl-empty">Nenhum evento ainda. Clique em <b>Avançar próximo marco</b> ou em <b>Reproduzir automaticamente</b>.</div>`; return; }
+  const ap = apur();
+  $("#tl").innerHTML = main.map(e=>{
+    const subs = S.events.filter(x=>x.of===e.stepId && x.kind!=="registro");
+    const isFresh = e.uid===S.lastFresh || subs.some(x=>x.uid===S.lastFresh);
+    let body = "";
+    if(e.kind==="sistema") body = `<div class="who">${esc(e.who.name)} · ${esc(e.who.role)}</div>` + (e.lines||[]).map(l=>`<div class="status">${esc(l)}</div>`).join("");
+    else if(e.kind==="apuracao") body = `<div class="who">${esc(e.who.role)}</div><div class="status">Permanência <b>${dur(ap.mins)}</b> · franquia ${RULE.franquia}h · excedente <b>${dur(ap.exc)}</b></div>`;
+    else body = `<div class="who">${esc(e.who.name)} · ${esc(e.who.role)}</div>
+      ${e.gps?`<div class="meta"><span>GPS ${e.gps.lat.toFixed(5)}, ${e.gps.lng.toFixed(5)}</span><span>±${e.gps.acc} m</span></div>`:""}
+      ${e.photo?`<img class="thumb" src="${e.photo}" alt="Evidência fotográfica: ${esc(e.title)}">`:""}
+      <div class="meta">${e.sync==="pendente"?`<span style="color:var(--warn)">● salvo no aparelho, aguardando envio</span>`:e.syncedAt?`<span>ocorrido ${fmt(e.t)} · sincronizado ${fmt(e.syncedAt)}</span>`:""}</div>
+      ${e.before?`<div class="status">Status: ${esc(e.before)} → <b>${esc(e.after)}</b></div>`:""}`;
+    const subH = subs.map(x=> x.kind==="divergencia"
+      ? `<div class="sub div"><div class="ev-top">${chip("divergencia")}<span class="mono">${fmt(x.t)}</span></div><p><b>${esc(x.who.name)}</b> · ${esc(x.who.role)}</p><p>${esc(x.note)}</p><p class="status">Ocorrência aberta · horário original de ${fmt(e.t)} preservado</p></div>`
+      : `<div class="sub"><div class="ev-top">${chip(x.kind)}<span class="mono">${fmt(x.t)}</span></div><p><b>${esc(x.title)}</b> por ${esc(x.who.name)} · ${esc(x.who.role)}</p><p class="status">Não altera o horário do registro (${fmt(e.t)})</p></div>`).join("");
+    return `<article class="ev k-${e.kind} ${isFresh?"fresh":""}"><span class="dot"></span><div class="ev-card">
+      <div class="ev-top">${chip(e.kind)}<span class="mono">${fmt(e.t)}</span></div><h4>${esc(e.title)}</h4>${body}${subH}</div></article>`;
+  }).join("");
+  const tl = $("#tl"); tl.scrollTop = tl.scrollHeight;
+}
+function apur(){
+  const che = ev("chegada"), lib = ev("liberacao"), sai = ev("saida");
+  const end = lib?lib.t:lastTime();
+  const mins = che? end-che.t : 0;
+  const exc = Math.max(0, mins-RULE.franquia*60);
+  return {che, lib, sai, mins, exc, val: exc/60*OP.carga*RULE.valor};
+}
+function renderApur(){
+  const a = apur();
+  const done = S.events.some(e=>e.kind==="apuracao");
+  $("#apstate").className = "pill "+(done?"ok":a.che?"warn":"");
+  $("#apstate").textContent = done?"Apuração registrada":a.che?"Em curso (prévia)":"Aguardando chegada";
+  if(!a.che){ $("#apur").innerHTML = `<p class="note">A apuração começa no marco inicial definido pela regra vigente. Nesta demonstração: a chegada registrada pelo TAC.</p>`+ruleBox(); return; }
+  const div = S.events.find(e=>e.kind==="divergencia" && e.stepId==="chegada_c");
+  let h = `<div><span class="label">Excedente sobre a franquia</span><div class="big">${dur(a.exc)}</div></div>
+    <div class="calc"><span>Marco inicial · chegada (TAC)</span><span class="v">${fmt(a.che.t)}</span>
+    <span>Marco final · ${a.lib?"liberação para viagem":"em aberto (agora)"}</span><span class="v">${fmt(a.lib?a.lib.t:lastTime())}</span>
+    <span>Permanência apurada</span><span class="v">${dur(a.mins)}</span>
+    <span>Franquia</span><span class="v">− ${RULE.franquia}h00</span>
+    <span class="sep"></span>
+    <span>Estimativa ilustrativa (${OP.carga} t × R$ ${RULE.valor.toFixed(2).replace(".",",")} × h excedente)</span><span class="v">${brl(a.val)}</span></div>`;
+  if(a.lib){
+    const alt = [
+      {l:"Chegada TAC → liberação (regra ativa)", v:a.mins, sel:true},
+      ...(a.sai?[{l:"Chegada TAC → saída física", v:a.sai.t-a.che.t}]:[]),
+      {l:"Chegada confirmada → liberação", v:a.lib.t-ev("chegada_c").t},
+      ...(div?[{l:"Horário alegado pelo destino (06:31) → liberação", v:a.lib.t-m(6,31)}]:[]),
+    ];
+    h += `<div class="alt"><span class="label">Cenários com outros marcos</span>${alt.map(x=>`<div class="alt-i ${x.sel?"sel":""}"><span>${esc(x.l)}</span><span class="mono">${dur(x.v)}</span></div>`).join("")}</div>`;
+  }
+  if(div) h += `<p class="note" style="color:var(--crit)">Há divergência aberta sobre a chegada. A apuração mostra os dois cenários e não decide qual prevalece.</p>`;
+  h += ruleBox();
+  $("#apur").innerHTML = h;
+}
+function ruleBox(){
+  return `<div class="rule"><span class="label">Regra aplicada</span><span><b>${RULE.id} ${RULE.ver}</b> · franquia ${RULE.franquia}h · R$ ${RULE.valor.toFixed(2).replace(".",",")} por tonelada/hora</span>
+    <span class="note">Parâmetros de referência (Lei 11.442/2007, art. 11) com versão e vigência. Valores e marcos a validar juridicamente antes do uso real. Resultado não é conclusão jurídica.</span></div>`;
+}
+function renderDoss(){
+  const ds = $("#dostate");
+  if(!S.dossie){
+    ds.className="pill"; ds.textContent="Não gerado";
+    const ready = S.i>=STEPS.length;
+    $("#doss").innerHTML = `<div class="doss-empty"><p style="margin:0;max-width:46ch">O dossiê reúne marcos, confirmações, fotos, localizações, ocorrências, apuração e trilha de auditoria em um documento rastreável.</p>
+      <button class="btn primary" data-act="doss" ${ready?"":"disabled"}>Gerar dossiê digital</button>${ready?"":`<span class="hint">Disponível após o registro da saída.</span>`}</div>`;
+    return;
+  }
+  ds.className="pill ok"; ds.textContent = S.fwd?"Encaminhado":"Gerado "+fmt(S.dossie.at);
+  const a = apur();
+  const regs = S.events.filter(e=>e.kind==="registro");
+  const divs = S.events.filter(e=>e.kind==="divergencia");
+  const photos = S.events.filter(e=>e.photo);
+  const rows = regs.map(e=>{
+    const c = S.events.find(x=>x.of===e.stepId && x.kind==="confirmacao");
+    const d = S.events.find(x=>x.of===e.stepId && x.kind==="divergencia");
+    return `<tr><td>${esc(e.title)}</td><td class="mono">${fmt(e.t)}${e.syncedAt?`<br><span class="hint">sinc. ${fmt(e.syncedAt)}</span>`:""}</td><td>${esc(e.who.name)}</td><td>${c?`${esc(c.who.name)} <span class="mono">${fmt(c.t)}</span>`:"—"}</td><td>${d?'<span class="pill crit">divergência</span>':(c?'<span class="pill ok">confirmado</span>':'<span class="pill">registro</span>')}</td></tr>`;
+  }).join("");
+  const audit = S.events.map(e=>`<tr><td class="mono">${fmt(e.t)}</td><td>${chip(e.kind)}</td><td>${esc(e.title)}</td><td>${esc(e.who.name)}</td></tr>`).join("");
+  const fw = ["Enviado","Recebido pelo escritório","Em análise","Parecer emitido"];
+  const fwT = [S.dossie.at+3,S.dossie.at+9,S.dossie.at+44,null];
+  $("#doss").innerHTML = `<div class="doc">
+    <div class="doc-h"><div><span class="label">Dossiê digital da estadia</span><h3>${OP.code}</h3><span class="hint">${OP.embarcador} · ${OP.destino} · ${OP.placa} · ${OP.nf}</span></div>
+      <div style="text-align:right"><span class="label">Gerado em</span><div class="mono">02/10/2026 ${fmt(S.dossie.at)}</div></div></div>
+    <div class="kpis"><div class="kpi"><span class="label">Marcos</span><b>${regs.length}</b></div><div class="kpi"><span class="label">Confirmações</span><b>${S.events.filter(e=>e.kind==="confirmacao").length}</b></div>
+      <div class="kpi"><span class="label">Ocorrências</span><b>${divs.length}</b></div><div class="kpi"><span class="label">Excedente</span><b>${dur(a.exc)}</b></div></div>
+    <div><span class="label">Marcos e confirmações</span><div class="tablewrap"><table><thead><tr><th>Marco</th><th>Horário</th><th>Registrado por</th><th>Confirmado por</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div><span class="label">Evidências fotográficas</span><div class="photos">${photos.map(e=>`<figure><img src="${e.photo}" alt="${esc(e.title)}"><figcaption>${esc(e.title)} · ${fmt(e.t)}</figcaption></figure>`).join("")}</div></div>
+    ${divs.length?`<div><span class="label">Ocorrências</span>${divs.map(d=>`<p style="margin:4px 0;font-size:13px"><span class="pill crit">aberta</span> ${esc(d.who.name)} (${fmt(d.t)}): ${esc(d.note)}</p>`).join("")}</div>`:""}
+    <div><span class="label">Trilha de auditoria</span><div class="tablewrap"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Ação</th><th>Autor</th></tr></thead><tbody>${audit}</tbody></table></div></div>
+    <div><span class="label">Integridade · SHA-256 do conteúdo</span><div class="hash">${S.dossie.hash}</div></div>
+    <p class="disclaimer">Este dossiê organiza fatos registrados pelas partes e a apuração pela regra ${RULE.id} ${RULE.ver}. Não constitui conclusão jurídica.</p>
+    <div><span class="label">Encaminhamento jurídico · Escritório parceiro</span>
+      ${S.fwd?`<div class="steps" style="margin-top:8px">${fw.map((l,k)=>`<div class="${k<S.fwd?"on":""}">${l}<b>${k<S.fwd&&fwT[k]?fmt(fwT[k]):k<S.fwd?"03/10 09:14":"—"}</b></div>`).join("")}</div>`
+        :`<div class="actions" style="margin-top:8px"><button class="btn primary" data-act="fwd">Encaminhar para advocacia</button><span class="hint">Apto: sequência completa e excedente identificado.</span></div>`}
+      ${S.fwd&&S.fwd<4?`<div class="actions" style="margin-top:10px"><button class="btn" data-act="fwd">Simular próximo status</button></div>`:""}
+    </div></div>`;
+}
+function renderHint(){
+  const st = STEPS[S.i]; let t;
+  if(st){ const b = blocked(); t = b ? b+". Avançar sincroniza." : "Próximo: "+st.title+" · "+(st.actor==="tac"?"no app do TAC":"no painel do destino"); }
+  else if(!S.dossie) t = "Próximo: gerar o dossiê digital";
+  else if(S.fwd<4) t = S.fwd?"Acompanhe o encaminhamento":"Próximo: encaminhar para advocacia";
+  else t = "Demonstração concluída";
+  $("#hint").textContent = t;
+  $("#next").disabled = !!(S.dossie && S.fwd>=4);
+}
+
+/* --- wiring --- */
+document.addEventListener("click", e=>{
+  const b = e.target.closest("[data-act]"); if(!b) return;
+  const a = b.dataset.act, st = STEPS[S.i];
+  if(a==="tac" && st && st.actor==="tac") perform(st);
+  else if(a==="dest" && st && st.actor==="dest") perform(st);
+  else if(a==="div-open"){ S.divOpen=true; renderDesk(); const ta=$("#divtxt"); if(ta) ta.focus(); }
+  else if(a==="div-cancel"){ S.divOpen=false; renderDesk(); }
+  else if(a==="div-save" && st){ perform(st,{div:true, note:($("#divtxt")||{}).value}); }
+  else if(a==="doss") genDossie();
+  else if(a==="fwd") forward();
+});
+$("#next").addEventListener("click", ()=>{ stopAuto(); next(); });
+$("#auto").addEventListener("click", startAuto);
+$("#reset").addEventListener("click", ()=>{ stopAuto(); const off=$("#offline").checked; S=fresh(); S.offline=off; render(); });
+$("#offline").addEventListener("change", e=>{ if(e.target.checked){ S.offline=true; render(); } else syncNow(); });
+
+S = fresh();
+render();
+})();
+</script>
