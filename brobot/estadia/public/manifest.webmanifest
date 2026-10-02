@@ -1,0 +1,11 @@
+{
+  "name": "Estadia · Brobot",
+  "short_name": "Estadia",
+  "description": "Registro e comprovação de eventos logísticos de carga e descarga.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#E9EDF1",
+  "theme_color": "#15212C",
+  "lang": "pt-BR",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

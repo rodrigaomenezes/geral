@@ -1,0 +1,15 @@
+# Blueprint do Render.com para o projeto Estadia (Brobot).
+services:
+  - type: web
+    name: brobot-estadia
+    runtime: node
+    rootDir: brobot/estadia
+    plan: free
+    buildCommand: "true"
+    startCommand: node server/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: ESTADIA_SECRET
+        generateValue: true
+      - key: ESTADIA_DATA
+        value: /tmp/estadia-data
