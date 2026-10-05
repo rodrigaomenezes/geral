@@ -1,4 +1,4 @@
-/* Estadia · Brobot — tokens: asfalto/ardósia + âmbar de sinalização viária. */
+/* Estadia BR — tokens: asfalto/ardósia + âmbar de sinalização viária. */
 :root {
   --bg: #E9EDF1; --surface: #FFFFFF; --surface-2: #F3F5F8; --ink: #15212C; --muted: #5A6774; --line: #D3DAE1;
   --accent: #F2A900; --accent-ink: #1A1405; --accent-soft: #FDF1D2;
@@ -41,8 +41,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .bar { position: sticky; top: 0; z-index: 10; background: var(--ink); color: var(--bg); padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .bar .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
 .bar .mark { width: 28px; height: 28px; border-radius: 6px; background: repeating-linear-gradient(135deg, var(--accent) 0 6px, #15212C 6px 12px); flex: none; }
-.bar .brand b { font-family: var(--f-display); font-size: 22px; text-transform: uppercase; letter-spacing: .04em; }
-.bar .brand span { font-size: 11px; opacity: .7; font-family: var(--f-mono); }
+.bar .brand b { font-family: var(--f-display); font-size: 22px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.navlink { color: inherit; text-decoration: none; font-size: 14px; padding: 5px 10px; border-radius: 6px; opacity: .85; }
+.navlink:hover { background: rgba(255,255,255,.1); opacity: 1; }
 .bar .who { margin-left: auto; font-size: 13px; text-align: right; line-height: 1.25; }
 .bar .who small { display: block; opacity: .7; }
 .bar button { background: transparent; border: 1px solid rgba(255,255,255,.3); color: inherit; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
@@ -193,3 +195,36 @@ tr.click:hover td { background: var(--surface-2); }
 .toast.show { transform: translate(-50%, 0); }
 .toast.bad { background: var(--crit); color: #fff; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* DEV 2.0 */
+.kvgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 18px; margin: 0; }
+.kvgrid div { min-width: 0; }
+.kvgrid dt { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.kvgrid dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 520px) { .kvgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.memoria { display: flex; flex-direction: column; gap: 2px; background: var(--surface-2); border-radius: 6px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
+.pill.tipo-carga { background: var(--sys-soft); color: var(--sys); border-color: transparent; }
+.pill.tipo-descarga { background: var(--accent-soft); color: var(--ink); border-color: transparent; }
+.limite { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 2px; }
+.meter.thin { height: 8px; margin-top: 4px; }
+.fin { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.fin b { display: block; font-family: var(--f-display); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (max-width: 420px) { .fin { grid-template-columns: minmax(0, 1fr); } }
+.amelia { border-color: var(--sys); }
+.ava { width: 38px; height: 38px; border-radius: 50%; background: var(--sys); color: var(--surface); display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 20px; flex: none; }
+.recdot { width: 10px; height: 10px; border-radius: 50%; background: var(--crit); display: inline-block; }
+#am-mic.rec { border-color: var(--crit); color: var(--crit); }
+#am-mic.rec .recdot { animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.amelia-res { display: flex; flex-direction: column; gap: 10px; background: var(--surface-2); border-radius: 8px; padding: 12px; }
+audio { width: 100%; max-width: 420px; }
+.wa { border-color: #25a35a; }
+.linkbox { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.btn.wa-btn { background: #1f9d55; border-color: #1f9d55; color: #fff; font-weight: 600; }
+.ev.k-ocorrencia .dot { background: var(--crit); }
+.ev.k-notificacao .dot, .ev.k-financeiro .dot { background: var(--ok); }
+.rel { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.confirm { max-width: 560px; }
+.confirm-photo { width: 100%; border-radius: 8px; display: block; }
+.ok-card { border-color: var(--ok); background: var(--ok-soft); }
+h1 + .kpis, .label + .kpis { margin-top: -6px; }

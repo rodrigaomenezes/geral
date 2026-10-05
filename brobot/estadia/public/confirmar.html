@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#15212C">
+  <meta name="robots" content="noindex">
+  <title>Confirmação · Estadia BR</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="bar"><span class="brand"><span class="mark"></span><b>Estadia BR</b></span><span class="who">Confirmação de evento<small>sem necessidade de aplicativo</small></span></header>
+  <main class="page confirm" id="main"><p class="boot">Carregando…</p></main>
+  <script>
+  (function () {
+    'use strict';
+    const $ = (s) => document.querySelector(s);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const dt = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    const placa = (p) => (p ? `${p.slice(0, 3)}-${p.slice(3)}` : '');
+    const token = location.pathname.split('/').pop();
+    const base = `/api/public/link/${token}`;
+    const main = $('#main');
+
+    function render(info, status) {
+      if (status === 404) { main.innerHTML = `<div class="card"><h1>Link inválido</h1><p>Confira se o endereço foi copiado inteiro. Se o problema continuar, peça um novo link ao motorista ou à transportadora.</p></div>`; return; }
+      const op = info.operacao, reg = info.registro;
+      const head = `<div class="card"><span class="label">${esc(op.codigo)} · ${op.tipo === 'CARGA' ? 'Carga' : 'Descarga'}</span><h1>${esc(info.botao)}</h1>
+        <dl class="kv"><dt>Placa</dt><dd class="mono">${esc(placa(op.placa))}${op.implemento ? ' · ' + esc(op.implemento) : ''}</dd><dt>Motorista (TAC)</dt><dd>${esc(op.tac || '—')}</dd>
+        <dt>Local</dt><dd>${esc(op.localNome)}</dd><dt>Destino</dt><dd>${esc(op.destinoNome)}</dd>
+        ${reg ? `<dt>Registro</dt><dd>${esc(reg.label)}</dd><dt>Data e hora</dt><dd class="mono">${dt(reg.em)}</dd>` : ''}
+        ${reg && reg.gps && !reg.gps.erro ? `<dt>Localização</dt><dd class="mono">${reg.gps.lat.toFixed(5)}, ${reg.gps.lng.toFixed(5)} <a href="https://www.openstreetmap.org/?mlat=${reg.gps.lat}&mlon=${reg.gps.lng}#map=17/${reg.gps.lat}/${reg.gps.lng}" target="_blank" rel="noopener">ver mapa</a></dd>` : ''}</dl>
+        ${reg && reg.temFoto && status !== 410 ? `<img class="confirm-photo" src="${base}/foto" alt="Foto do registro do motorista">` : ''}</div>`;
+      if (info.confirmado) {
+        main.innerHTML = head + `<div class="card ok-card"><h2>Confirmado</h2><p>Registrado em <b class="mono">${dt(info.confirmado.em)}</b> por ${esc(info.confirmado.por)}. O horário do registro do motorista foi mantido.</p><p class="small muted">Você já pode fechar esta página.</p></div>`;
+        return;
+      }
+      if (status === 410) {
+        main.innerHTML = head + `<div class="card"><h2>Este link expirou</h2><p>Por segurança, links de confirmação têm validade. Peça um novo link.</p><button class="btn primary" id="renovar">Solicitar novo link</button><p class="small" id="msg"></p></div>`;
+        $('#renovar').onclick = async () => { const r = await fetch(`${base}/renovar`, { method: 'POST' }).then((x) => x.json()).catch(() => ({ mensagem: 'Sem conexão. Tente de novo.' })); $('#msg').textContent = r.mensagem; $('#renovar').disabled = true; };
+        return;
+      }
+      main.innerHTML = head + `<div class="card"><div class="field"><label class="label" for="nome">Seu nome (opcional)</label><input id="nome" autocomplete="name" placeholder="Para identificar quem confirmou"></div>
+        <button class="big ok" id="confirmar">${esc(info.botao.toUpperCase())}</button>
+        <p class="small muted">Sua confirmação fica registrada com data e hora do servidor, separada do registro do motorista. Este link vale só para esta confirmação e expira em ${dt(info.expiraEm)}.</p>
+        <p class="err" id="err" hidden></p></div>`;
+      $('#confirmar').onclick = async () => {
+        $('#confirmar').disabled = true;
+        try {
+          const res = await fetch(`${base}/confirmar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: $('#nome').value }) });
+          const data = await res.json();
+          if (!res.ok && res.status !== 410) throw new Error(data.mensagem || 'Não foi possível confirmar.');
+          render(data, res.status);
+        } catch (e) { $('#confirmar').disabled = false; const el = $('#err'); el.textContent = e.message || 'Sem conexão. Tente de novo.'; el.hidden = false; }
+      };
+    }
+
+    fetch(base).then(async (res) => render(await res.json(), res.status)).catch(() => { main.innerHTML = '<div class="card"><h2>Sem conexão</h2><p>Verifique a internet e recarregue a página.</p></div>'; });
+  })();
+  </script>
+</body>
+</html>

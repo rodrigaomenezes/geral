@@ -1,8 +1,8 @@
 {
   "name": "brobot-estadia",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Estadia: registro e comprovação de eventos logísticos de carga e descarga (Brobot Tecnologia).",
+  "description": "Estadia BR: gestão, comprovação e rastreabilidade de eventos logísticos de carga e descarga.",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",

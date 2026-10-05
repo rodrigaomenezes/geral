@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const { EventEmitter } = require('node:events');
 
 const GENESIS = 'GENESIS';
+const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3' };
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
 const hashEvent = (ev) => {
   const { hash, ...rest } = ev;
@@ -50,6 +51,9 @@ class EventStore extends EventEmitter {
       actor: data.actor,
       refEventId: data.refEventId || null,
       clientEventId: data.clientEventId || null,
+      origem: data.origem || 'sistema',
+      ip: data.ip || null,
+      dispositivo: data.dispositivo || null,
       payload: data.payload || {},
       prevHash: this.lastHash,
     };
@@ -65,6 +69,7 @@ class EventStore extends EventEmitter {
   /** Apaga todos os dados (somente para reiniciar a demonstração). */
   reset() {
     fs.writeFileSync(this.file, '');
+    if (fs.existsSync(this.linksFile)) fs.rmSync(this.linksFile);
     for (const sub of ['photos', 'dossies']) {
       const d = path.join(this.dir, sub);
       for (const f of fs.readdirSync(d)) fs.rmSync(path.join(d, f), { force: true });
@@ -96,17 +101,22 @@ class EventStore extends EventEmitter {
 
   savePhoto(buffer, mime) {
     const hash = sha256(buffer);
-    const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+    const ext = EXT[mime] || 'jpg';
     const file = path.join(this.dir, 'photos', `${hash}.${ext}`);
     if (!fs.existsSync(file)) fs.writeFileSync(file, buffer);
     return { sha256: hash, mime, bytes: buffer.length, file: `${hash}.${ext}` };
   }
 
   photoPath(name) {
-    if (!/^[a-f0-9]{64}\.(jpg|png|webp)$/.test(name)) return null;
+    if (!/^[a-f0-9]{64}\.(jpg|png|webp|webm|ogg|m4a|mp3)$/.test(name)) return null;
     const p = path.join(this.dir, 'photos', name);
     return fs.existsSync(p) ? p : null;
   }
+
+  // Links de confirmação: o token fica fora do log (no log vai apenas o hash dele).
+  get linksFile() { return path.join(this.dir, 'links.json'); }
+  loadLinks() { return fs.existsSync(this.linksFile) ? JSON.parse(fs.readFileSync(this.linksFile, 'utf8')) : {}; }
+  saveLinks(links) { fs.writeFileSync(this.linksFile, JSON.stringify(links, null, 2)); }
 
   saveDossie(content) {
     const body = JSON.stringify(content);
@@ -122,4 +132,4 @@ class EventStore extends EventEmitter {
   }
 }
 
-module.exports = { EventStore, sha256, hashEvent, GENESIS };
+module.exports = { EventStore, sha256, hashEvent, GENESIS, EXT };

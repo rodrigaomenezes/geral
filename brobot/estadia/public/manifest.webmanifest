@@ -1,6 +1,6 @@
 {
-  "name": "Estadia · Brobot",
-  "short_name": "Estadia",
+  "name": "Estadia BR",
+  "short_name": "Estadia BR",
   "description": "Registro e comprovação de eventos logísticos de carga e descarga.",
   "start_url": "/",
   "display": "standalone",
