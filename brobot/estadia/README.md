@@ -70,9 +70,9 @@ Cada mensagem guarda no log imutável: o envio, o status de entrega e leitura, a
 
 | Modo | Quando | Como funciona |
 |---|---|---|
-| `simulado` | Padrão da demonstração | As mensagens vão para o **celular simulado** em `/whatsapp.html`, onde você faz o papel da portaria ou da transportadora e responde SIM/NÃO/OK |
+| `simulado` | Só com `WHATSAPP_MODE=simulado` (demonstração sem celular real) | As mensagens vão para o **celular simulado** em `/whatsapp.html`, onde você faz o papel da portaria ou da transportadora e responde SIM/NÃO/OK |
 | `api` | Com a API oficial configurada | Envio pelo número da empresa (WhatsApp Business Cloud API). Respostas e status de entrega e leitura chegam pelo webhook `POST /api/whatsapp/webhook` |
-| `manual` | Sem API (configurado hoje no Railway) | A mensagem sai do **WhatsApp do próprio motorista**. Logo após cada registro aparece **AVISAR A PORTARIA**, com o número já preenchido. O motorista pode **trocar o número na hora** (para quem estiver na portaria ou outra pessoa), com a opção de usar o novo número nas próximas mensagens, ou **escolher o contato na agenda do WhatsApp**. A mensagem pede para a pessoa **tocar no link** e confirmar, ou marcar **NÃO CONFERE**, e a resposta volta sozinha ao sistema. Vai uma mensagem por passo, só para a portaria; a transportadora acompanha pelo portal. Se a pessoa responder só por texto, o motorista envia o print |
+| `manual` | **Padrão** quando não há API oficial | A mensagem sai do **WhatsApp do próprio motorista**. Logo após cada registro aparece **AVISAR A PORTARIA**, com o número já preenchido. O motorista pode **trocar o número na hora** (para quem estiver na portaria ou outra pessoa), com a opção de usar o novo número nas próximas mensagens, ou **escolher o contato na agenda do WhatsApp**. A mensagem pede para a pessoa **tocar no link** e confirmar, ou marcar **NÃO CONFERE**, e a resposta volta sozinha ao sistema. Vai uma mensagem por passo, só para a portaria; a transportadora acompanha pelo portal. Se a pessoa responder só por texto, o motorista envia o print |
 
 Variáveis para o modo `api`:
 

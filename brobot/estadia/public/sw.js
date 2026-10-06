@@ -1,6 +1,6 @@
 // Service worker: mantém a "casca" do app disponível sem internet.
 // Chamadas à API nunca são cacheadas; registros offline ficam no IndexedDB (app.js).
-const CACHE = 'estadia-br-v5';
+const CACHE = 'estadia-br-v6';
 const SHELL = ['/', '/index.html', '/app.js', '/styles.css', '/icon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {

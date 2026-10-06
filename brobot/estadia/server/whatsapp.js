@@ -28,9 +28,10 @@ function normFone(s) {
 
 const fmtFone = (d) => (d && d.length >= 12 ? `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, -4)}-${d.slice(-4)}` : d || '');
 
-function config(env = process.env, demo = true) {
+function config(env = process.env) {
   const token = env.WHATSAPP_TOKEN, phoneId = env.WHATSAPP_PHONE_ID;
-  const mode = env.WHATSAPP_MODE || (token && phoneId ? 'api' : demo ? 'simulado' : 'manual');
+  // Sem API oficial, o padrão é o WhatsApp do próprio motorista. O simulador só liga com WHATSAPP_MODE=simulado.
+  const mode = env.WHATSAPP_MODE || (token && phoneId ? 'api' : 'manual');
   return { mode, token, phoneId, apiVersion: env.WHATSAPP_API_VERSION || 'v21.0', verifyToken: env.WHATSAPP_VERIFY_TOKEN || null, appSecret: env.WHATSAPP_APP_SECRET || null };
 }
 

@@ -29,7 +29,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   const dir = new Directory(dataDir);
   const demo = process.env.ESTADIA_DEMO_RESET !== '0';
   const SYS = { userId: 'sistema', name: 'Estadia BR', role: 'sistema', orgId: 'estadia-br' };
-  const zcfg = Z.config(process.env, demo);
+  const zcfg = Z.config(process.env);
   const autoRespostas = []; // respostas automáticas do número Estadia BR (exibidas no simulador)
   const actorOf = (u) => ({ userId: u.id, name: u.nome, role: u.role, orgId: u.orgId });
   const origemDe = (u) => (u.role === 'tac' ? 'app' : 'portal');

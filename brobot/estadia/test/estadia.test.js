@@ -12,6 +12,7 @@ const D = require('../server/domain');
 const Amelia = require('../server/amelia');
 const { sha256, EventStore } = require('../server/store');
 
+process.env.WHATSAPP_MODE = process.env.WHATSAPP_MODE || 'simulado'; // testes do simulador; o modo manual tem teste próprio
 const PHOTO = 'data:image/png;base64,' + demoPhotoPng(40, 30).toString('base64');
 const JUNDIAI = { lat: -23.18571, lng: -46.89784, acc: 8 };
 const now = (offsetMin = 0) => new Date(Date.now() + offsetMin * 60000).toISOString();

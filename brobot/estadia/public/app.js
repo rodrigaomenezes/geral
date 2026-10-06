@@ -548,6 +548,13 @@
     zap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 1a4 4 0 0 1-2.9-2.9l1-1-1-2z"/></svg>',
   };
 
+  // Texto honesto sobre o aviso: no modo manual nada sai sozinho.
+  function avisoTxt(p, antes) {
+    const manual = !S.config || S.config.zapModo === 'manual';
+    if (p.k === 'SAIDA' && manual) return 'A transportadora acompanha pelo sistema.';
+    if (manual) return antes ? `Depois você avisa ${p.avisa} pelo seu WhatsApp.` : '';
+    return `Avisamos ${p.avisa} pelo WhatsApp.`;
+  }
   function passos(op) {
     const t = tipoTxt(op), T = t.toUpperCase();
     return [
@@ -621,8 +628,10 @@
     if (r && r.interpretacao === 'NAO') return ['crit', `${nome} respondeu NÃO: “${r.texto}”`];
     if (r) return ['warn', `${nome} respondeu: “${r.texto}”`];
     return {
-      aguardando_envio: ['warn', 'Falta avisar pelo WhatsApp'], enviada: ['', `Enviado para ${nome} ✓`],
-      enviada_manual: [m.linkAbertoEm ? 'sys' : '', m.linkAbertoEm ? `${nome} abriu o link · esperando confirmar` : `Você enviou para ${nome} · esperando ${nome} tocar no link`],
+      aguardando_envio: ['warn', 'Falta avisar pelo WhatsApp'],
+      enviada: m.modo === 'simulado' ? ['', `Enviado ao simulador de ${nome} (demonstração)`] : ['', `Enviado para ${nome} ✓`],
+      enviada_manual: m.linkAbertoEm ? ['ok', `${nome} recebeu e abriu o link · esperando confirmar`]
+        : ['warn', `Abrimos o seu WhatsApp para enviar a ${nome}. Se a mensagem não foi, toque em enviar de novo.`],
       entregue: ['', `Chegou no celular de ${nome} ✓✓ · esperando resposta`], lida: ['sys', `${nome} leu ✓✓ · esperando resposta`], falha: ['crit', `Não foi enviado para ${nome}`],
     }[m.status] || ['', m.status];
   }
@@ -665,7 +674,7 @@
       if (!w) location.href = url;
       const btn = f.querySelector('button'); btn.disabled = true;
       api('POST', `/api/operations/${opId}/whatsapp/destinatario`, { mensagemId: f.dataset.dest, telefone: num, nome: nome.value, salvar: chk.checked, viaMotorista: true })
-        .then(() => { toast('Abrimos o seu WhatsApp. Toque em enviar lá.'); if (depois) setTimeout(depois, 600); else refresh(); })
+        .then(() => { toast('Abrimos o seu WhatsApp. Confira e toque em enviar lá.'); if (depois) setTimeout(depois, 600); else refresh(); })
         .catch((err) => { toast(err.message, true); btn.disabled = false; });
     }));
   }
@@ -721,8 +730,8 @@
           <input id="tel-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome do contato"><button class="drv-mid" type="submit">ENVIAR AVISO</button></form>` : ''}
         ${aberto && m.status === 'aguardando_envio' ? envioBloco(m) : ''}
         ${aberto && m.status !== 'aguardando_envio' && !semNumero ? `<button type="button" class="drv-link left" data-trocar="${m.id}">Mandar para outra pessoa</button><form class="drv-tel" data-dest="${m.id}" hidden><label for="dn-${m.id}">Número de quem vai receber</label><input id="dn-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome"><label class="chk"><input type="checkbox" checked> Usar nas próximas mensagens</label><button class="drv-mid" type="submit">${ICON.zap} ENVIAR PARA ESTE NÚMERO</button></form>` : ''}
-        ${aberto && m.status !== 'aguardando_envio' && !semNumero && (minutos >= 5 || m.status === 'falha' || S.config.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém respondeu ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
-          ${S.config.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR DE NOVO NO WHATSAPP</a>` : ''}
+        ${aberto && m.status !== 'aguardando_envio' && !semNumero && (minutos >= 5 || m.status === 'falha' || m.modo === 'manual' || S.config.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém confirmou ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
+          ${m.modo === 'manual' || S.config.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR DE NOVO NO WHATSAPP</a>` : ''}
           ${m.status !== 'aguardando_envio' && (minutos >= 5 || m.status === 'falha') ? `<button class="btn" data-reenviar="${m.id}">Mandar de novo</button>` : ''}
           ${m.status !== 'aguardando_envio' && S.config.zapModo !== 'manual' && m.whatsappUrl ? `<a class="btn" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Mandar pelo meu WhatsApp</a>` : ''}
           <button class="btn" data-print="${m.id}">Responderam no meu WhatsApp</button></div>` : ''}</div></div>`;
@@ -756,7 +765,7 @@
     } else if (atual) {
       agora = `<div class="drv-card now"><span class="drv-step">Passo ${idx + 1} de ${ps.length}</span>
         <button class="drv-giant" data-passo="${atual.k}">${ICON[atual.icon]}<span>${esc(atual.botao)}</span></button>
-        <p class="drv-muted center">${atual.foto === 'required' ? `${ICON.cam} Vai abrir a câmera. ` : ''}${S.config.zapModo === 'manual' ? `Depois você avisa ${atual.avisa} pelo seu WhatsApp.` : `Avisamos ${atual.avisa} pelo WhatsApp.`}</p></div>`;
+        <p class="drv-muted center">${atual.foto === 'required' ? `${ICON.cam} Vai abrir a câmera. ` : ''}${avisoTxt(atual, true)}</p></div>`;
     } else {
       const f = d.financeiro;
       agora = `<div class="drv-card done-card"><span class="drv-ok-big">${ICON.check}</span><h2>Viagem concluída</h2>
@@ -835,7 +844,7 @@
           return;
         }
         $('.sheet', bg).innerHTML = `<div class="drv-done">${ICON.check}<h2>Pronto!</h2><p>${esc(p.titulo)} às <b>${hhmm(occurredAt)}</b>.</p>
-          <p class="drv-muted">${r.offline ? 'Sem internet: guardamos no celular e enviamos sozinho quando o sinal voltar.' : `Avisamos ${p.avisa} pelo WhatsApp.`}</p></div>`;
+          <p class="drv-muted">${r.offline ? 'Sem internet: guardamos no celular e enviamos sozinho quando o sinal voltar.' : avisoTxt(p)}</p></div>`;
         setTimeout(() => { bg.remove(); refresh(); }, 2200);
       } catch (e) { if (go) { go.disabled = false; go.textContent = 'ENVIAR'; } toast(e.message, true); }
     };
