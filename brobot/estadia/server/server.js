@@ -356,8 +356,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   if (dir.empty && seedIfEmpty) seedAll();
   function resetDemo() { store.reset(); dir.reset(); autoRespostas.length = 0; seedAll(); }
   // Dados de demonstração da versão 1.0 (sem transportadora) são recriados no formato 2.0.
-  if (demo && !dir.empty && !dir.data.orgs.some((o) => o.tipo === 'transportadora')) {
-    if (!quiet) console.log('Dados da versão anterior encontrados: recriando a demonstração no formato 2.0.');
+  if (demo && !dir.empty && (!dir.data.orgs.some((o) => o.tipo === 'transportadora') || dir.data.users.some((u) => u.role === 'tac' && !u.pinHash))) {
+    if (!quiet) console.log('Dados de demonstração de versão anterior encontrados: recriando no formato atual.');
     resetDemo();
   }
 
