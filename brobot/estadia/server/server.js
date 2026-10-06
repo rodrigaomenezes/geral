@@ -10,6 +10,7 @@ const { EventStore, sha256 } = require('./store');
 const { Directory, publicUser } = require('./auth');
 const D = require('./domain');
 const Amelia = require('./amelia');
+const Z = require('./whatsapp');
 const { seed } = require('./seed');
 
 const MAX_BODY = 12 * 1024 * 1024;
@@ -28,6 +29,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   const dir = new Directory(dataDir);
   const demo = process.env.ESTADIA_DEMO_RESET !== '0';
   const SYS = { userId: 'sistema', name: 'Estadia BR', role: 'sistema', orgId: 'estadia-br' };
+  const zcfg = Z.config(process.env, demo);
+  const autoRespostas = []; // respostas automáticas do número Estadia BR (exibidas no simulador)
   const actorOf = (u) => ({ userId: u.id, name: u.nome, role: u.role, orgId: u.orgId });
   const origemDe = (u) => (u.role === 'tac' ? 'app' : 'portal');
   const stateOf = (opId) => D.project(store.forOp(opId));
@@ -75,6 +78,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       }),
       ocorrencias: st.ocorrencias.map((o) => ({ codigo: o.type, descricao: D.labelOf(o.type), ...ev(o), dados: o.payload })),
       notificacoes: st.links.map((l) => ({ tipo: D.labelOf(l.type), ...ev(l), canal: l.payload.canal || null, destinatario: l.payload.destinatario || null })),
+      mensagensWhatsApp: st.mensagens.map((m) => ({ id: m.id, finalidade: m.finalidade, assunto: m.assunto, para: m.para, enviadaEm: m.enviadaEm, modo: m.modo, status: m.status, erro: m.erro,
+        historico: m.historico, respostas: m.respostas.map((r) => ({ em: r.em, texto: r.texto, interpretacao: r.interpretacao, origem: r.origem })), reenvioDe: m.reenvioDe })),
       retificacoes: st.retificacoes.map((r) => ({ ...ev(r), campo: r.payload.campo, anterior: r.payload.anterior, novo: r.payload.novo, motivo: r.payload.motivo })),
       alertas: D.alertas(st),
       apuracao: ap,
@@ -91,7 +96,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     return hash;
   }
 
-  function createLink(st, refEvent, confirmType, by = SYS) {
+  function createLink(st, refEvent, confirmType, by = SYS, registrar = true) {
     const links = store.loadLinks();
     const token = crypto.randomBytes(24).toString('base64url');
     const id = crypto.randomUUID();
@@ -100,9 +105,114 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     const destinatario = { nome: st.op.responsavelNome || st.op.destinoNome, telefone: st.op.responsavelTelefone || null };
     links[token] = { id, opId: st.op.id, refEventId: refEvent.id, confirmType, criadoEm, expiraEm, usadoEm: null, destinatario };
     store.saveLinks(links);
-    store.append({ opId: st.op.id, type: 'LINK_GERADO', actor: by, origem: 'sistema', payload: {
+    if (registrar) store.append({ opId: st.op.id, type: 'LINK_GERADO', actor: by, origem: 'sistema', payload: {
       linkId: id, refEventId: refEvent.id, confirmType, canal: 'whatsapp', modo: 'manual', destinatario, expiraEm, tokenHash: sha256(token) } });
-    return token;
+    return { token, id };
+  }
+  const tokenDoLink = (linkId) => { const e = Object.entries(store.loadLinks()).find(([, l]) => l.id === linkId); return e ? e[0] : null; };
+
+  // ---------- WhatsApp: envio, respostas e confirmações ----------
+  const fmtH = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  const fmtD = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+  const placaF = (p) => (p ? `${p.slice(0, 3)}-${p.slice(3)}` : '');
+  const contatos = (op) => ({
+    destino: { nome: op.responsavelNome || 'Responsável no destino', telefone: Z.normFone(op.responsavelTelefone), papel: 'destino' },
+    transportadora: { nome: op.transportadoraContatoNome || op.transportadoraNome || 'Transportadora', telefone: Z.normFone(op.transportadoraContatoTelefone), papel: 'transportadora' },
+  });
+  function frase(type, op) {
+    const t = op.tipo === 'CARGA' ? 'a carga' : 'a descarga';
+    return { CHEGADA: `chegou a ${op.localNome}`, INICIO: `iniciou ${t}`, TERMINO: `terminou ${t}`, LIBERACAO: 'foi liberado para viagem', SAIDA: `saiu de ${op.localNome}` }[type] || D.labelOf(type).toLowerCase();
+  }
+  const textoReal = (m, baseUrl) => { const tk = m.linkId && tokenDoLink(m.linkId); return String(m.texto || '').replace('{{link}}', tk && baseUrl ? `${baseUrl}/c/${tk}` : '(link indisponível)'); };
+
+  async function enviarZap(st, para, { finalidade, ev, confirmType, extra = '', baseUrl, reenvioDe, by = SYS }) {
+    const op = st.op;
+    let linkId = null;
+    if (finalidade === 'CONFIRMAR' && baseUrl) linkId = createLink(st, ev, confirmType, by, false).id;
+    const assunto = frase(ev.type, op);
+    const texto = `*Estadia BR* · ${op.codigo}\n${op.tacNome || 'O motorista'} (placa ${placaF(op.placa)}) informou que *${assunto}* às *${fmtH(ev.occurredAt)}* de ${fmtD(ev.occurredAt)}.${extra}`
+      + (finalidade === 'CONFIRMAR' ? '\n\nVocê confirma? Responda *SIM* para confirmar ou *NÃO* se não reconhece.' : '\n\nResponda *OK* para confirmar que recebeu.')
+      + (linkId ? '\n\nVer foto e local: {{link}}' : '');
+    const mensagemId = crypto.randomUUID();
+    let status, externalId = null, erro = null;
+    if (!para.telefone) { status = 'falha'; erro = 'Contato sem número de WhatsApp'; }
+    else if (zcfg.mode === 'api') {
+      try { ({ externalId } = await Z.enviarApi(zcfg, para.telefone, textoReal({ texto, linkId }, baseUrl))); status = 'enviada'; } catch (e) { status = 'falha'; erro = e.message; }
+    } else status = zcfg.mode === 'simulado' ? 'enviada' : 'aguardando_envio';
+    store.append({ opId: op.id, type: 'WHATSAPP_ENVIADA', actor: by, origem: 'sistema', payload: {
+      mensagemId, externalId, para, finalidade, confirmType: confirmType || null, refEventId: ev.id, assunto, texto, linkId, modo: zcfg.mode, status, erro: erro || undefined, reenvioDe: reenvioDe || undefined } });
+    return { mensagemId, status };
+  }
+
+  async function notificar(st, ev, baseUrl) {
+    if (ev.actor.role !== 'tac') return;
+    const c = contatos(st.op);
+    if (D.CONFIRMATIONS[ev.type] && ['CHEGADA', 'INICIO', 'TERMINO', 'LIBERACAO'].includes(ev.type)) {
+      await enviarZap(st, c.destino, { finalidade: 'CONFIRMAR', ev, confirmType: D.CONFIRMATIONS[ev.type].type, baseUrl });
+    }
+    if (['CHEGADA', 'LIBERACAO'].includes(ev.type)) await enviarZap(stateOf(st.op.id), c.transportadora, { finalidade: 'INFORMAR', ev, baseUrl });
+    if (ev.type === 'SAIDA') {
+      const s2 = stateOf(st.op.id);
+      const ap = s2.apuracoes.length ? s2.apuracoes[s2.apuracoes.length - 1].payload : null;
+      const extra = ap ? `\nTempo de estadia: ${D.fmtDur(ap.tempoMin)}. Valor devido: ${ap.valorDevido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.` : '';
+      await enviarZap(s2, c.transportadora, { finalidade: 'INFORMAR', ev, extra, baseUrl });
+    }
+  }
+
+  function acharMensagem({ mensagemId, contextId, fone }) {
+    const all = [];
+    for (const st of allStates()) for (const m of st.mensagens) all.push({ st, m });
+    if (mensagemId) return all.find((x) => x.m.id === mensagemId) || null;
+    if (contextId) { const x = all.find((y) => y.m.externalId === contextId || y.m.id === contextId); if (x) return x; }
+    const doFone = all.filter((x) => x.m.para.telefone === fone && Date.now() - Date.parse(x.m.enviadaEm) < 72 * 3600000)
+      .sort((a, b) => b.m.enviadaEm.localeCompare(a.m.enviadaEm));
+    const pendente = doFone.find((x) => x.m.finalidade === 'CONFIRMAR' && !x.m.respostas.some((r) => r.interpretacao !== 'OUTRO') && !x.st.confirmations[x.m.refEventId]);
+    return pendente || doFone.find((x) => !x.m.respostas.length) || doFone[0] || null;
+  }
+
+  async function responderAuto(fone, texto) {
+    if (zcfg.mode === 'simulado') autoRespostas.push({ telefone: fone, texto, em: new Date().toISOString() });
+    else if (zcfg.mode === 'api') { try { await Z.enviarApi(zcfg, fone, texto); } catch { /* resposta automática é opcional */ } }
+  }
+
+  /** Processa a resposta de um contato: registra, e se for SIM/NÃO para um pedido de confirmação, cria o evento. */
+  async function processarResposta({ from, texto, contextId, em, mensagemId, origem = 'whatsapp', photo, declaradoPor, meta: mt = {} }) {
+    const fone = Z.normFone(from);
+    const alvo = acharMensagem({ mensagemId, contextId, fone });
+    if (!alvo) return { resultado: 'sem_mensagem' };
+    const { st, m } = alvo;
+    const interp = Z.interpretar(texto);
+    const when = em && Date.parse(em) <= Date.now() + 60000 ? new Date(em).toISOString() : new Date().toISOString();
+    const nome = declaradoPor ? `${m.para.nome} (print do WhatsApp enviado por ${declaradoPor})` : `${m.para.nome} (WhatsApp)`;
+    const actor = { userId: `${origem}:${m.para.telefone || 'sem-numero'}`, name: nome, role: m.para.papel === 'transportadora' ? 'transportadora' : 'destino', orgId: m.para.papel === 'transportadora' ? st.op.transportadoraOrgId : st.op.destinoOrgId };
+    store.append({ opId: st.op.id, type: 'WHATSAPP_RESPOSTA', actor, origem, occurredAt: when, ...mt, payload: { mensagemId: m.id, de: fone || m.para.telefone, texto: String(texto || '').slice(0, 1000), interpretacao: interp, photo: photo || undefined, declaradoPor: declaradoPor || undefined } });
+    let resultado = m.finalidade === 'INFORMAR' ? 'ciente' : 'registrada';
+    const s2 = stateOf(st.op.id);
+    const ref = Object.values(s2.milestones).find((e) => e.id === m.refEventId);
+    if (m.finalidade === 'CONFIRMAR' && ref && !s2.encerrada) {
+      if (s2.confirmations[ref.id]) resultado = 'ja_confirmado';
+      else if (interp === 'SIM') {
+        store.append({ opId: st.op.id, type: m.confirmType, actor, origem, occurredAt: when, refEventId: ref.id, ...mt, payload: { mensagemId: m.id, resposta: String(texto || '').slice(0, 200), photo: photo || undefined } });
+        resultado = 'confirmado';
+      } else if (interp === 'NAO') {
+        if (!s2.divergences.some((d) => d.refEventId === ref.id)) store.append({ opId: st.op.id, type: 'DIVERGENCIA', actor, origem, occurredAt: when, refEventId: ref.id, ...mt, payload: { note: `Respondeu NÃO pelo WhatsApp: "${String(texto || '').slice(0, 300)}"`, mensagemId: m.id, photo: photo || undefined } });
+        resultado = 'divergencia';
+      } else resultado = 'nao_entendida';
+    } else if (m.finalidade === 'INFORMAR' && interp === 'NAO') resultado = 'registrada';
+    if (!declaradoPor && fone) {
+      const msg = { confirmado: `Obrigado! Confirmação registrada às ${fmtH(when)}.`, divergencia: 'Obrigado. Registramos que você NÃO confirma. A informação será analisada.',
+        nao_entendida: 'Não entendi a resposta. Responda *SIM* para confirmar ou *NÃO* se não reconhece.', ciente: 'Obrigado! Recebimento confirmado.' }[resultado];
+      if (msg) await responderAuto(fone, msg);
+    }
+    return { resultado, opId: st.op.id, mensagemId: m.id };
+  }
+
+  function mensagensView(st, baseUrl) {
+    return st.mensagens.map((m) => {
+      const real = textoReal(m, baseUrl);
+      return { ...m, texto: real, telefoneFmt: Z.fmtFone(m.para.telefone), whatsappUrl: m.para.telefone ? `https://wa.me/${m.para.telefone}?text=${encodeURIComponent(real)}` : null,
+        respondida: m.respostas.length > 0, ultimaResposta: m.respostas[m.respostas.length - 1] || null, reenviada: st.mensagens.some((x) => x.reenvioDe === m.id) };
+    });
   }
 
   function linksAtivos(st, baseUrl) {
@@ -118,10 +228,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   }
 
   // Após registros do TAC que dependem do destino: gera link de confirmação (épico 04/21).
-  function aposRegistro(st, ev) {
-    if (ev.actor.role === 'tac' && ['CHEGADA', 'INICIO', 'TERMINO'].includes(ev.type)) {
-      createLink(st, ev, D.CONFIRMATIONS[ev.type].type);
-    }
+  async function aposRegistro(st, ev, baseUrl) {
     if (ev.type === 'CHEGADA' && ev.payload.gps && ev.payload.gps.erro) {
       store.append({ opId: st.op.id, type: 'GPS_INDISPONIVEL', actor: SYS, refEventId: ev.id, payload: { marco: D.labelOf(ev.type), motivo: ev.payload.gps.erro } });
     }
@@ -131,6 +238,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       recordApuracao(s2);
       buildDossie(stateOf(st.op.id), SYS);
     }
+    await notificar(stateOf(st.op.id), ev, baseUrl);
   }
 
   function checarDeslocamento(st, gps, occurredAt, extra = {}) {
@@ -169,6 +277,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       apuracao: D.apurar(st), apuracoes: st.apuracoes.length, alertas: D.alertas(st), acoes: D.nextActions(st, user),
       financeiro: { ...st.financeiro, pagamentos: timeline(st.pagamentos), origens: D.ORIGENS_PAGAMENTO },
       links: parte && baseUrl ? linksAtivos(st, baseUrl) : [],
+      mensagens: parte ? mensagensView(st, baseUrl) : [], contatos: contatos(st.op), zapModo: zcfg.mode,
       dossies: st.dossies.map((d) => ({ hash: d.payload.hash, geradoEm: d.occurredAt, por: d.actor.name })),
       juridico: { elegivel: D.elegivelJuridico(st), status: st.statusJuridico, historico: timeline(st.juridico) },
       divergenciasAbertas: st.divergenciasAbertas.map((d) => d.id),
@@ -245,7 +354,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       payload: { valor: 400, origem: 'pagamento_comercial', note: 'Pagamento parcial informado pelo destinatário.' } });
   }
   if (dir.empty && seedIfEmpty) seedAll();
-  function resetDemo() { store.reset(); dir.reset(); seedAll(); }
+  function resetDemo() { store.reset(); dir.reset(); autoRespostas.length = 0; seedAll(); }
   // Dados de demonstração da versão 1.0 (sem transportadora) são recriados no formato 2.0.
   if (demo && !dir.empty && !dir.data.orgs.some((o) => o.tipo === 'transportadora')) {
     if (!quiet) console.log('Dados da versão anterior encontrados: recriando a demonstração no formato 2.0.');
@@ -257,6 +366,10 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   const fail = (res, status, code, message) => send(res, status, { erro: code, mensagem: message });
   const meta = (req) => ({ ip: String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() || null, dispositivo: String(req.headers['user-agent'] || '').slice(0, 200) || null });
   const baseUrlOf = (req) => process.env.ESTADIA_BASE_URL || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`;
+
+  function readRaw(req) {
+    return new Promise((resolve, reject) => { const chunks = []; let size = 0; req.on('data', (c) => { size += c.length; if (size > MAX_BODY) { req.destroy(); reject(new D.DomainError(413, 'MUITO_GRANDE', 'Envio grande demais.')); } else chunks.push(c); }); req.on('end', () => resolve(Buffer.concat(chunks))); req.on('error', reject); });
+  }
 
   function readBody(req) {
     return new Promise((resolve, reject) => {
@@ -351,9 +464,71 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     if ((m = /^\/api\/public\/link\/([A-Za-z0-9_-]{20,})(?:\/(foto|confirmar|renovar))?$/.exec(p))) return handlePublic(req, res, m[1], m[2]);
 
     if (p === '/api/login' && req.method === 'POST') {
-      const { email, senha } = await readBody(req);
+      const { email, senha, telefone, pin } = await readBody(req);
+      if (telefone) {
+        const r = dir.loginTelefone(telefone, pin);
+        return r ? send(res, 200, r) : fail(res, 401, 'CREDENCIAIS', 'Celular ou código errado. Confira e tente de novo.');
+      }
       const r = dir.login(email, senha);
       return r ? send(res, 200, r) : fail(res, 401, 'CREDENCIAIS', 'E-mail ou senha incorretos.');
+    }
+
+    // Webhook oficial do WhatsApp (Cloud API): verificação e recebimento de respostas e status.
+    if (p === '/api/whatsapp/webhook' && req.method === 'GET') {
+      const ok = url.searchParams.get('hub.mode') === 'subscribe' && zcfg.verifyToken && url.searchParams.get('hub.verify_token') === zcfg.verifyToken;
+      res.writeHead(ok ? 200 : 403, { 'Content-Type': 'text/plain' });
+      return res.end(ok ? url.searchParams.get('hub.challenge') || '' : 'forbidden');
+    }
+    if (p === '/api/whatsapp/webhook' && req.method === 'POST') {
+      const raw = await readRaw(req);
+      if (!Z.assinaturaValida(zcfg.appSecret, raw, req.headers['x-hub-signature-256'])) return fail(res, 401, 'ASSINATURA', 'Assinatura inválida.');
+      let body; try { body = JSON.parse(raw.toString('utf8')); } catch { return fail(res, 400, 'JSON_INVALIDO', 'Corpo inválido.'); }
+      const { mensagens, status } = Z.lerWebhook(body);
+      for (const s of status) {
+        const alvo = allStates().flatMap((st) => st.mensagens.map((m) => ({ st, m }))).find((x) => x.m.externalId && x.m.externalId === s.externalId);
+        if (alvo) store.append({ opId: alvo.st.op.id, type: 'WHATSAPP_STATUS', actor: SYS, origem: 'whatsapp', occurredAt: s.em, payload: { mensagemId: alvo.m.id, status: s.status, erro: s.erro || undefined } });
+      }
+      const resultados = [];
+      for (const msg of mensagens) resultados.push(await processarResposta(msg));
+      return send(res, 200, { ok: true, resultados });
+    }
+
+    // Simulador do WhatsApp do destino/transportadora (somente demonstração).
+    if (p.startsWith('/api/sim/whatsapp')) {
+      if (!demo || zcfg.mode !== 'simulado') return fail(res, 404, 'NAO_DISPONIVEL', 'Simulador disponível apenas no modo de demonstração.');
+      const conversas = () => {
+        const map = new Map();
+        for (const st of allStates()) for (const m of mensagensView(st, baseUrlOf(req))) {
+          const k = m.para.telefone || 'sem-numero';
+          if (!map.has(k)) map.set(k, { telefone: k, telefoneFmt: m.telefoneFmt, nome: m.para.nome, papel: m.para.papel, itens: [] });
+          const c = map.get(k);
+          c.itens.push({ tipo: 'recebida', id: m.id, texto: m.texto, em: m.enviadaEm, status: m.status, codigo: st.op.codigo, finalidade: m.finalidade });
+          for (const r of m.respostas) if (r.origem === 'whatsapp') c.itens.push({ tipo: 'enviada', texto: r.texto, em: r.em });
+        }
+        for (const a of autoRespostas) { const c = map.get(a.telefone); if (c) c.itens.push({ tipo: 'recebida', texto: a.texto, em: a.em, auto: true }); }
+        return [...map.values()].map((c) => ({ ...c, itens: c.itens.sort((a, b) => a.em.localeCompare(b.em)), ultima: c.itens.reduce((x, i) => (i.em > x ? i.em : x), '') })).sort((a, b) => b.ultima.localeCompare(a.ultima));
+      };
+      const marcar = (fone, status) => {
+        for (const st of allStates()) for (const m of st.mensagens) {
+          if (m.para.telefone !== fone) continue;
+          if (status === 'entregue' && m.status === 'enviada') store.append({ opId: st.op.id, type: 'WHATSAPP_STATUS', actor: SYS, origem: 'whatsapp', payload: { mensagemId: m.id, status: 'entregue' } });
+          if (status === 'lida' && ['enviada', 'entregue'].includes(m.status)) {
+            if (m.status === 'enviada') store.append({ opId: st.op.id, type: 'WHATSAPP_STATUS', actor: SYS, origem: 'whatsapp', payload: { mensagemId: m.id, status: 'entregue' } });
+            store.append({ opId: st.op.id, type: 'WHATSAPP_STATUS', actor: SYS, origem: 'whatsapp', payload: { mensagemId: m.id, status: 'lida' } });
+          }
+        }
+      };
+      if (p === '/api/sim/whatsapp' && req.method === 'GET') {
+        for (const c of conversas()) marcar(c.telefone, 'entregue');
+        return send(res, 200, { conversas: conversas() });
+      }
+      if (p === '/api/sim/whatsapp/abrir' && req.method === 'POST') { const b = await readBody(req); marcar(Z.normFone(b.telefone), 'lida'); return send(res, 200, { ok: true }); }
+      if (p === '/api/sim/whatsapp/responder' && req.method === 'POST') {
+        const b = await readBody(req);
+        if (!String(b.texto || '').trim()) return fail(res, 400, 'TEXTO', 'Escreva a resposta.');
+        marcar(Z.normFone(b.telefone), 'lida');
+        return send(res, 200, await processarResposta({ from: b.telefone, texto: b.texto, contextId: b.mensagemId, meta: meta(req) }));
+      }
     }
 
     const h = req.headers.authorization || '';
@@ -375,7 +550,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
 
     if (p === '/api/config') {
-      return send(res, 200, { demo, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS,
+      return send(res, 200, { demo, zapModo: zcfg.mode, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS,
         destinos: dir.data.orgs.filter((o) => o.tipo === 'destino').map((o) => ({ id: o.id, nome: o.nome })), permissoes: D.PERMISSOES });
     }
 
@@ -448,12 +623,21 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       return send(res, 200, detail(stateOf(st.op.id), user, baseUrl));
     }
 
+    if (p === '/api/tac/viagens') {
+      if (user.role !== 'tac') return fail(res, 403, 'SEM_PERMISSAO', 'Somente motoristas.');
+      const sts = allStates();
+      const minhas = sts.filter((st) => st.op.tacUserId === user.id).map(summary).reverse();
+      const disponiveis = sts.filter((st) => !st.op.tacUserId && st.op.placa === user.placa && !st.encerrada)
+        .map((st) => ({ ...summary(st), mercadoria: st.op.mercadoria, pesoToneladas: st.op.pesoToneladas, dataPrevista: st.op.dataPrevista || null, origem: st.op.origem }));
+      return send(res, 200, { minhas, disponiveis, placa: user.placa });
+    }
+
     if (p === '/api/relatorios') {
       if (!D.can(user, 'relatorios')) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não acessa relatórios.');
       return send(res, 200, relatorios(user));
     }
 
-    if ((m = /^\/api\/operations\/([0-9a-f-]{36})(\/[a-z-]+)?(?:\/([0-9a-f-]{36})\/(enviado))?$/.exec(p))) {
+    if ((m = /^\/api\/operations\/([0-9a-f-]{36})(\/[a-z-]+(?:\/[a-z-]+)?)?(?:\/([0-9a-z-]{8,40})\/(enviado|enviada))?$/.exec(p))) {
       const st = stateOf(m[1]);
       if (!canSee(user, st)) return fail(res, 404, 'NAO_ENCONTRADA', 'Operação não encontrada.');
       const sub = m[2] || '';
@@ -470,7 +654,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         for (const k of ['gps', 'note', 'alegadoEm', 'resolucao', 'valor', 'origem', 'situacao']) if (v[k] !== undefined && v[k] !== null) payload[k] = v[k];
         if (b.photo) payload.photo = parseFile(b.photo);
         const ev = append({ opId, type: v.type, occurredAt: v.occurredAt, refEventId: v.refEventId, clientEventId: b.clientEventId, payload });
-        aposRegistro(stateOf(opId), ev);
+        await aposRegistro(stateOf(opId), ev, baseUrl);
         return send(res, 201, { duplicado: false, evento: ev, detalhe: fresh() });
       }
 
@@ -483,6 +667,63 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         const ref = D.pontoReferencia(st);
         const r = checarDeslocamento(st, gps, undefined, b.simulado ? { simulado: true } : {});
         return send(res, 200, { ...r, distanciaM: ref ? D.haversineM(gps, ref) : null, limiteM: D.LIMITE_DESLOCAMENTO_M });
+      }
+
+      const ehParte = ['admin', 'transportadora'].includes(user.role) || (user.role === 'tac' && st.op.tacUserId === user.id) || (user.role === 'destino' && st.op.destinoOrgId === user.orgId);
+
+      if (sub === '/dados-conferidos' && req.method === 'POST') {
+        if (user.role !== 'tac' || st.op.tacUserId !== user.id) return fail(res, 403, 'SEM_PERMISSAO', 'Somente o motorista da operação.');
+        if (st.dadosInformados) return send(res, 200, fresh());
+        const campos = ['placa', 'tipo', 'implemento', 'mercadoria', 'pesoToneladas', 'volume', 'nfe', 'localNome'].filter((k) => st.op[k] != null && st.op[k] !== '');
+        const lab = { placa: 'Placa', tipo: 'Tipo de operação', implemento: 'Implemento', mercadoria: 'Carga', pesoToneladas: 'Peso (t)', volume: 'Volume', nfe: 'NF-e', localNome: 'Local' };
+        append({ opId, type: 'DADOS_INFORMADOS', origem: 'app', payload: { canal: 'conferencia', texto: 'Motorista conferiu e confirmou os dados cadastrados.', entidades: campos.map((k) => ({ campo: k, label: lab[k], valor: st.op[k], cadastrado: st.op[k], confere: true, trecho: 'conferido na tela' })) } });
+        return send(res, 200, fresh());
+      }
+
+      if (sub === '/contato' && req.method === 'POST') {
+        if (!ehParte || user.role === 'destino') return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não altera contatos.');
+        const b = await readBody(req);
+        const papel = b.papel === 'transportadora' ? 'transportadora' : 'destino';
+        const tel = Z.normFone(b.telefone);
+        if (!tel || tel.length < 12) return fail(res, 400, 'TELEFONE', 'Informe o celular com DDD.');
+        append({ opId, type: 'CONTATO_INFORMADO', payload: { papel, nome: String(b.nome || '').trim().slice(0, 60) || null, telefone: `+${tel}` } });
+        // Reenvia o que não saiu por falta de número
+        let s2 = stateOf(opId);
+        for (const msg of s2.mensagens.filter((x) => x.para.papel === papel && x.status === 'falha' && !s2.mensagens.some((y) => y.reenvioDe === x.id))) {
+          const ev = Object.values(s2.milestones).find((e) => e.id === msg.refEventId);
+          if (ev && (msg.finalidade !== 'CONFIRMAR' || !s2.confirmations[ev.id])) await enviarZap(s2, contatos(s2.op)[papel], { finalidade: msg.finalidade, ev, confirmType: msg.confirmType, baseUrl, reenvioDe: msg.id, by: actorOf(user) });
+          s2 = stateOf(opId);
+        }
+        return send(res, 201, fresh());
+      }
+
+      if (sub === '/whatsapp/reenviar' && req.method === 'POST') {
+        if (!ehParte) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não envia mensagens.');
+        const b = await readBody(req);
+        const msg = st.mensagens.find((x) => x.id === b.mensagemId);
+        if (!msg) return fail(res, 404, 'MENSAGEM', 'Mensagem não encontrada.');
+        const ev = Object.values(st.milestones).find((e) => e.id === msg.refEventId);
+        if (!ev) return fail(res, 409, 'SEM_REGISTRO', 'Registro de origem não encontrado.');
+        if (msg.finalidade === 'CONFIRMAR' && st.confirmations[ev.id]) return fail(res, 409, 'JA_CONFIRMADO', 'Já foi confirmado. Não é preciso reenviar.');
+        const extra = msg.texto.includes('Tempo de estadia') ? msg.texto.slice(msg.texto.indexOf('\nTempo de estadia'), msg.texto.indexOf('\n\nResponda')) : '';
+        await enviarZap(st, contatos(st.op)[msg.para.papel], { finalidade: msg.finalidade, ev, confirmType: msg.confirmType, extra, baseUrl, reenvioDe: msg.id, by: actorOf(user) });
+        return send(res, 201, fresh());
+      }
+
+      if (sub === '/whatsapp/print' && req.method === 'POST') {
+        if (user.role !== 'tac' || st.op.tacUserId !== user.id) return fail(res, 403, 'SEM_PERMISSAO', 'Somente o motorista da operação.');
+        const b = await readBody(req);
+        if (!st.mensagens.some((x) => x.id === b.mensagemId)) return fail(res, 404, 'MENSAGEM', 'Mensagem não encontrada.');
+        if (!b.photo) return fail(res, 400, 'FOTO_OBRIGATORIA', 'Envie o print da conversa.');
+        const photo = parseFile(b.photo);
+        const r = await processarResposta({ mensagemId: b.mensagemId, texto: b.resposta === 'NAO' ? 'NÃO (conforme print)' : 'SIM (conforme print)', origem: 'print_whatsapp', photo, declaradoPor: user.nome, meta: mt });
+        return send(res, 201, { ...r, detalhe: fresh() });
+      }
+
+      if (m[4] && sub === '/whatsapp' && req.method === 'POST') {
+        if (!ehParte) return fail(res, 403, 'SEM_PERMISSAO', 'Sem permissão.');
+        if (st.mensagens.some((x) => x.id === m[3] && x.status === 'aguardando_envio')) append({ opId, type: 'WHATSAPP_STATUS', payload: { mensagemId: m[3], status: 'enviada_manual' } });
+        return send(res, 201, { ok: true });
       }
 
       if (m[4] === 'enviado' && sub === '/links' && req.method === 'POST') {

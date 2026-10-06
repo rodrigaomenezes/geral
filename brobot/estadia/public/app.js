@@ -237,7 +237,12 @@
     renderShell();
     const r = route();
     try {
-      if (r.name === 'op' && r.id) await viewOp(r.id);
+      const tac = S.user.role === 'tac';
+      document.body.classList.toggle('motorista', tac);
+      if (r.name === 'op' && r.id) await (tac ? viewOpMotorista(r.id) : viewOp(r.id));
+      else if (r.name === 'det' && r.id) await viewOp(r.id);
+      else if (r.name === 'amelia' && tac) await viewAmelia(r.id);
+      else if (tac) await homeMotorista();
       else if (r.name === 'dossie' && r.id) await viewDossie(r.id);
       else if (r.name === 'relatorios' && can('relatorios')) await viewRelatorios();
       else if (r.name === 'admin' && S.user.role === 'admin') await viewAdmin();
@@ -264,20 +269,23 @@
     const bar = $('#bar'); if (!bar || !S.user) return;
     const pend = fila.length;
     const nav = (href, label) => `<a class="navlink" href="${href}">${label}</a>`;
+    if (S.user.role === 'tac') {
+      bar.innerHTML = `<a class="brand" href="#/"><span class="mark"></span><b>Estadia BR</b></a>
+        <span class="net ${online() ? '' : 'off'}"><i></i>${online() ? 'Conectado' : 'Sem internet'}${pend ? ` · ${pend} para enviar` : ''}</span>
+        <button id="logout" class="bar-sair">Sair</button>`;
+      $('#logout').onclick = logout;
+      return;
+    }
     bar.innerHTML = `<a class="brand" href="#/"><span class="mark"></span><b>Estadia BR</b></a>
       <nav class="nav">${nav('#/', 'Operações')}${can('relatorios') ? nav('#/relatorios', 'Relatórios') : ''}${S.user.role === 'admin' ? nav('#/admin', 'Administração') : ''}</nav>
       <span class="net ${online() ? '' : 'off'}"><i></i>${online() ? 'Online' : 'Sem sinal'}${pend ? ` · ${pend} a enviar` : ''}</span>
-      ${S.user.role === 'tac' ? `<button id="simoff" title="Simula a perda de sinal para demonstrar o modo offline">${S.simOffline ? 'Reativar sinal' : 'Simular sem sinal'}</button>` : ''}
       <span class="who">${esc(S.user.nome)}<small>${esc(ROLE[S.user.role])} · ${esc(S.user.orgNome || '')}</small></span>
       <button id="logout">Sair</button>`;
     $('#logout').onclick = logout;
-    const so = $('#simoff');
-    if (so) so.onclick = () => { S.simOffline = !S.simOffline; store.set('estadia.simOffline', S.simOffline ? '1' : null); renderBar(); if (!S.simOffline) flush(); else refresh(); };
   }
 
   // ---------------- login ----------------
   const DEMO = [
-    ['joao@tac.demo', 'João Batista Ferreira', 'TAC · placa RTB-4F27'],
     ['operacao@rodoviasul.demo', 'Carla Mendes', 'Transportadora · Rodovia Sul'],
     ['portaria@serraazul.demo', 'Marina Coelho', 'Destinatário · Serra Azul (portaria)'],
     ['doca@serraazul.demo', 'Rafael Toledo', 'Destinatário · Serra Azul (doca)'],
@@ -286,29 +294,43 @@
     ['admin@estadiabr.demo', 'Administração', 'Estadia BR'],
   ];
   function renderLogin() {
+    const aba = store.get('estadia.aba') || 'motorista';
     $('#app').innerHTML = `<div class="login">
       <section class="hero"><div class="mark"></div><h1>Estadia BR</h1>
-        <p>Registro, confirmação e comprovação dos eventos de carga e descarga. Cada marco tem autor, horário, local e evidência, e a apuração da estadia sai automaticamente.</p>
-        <p class="small">Registrar · confirmar · comprovar · apurar · conciliar · rastrear</p></section>
-      <section class="card"><h2>Entrar</h2>
-        <form id="lf" class="form" style="grid-template-columns:1fr">
+        <p>Registre cada etapa da carga e descarga com um toque. A confirmação chega pelo WhatsApp e o tempo de estadia é calculado sozinho.</p></section>
+      <section class="card login-card">
+        <div class="tabs" role="tablist"><button role="tab" data-aba="motorista" aria-selected="${aba === 'motorista'}">Sou motorista</button><button role="tab" data-aba="empresa" aria-selected="${aba === 'empresa'}">Sou da empresa</button></div>
+        <form id="lm" class="login-m" ${aba === 'motorista' ? '' : 'hidden'}>
+          <label for="lm-t">Seu celular</label><input id="lm-t" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required>
+          <label for="lm-p">Seu código de 4 números</label><input id="lm-p" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="••••" required>
+          <p class="err" id="lm-err" hidden></p>
+          <button class="drv-big" type="submit">ENTRAR</button>
+          <p class="small muted">Você continua conectado neste celular. Não precisa entrar de novo toda vez.</p>
+          <div class="demo-users"><span class="label">Demonstração</span>
+            <button type="button" data-tel="11988880001"><b>João Batista Ferreira</b><span class="muted small">(11) 98888-0001 · código 1234 · RTB-4F27</span></button>
+            <button type="button" data-tel="11988880002"><b>Ana Lúcia Prado</b><span class="muted small">(11) 98888-0002 · código 1234 · QPE-2H91</span></button></div>
+        </form>
+        <form id="lf" class="form" style="grid-template-columns:1fr" ${aba === 'empresa' ? '' : 'hidden'}>
           <div class="field"><label class="label" for="lf-e">E-mail</label><input id="lf-e" type="email" autocomplete="username" required></div>
           <div class="field"><label class="label" for="lf-s">Senha</label><input id="lf-s" type="password" autocomplete="current-password" required></div>
           <p class="err" id="lf-err" hidden></p><button class="btn primary" type="submit">Entrar</button>
+          <div class="demo-users"><span class="label">Contas de demonstração · senha estadia123</span>
+            ${DEMO.map(([e, n, r]) => `<button type="button" data-e="${e}"><b>${esc(n)}</b><span class="muted small">${esc(r)}</span></button>`).join('')}</div>
         </form>
-        <div class="demo-users"><span class="label">Contas de demonstração · senha estadia123</span>
-          ${DEMO.map(([e, n, r]) => `<button type="button" data-e="${e}"><b>${esc(n)}</b><span class="muted small">${esc(r)}</span></button>`).join('')}</div>
       </section></div>`;
-    const go = async (email, senha) => {
+    const entrar = async (body, errSel) => {
       try {
-        const r = await api('POST', '/api/login', { email, senha });
+        const r = await api('POST', '/api/login', body);
         S.token = r.token; S.user = r.user; S.config = null;
         store.set('estadia.token', r.token); store.set('estadia.user', JSON.stringify(r.user));
         location.hash = '#/'; render();
-      } catch (e) { const el = $('#lf-err'); el.textContent = e.message; el.hidden = false; }
+      } catch (e) { const el = $(errSel); el.textContent = e.message; el.hidden = false; }
     };
-    $('#lf').onsubmit = (e) => { e.preventDefault(); go($('#lf-e').value, $('#lf-s').value); };
-    $$('[data-e]').forEach((b) => (b.onclick = () => go(b.dataset.e, 'estadia123')));
+    $$('[data-aba]').forEach((t) => (t.onclick = () => { store.set('estadia.aba', t.dataset.aba); renderLogin(); }));
+    $('#lm').onsubmit = (e) => { e.preventDefault(); entrar({ telefone: $('#lm-t').value, pin: $('#lm-p').value }, '#lm-err'); };
+    $$('[data-tel]').forEach((b) => (b.onclick = () => entrar({ telefone: b.dataset.tel, pin: '1234' }, '#lm-err')));
+    $('#lf').onsubmit = (e) => { e.preventDefault(); entrar({ email: $('#lf-e').value, senha: $('#lf-s').value }, '#lf-err'); };
+    $$('[data-e]').forEach((b) => (b.onclick = () => entrar({ email: b.dataset.e, senha: 'estadia123' }, '#lf-err')));
   }
 
   // ---------------- pills e rótulos ----------------
@@ -334,9 +356,14 @@
 
   // Amélia: gravação de áudio + transcrição do navegador quando disponível.
   const recorder = { active: false, media: null, chunks: [], rec: null, audio: null };
-  function homeTac(main, ops) {
+  async function viewAmelia(opId) {
+    let ops = [];
+    try { ops = await api('GET', '/api/operations'); } catch { /* sem internet */ }
+    homeTac($('#main'), ops, opId);
+  }
+  function homeTac(main, ops, voltarOp) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    main.innerHTML = `<div class="card amelia"><div class="card-h"><div class="row"><span class="ava">A</span><div><h2>Amélia</h2><span class="small muted">Assistente da operação</span></div></div></div>
+    main.innerHTML = `<a class="drv-back" href="${voltarOp ? `#/op/${voltarOp}` : '#/'}">← Voltar</a><div class="card amelia"><div class="card-h"><div class="row"><span class="ava">A</span><div><h2>Amélia</h2><span class="small muted">Assistente da operação</span></div></div></div>
         <p>Me conte os dados da sua operação por texto ou áudio. Por exemplo: <i>“Placa RTB4F27, carreta sider, descarga de 28 toneladas de açúcar no CD Jundiaí, nota fiscal 35261000184552.”</i></p>
         <div class="field"><label class="label" for="am-txt">Sua mensagem</label><textarea id="am-txt" rows="3" placeholder="Digite ou toque em Gravar áudio"></textarea></div>
         <div class="row"><button class="btn" id="am-mic" type="button"><span class="recdot"></span><span id="am-mic-l">Gravar áudio</span></button>
@@ -350,8 +377,7 @@
           <div class="field"><label class="label" for="id-p">Placa</label><input id="id-p" value="${esc(placaFmt(S.user.placa))}" required autocapitalize="characters"></div>
           <div class="field" style="justify-content:flex-end"><button class="btn" type="submit">Identificar</button></div>
         </form><p class="err" id="id-err" hidden></p></details>
-      <div class="card-h"><h2>Minhas operações</h2><span class="pill">${ops.length}</span></div>
-      ${ops.length ? ops.map(opCard).join('') : '<p class="muted">Nenhuma operação vinculada ainda.</p>'}`;
+`;
 
     $('#idf').onsubmit = async (e) => {
       e.preventDefault();
@@ -506,6 +532,327 @@
     $$('[data-op]', main).forEach((tr) => (tr.onclick = () => (location.hash = `#/op/${tr.dataset.op}`)));
   }
 
+  // ================= MODO MOTORISTA (TAC) =================
+  // Uma tela, um passo de cada vez, botões grandes e frases do dia a dia.
+  const tipoTxt = (op) => (op.tipo === 'CARGA' ? 'carga' : 'descarga');
+  const primeiro = (n) => String(n || '').split(/[\s(]/)[0];
+  const vibrar = (p = 200) => { try { navigator.vibrate && navigator.vibrate(p); } catch { /* opcional */ } };
+  const ICON = {
+    pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/></svg>',
+    stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>',
+    truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v10H2zM13 10h4l3 3v3h-7z"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg>',
+    cam: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    zap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 1a4 4 0 0 1-2.9-2.9l1-1-1-2z"/></svg>',
+  };
+
+  function passos(op) {
+    const t = tipoTxt(op), T = t.toUpperCase();
+    return [
+      { k: 'CHEGADA', titulo: 'Cheguei no local', botao: 'CHEGUEI', icon: 'pin', pergunta: `Você chegou em ${op.localNome}?`, foto: 'required', fotoTxt: 'Tire uma foto do caminhão no local', gps: 'capturar', avisa: 'a portaria' },
+      { k: 'INICIO', titulo: `Começou a ${t}`, botao: `COMEÇOU A ${T}`, icon: 'play', pergunta: `A ${t} começou agora?`, gps: 'capturar', avisa: 'a portaria' },
+      { k: 'TERMINO', titulo: `Terminou a ${t}`, botao: `TERMINOU A ${T}`, icon: 'stop', pergunta: `A ${t} terminou agora?`, gps: 'capturar', avisa: 'a portaria' },
+      { k: 'LIBERACAO', titulo: 'Fui liberado para viajar', botao: 'FUI LIBERADO', icon: 'doc', pergunta: 'Você foi liberado para seguir viagem?', foto: 'optional', fotoTxt: 'Foto do documento de liberação, se tiver', avisa: 'a portaria' },
+      { k: 'SAIDA', titulo: 'Saí do local', botao: 'SAÍ DO LOCAL', icon: 'truck', pergunta: `Você está saindo de ${op.localNome}?`, foto: 'required', fotoTxt: 'Foto do comprovante ou documento de saída', gps: 'opcional', avisa: 'a transportadora' },
+    ];
+  }
+
+  async function homeMotorista() {
+    const main = $('#main');
+    let v;
+    try { v = await api('GET', '/api/tac/viagens'); store.set('estadia.cache.viagens.' + S.user.id, JSON.stringify(v)); }
+    catch (e) { if (e.code !== 'REDE') throw e; v = JSON.parse(store.get('estadia.cache.viagens.' + S.user.id) || '{"minhas":[],"disponiveis":[]}'); }
+    const ativa = v.minhas.find((o) => !['SAIDA_REGISTRADA', 'APURADA', 'AGUARDANDO_PAGAMENTO', 'PAGAMENTO_PARCIAL', 'PAGO', 'VALOR_DIVERGENTE', 'EM_TRATATIVA', 'ENCAMINHADA_JURIDICO', 'ENCERRADA'].includes(o.statusCode));
+    if (ativa && !sessionStorage.getItem('estadia.naoAbrirAtiva')) { location.hash = `#/op/${ativa.id}`; return; }
+    const viagem = (o) => `<div class="drv-card trip"><span class="drv-tag">${o.tipo === 'CARGA' ? 'CARGA' : 'DESCARGA'}</span>
+      <h2>${esc(o.localNome)}</h2><p class="drv-muted">${esc(o.destinoNome)}</p>
+      <p>${[o.mercadoria, o.pesoToneladas != null ? `${num(o.pesoToneladas)} toneladas` : null, o.dataPrevista ? `previsto ${diaHora(o.dataPrevista)}` : null].filter(Boolean).map(esc).join(' · ')}</p>
+      <button class="drv-big" data-comecar="${esc(o.codigo)}">É ESSA · COMEÇAR</button></div>`;
+    main.innerHTML = `<div class="drv">
+      <h1 class="drv-hello">Olá, ${esc(primeiro(S.user.nome))}</h1>
+      <p class="drv-muted">Caminhão <b class="mono">${esc(placaFmt(S.user.placa))}</b></p>
+      ${ativa ? `<a class="drv-card drv-cont" href="#/op/${ativa.id}"><b>Continuar viagem em andamento</b><span>${esc(ativa.localNome)}</span></a>` : ''}
+      ${v.disponiveis.length ? `<h2 class="drv-h">${v.disponiveis.length > 1 ? 'Viagens para você' : 'Sua próxima viagem'}</h2>${v.disponiveis.map(viagem).join('')}`
+        : !ativa ? `<div class="drv-card"><h2>Nenhuma viagem cadastrada para ${esc(placaFmt(S.user.placa))}</h2><p class="drv-muted">Peça para a transportadora cadastrar, ou informe você mesmo:</p>
+          <a class="drv-big alt" href="#/amelia">FALAR COM A AMÉLIA</a><a class="drv-link" href="#/amelia">Digitar o código da viagem</a></div>` : ''}
+      ${v.disponiveis.length ? '<a class="drv-link" href="#/amelia">Não é nenhuma dessas? Fale com a Amélia</a>' : ''}
+      ${v.minhas.length ? `<h2 class="drv-h">Viagens anteriores</h2>${v.minhas.filter((o) => o !== ativa).slice(0, 6).map((o) => `<a class="drv-row" href="#/op/${o.id}"><span><b>${esc(o.localNome)}</b><br><span class="drv-muted">${esc(o.status)}</span></span><span class="mono">${o.financeiro.devido != null ? brl(o.financeiro.devido) : ''}</span></a>`).join('')}` : ''}
+      ${ajudaHtml(null)}${demoToolsHtml(null)}
+    </div>`;
+    $$('[data-comecar]').forEach((b) => (b.onclick = async () => {
+      b.disabled = true; b.textContent = 'ABRINDO…';
+      try { const d = await api('POST', '/api/operations/identify', { codigo: b.dataset.comecar, placa: S.user.placa, clientEventId: uuid(), occurredAt: new Date().toISOString() }); sessionStorage.removeItem('estadia.naoAbrirAtiva'); location.hash = `#/op/${d.op.id}`; }
+      catch (e) { toast(e.message, true); b.disabled = false; b.textContent = 'É ESSA · COMEÇAR'; }
+    }));
+    bindDemoTools(null);
+  }
+
+  function ajudaHtml(d) {
+    const tel = d && d.contatos && d.contatos.transportadora && d.contatos.transportadora.telefone;
+    const msg = encodeURIComponent(`Olá, aqui é ${S.user.nome} (placa ${placaFmt(S.user.placa)}). Preciso de ajuda${d ? ` na viagem ${d.op.codigo}` : ''}.`);
+    return `<a class="drv-help" href="https://wa.me/${tel || ''}?text=${msg}" target="_blank" rel="noopener">${ICON.zap}<span>Precisa de ajuda? <b>Falar com a transportadora</b></span></a>`;
+  }
+
+  function demoToolsHtml(d) {
+    if (!(S.config && S.config.demo)) return '';
+    return `<details class="drv-demo"><summary>Ferramentas da demonstração</summary>
+      <div class="row"><button class="btn small" id="dm-off">${S.simOffline ? 'Reativar sinal' : 'Simular sem sinal'}</button>
+      ${d && d.referencia ? '<button class="btn small" id="dm-desl">Simular afastamento de 450 m</button>' : ''}
+      ${S.config.zapModo === 'simulado' ? '<a class="btn small" href="/whatsapp.html" target="_blank" rel="noopener">Abrir celular do destino (simulador)</a>' : ''}
+      ${d ? `<a class="btn small" href="#/det/${d.op.id}">Ver tela completa</a>` : ''}</div></details>`;
+  }
+  function bindDemoTools(d, opId) {
+    const off = $('#dm-off');
+    if (off) off.onclick = () => { S.simOffline = !S.simOffline; store.set('estadia.simOffline', S.simOffline ? '1' : null); if (!S.simOffline) flush(); refresh(); };
+    const desl = $('#dm-desl');
+    if (desl) desl.onclick = async () => {
+      const ref = d.referencia;
+      try { const x = await api('POST', `/api/operations/${opId}/posicao`, { lat: ref.lat + 0.004, lng: ref.lng, acc: 10, simulado: true }); toast(`Posição simulada a ${x.distanciaM} m do local.`); refresh(); } catch (e) { toast(e.message, true); }
+    };
+  }
+
+  function zapStatus(m, confirmado) {
+    const nome = primeiro(m.para.nome);
+    if (confirmado) return ['ok', `${nome} confirmou${confirmado.occurredAt ? ' às ' + hhmm(confirmado.occurredAt) : ''}`];
+    const r = m.ultimaResposta;
+    if (r && r.interpretacao === 'SIM') return ['ok', m.finalidade === 'INFORMAR' ? `${nome} recebeu (${hhmm(r.em)})` : `${nome} confirmou às ${hhmm(r.em)}`];
+    if (r && r.interpretacao === 'NAO') return ['crit', `${nome} respondeu NÃO: “${r.texto}”`];
+    if (r) return ['warn', `${nome} respondeu: “${r.texto}”`];
+    return {
+      aguardando_envio: ['warn', 'Falta enviar pelo WhatsApp'], enviada: ['', `Enviado para ${nome} ✓`], enviada_manual: ['', `Enviado para ${nome} pelo seu WhatsApp`],
+      entregue: ['', `Chegou no celular de ${nome} ✓✓ · esperando resposta`], lida: ['sys', `${nome} leu ✓✓ · esperando resposta`], falha: ['crit', `Não foi enviado para ${nome}`],
+    }[m.status] || ['', m.status];
+  }
+
+  async function viewOpMotorista(id) {
+    let d;
+    try { d = await api('GET', `/api/operations/${id}`); store.set('estadia.cache.op.' + id, JSON.stringify(d)); }
+    catch (e) { if (e.code !== 'REDE') throw e; d = JSON.parse(store.get('estadia.cache.op.' + id) || 'null'); if (!d) throw e; }
+    const main = $('#main');
+    const op = d.op;
+    const pend = fila.filter((x) => x.opId === id);
+    const reg = {};
+    for (const e of d.timeline) if (e.kind === 'registro') reg[e.type] = e;
+    for (const p of pend) if (!reg[p.body.type]) reg[p.body.type] = { type: p.body.type, occurredAt: p.body.occurredAt, pendente: true };
+    const conf = (ev) => ev && !ev.pendente && d.timeline.find((c) => c.kind === 'confirmacao' && c.refEventId === ev.id);
+    const div = (ev) => ev && !ev.pendente && d.timeline.find((c) => c.kind === 'divergencia' && c.refEventId === ev.id);
+    const ps = passos(op);
+    const atual = ps.find((p) => !reg[p.k]);
+    const idx = atual ? ps.indexOf(atual) : ps.length;
+    const ap = d.apuracao;
+    const encerradoTac = !!reg.SAIDA;
+    const confLibPortal = d.acoes.find((a) => a.type === 'LIBERACAO_CONFIRMADA');
+
+    // Avisos de confirmações recebidas desde a última visita (vibra o celular).
+    const chave = 'estadia.conf.' + id;
+    const nConf = d.timeline.filter((e) => e.kind === 'confirmacao').length;
+    const antes = Number(store.get(chave) || nConf);
+    if (nConf > antes) { const ult = d.timeline.filter((e) => e.kind === 'confirmacao').pop(); toast(`${primeiro(ult.actor.name)} confirmou: ${ult.label}`); vibrar([120, 60, 120]); }
+    store.set(chave, String(nConf));
+
+    // Tempo de estadia
+    let tempo = '';
+    if (reg.CHEGADA && !ap.pendente) {
+      const t = ap.emCurso ? Math.max(0, Math.round((Date.now() - Date.parse(ap.marcoInicial)) / 60000)) : ap.tempoMin;
+      const passou = t > ap.regra.limiteMin;
+      tempo = `<div class="drv-timer ${passou ? 'over' : ''}"><span class="drv-label">${ap.emCurso ? 'Tempo de espera' : 'Tempo total de estadia'}</span><b id="drv-t">${dur(t)}</b>
+        <span>${passou ? 'Passou de 5 horas: o tempo todo conta para a estadia.' : ap.emCurso ? `Limite de 5 horas às ${hhmm(ap.limiteEm)}` : 'Dentro das 5 horas'}</span></div>`;
+    } else if (reg.CHEGADA) {
+      tempo = `<div class="drv-timer wait"><span class="drv-label">Tempo de espera</span><b>—</b><span>O tempo começa quando a portaria confirmar sua chegada.</span></div>`;
+    }
+
+    // Mensagens ligadas a cada passo
+    const msgsDe = (ev) => (ev && !ev.pendente ? d.mensagens.filter((m) => m.refEventId === ev.id && !m.reenviada) : []);
+    const linhaZap = (m, ev) => {
+      const c = m.finalidade === 'CONFIRMAR' ? conf(ev) : null;
+      const [tom, txt] = zapStatus(m, c);
+      const aberto = m.finalidade === 'CONFIRMAR' && !c && !(m.ultimaResposta && m.ultimaResposta.interpretacao !== 'OUTRO');
+      const semNumero = m.status === 'falha' && /sem número/i.test(m.erro || '');
+      const minutos = Math.round((Date.now() - Date.parse(m.enviadaEm)) / 60000);
+      return `<div class="zap ${tom}"><span class="zap-ico">${ICON.zap}</span><div class="zap-b"><span>${esc(txt)}</span>
+        ${aberto && semNumero ? `<form class="drv-tel" data-tel="${m.para.papel}"><label for="tel-${m.id}">Qual o WhatsApp ${m.para.papel === 'destino' ? 'da portaria' : 'da transportadora'}?</label>
+          <input id="tel-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome do contato"><button class="drv-mid" type="submit">ENVIAR AVISO</button></form>` : ''}
+        ${aberto && !semNumero && (minutos >= 5 || m.status === 'falha' || m.status === 'aguardando_envio' || S.config.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém respondeu ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
+          ${m.status === 'aguardando_envio' || S.config.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR PELO MEU WHATSAPP</a>` : ''}
+          ${m.status !== 'aguardando_envio' && (minutos >= 5 || m.status === 'falha') ? `<button class="btn" data-reenviar="${m.id}">Mandar de novo</button>` : ''}
+          ${m.status !== 'aguardando_envio' && S.config.zapModo !== 'manual' && m.whatsappUrl ? `<a class="btn" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Mandar pelo meu WhatsApp</a>` : ''}
+          <button class="btn" data-print="${m.id}">Responderam no meu WhatsApp</button></div>` : ''}</div></div>`;
+    };
+
+    // Lista de passos (checklist)
+    const lista = ps.map((p, i) => {
+      const ev = reg[p.k];
+      const c = conf(ev), dv = div(ev);
+      const msgs = msgsDe(ev).filter((m) => m.finalidade === 'CONFIRMAR');
+      return `<li class="${ev ? 'done' : i === idx ? 'now' : ''}"><span class="drv-dot">${ev ? ICON.check : i + 1}</span><div><b>${esc(p.titulo)}</b>
+        ${ev ? `<span class="drv-muted">${hhmm(ev.occurredAt)}${ev.pendente ? ' · guardado no celular, envia quando tiver sinal' : ''}</span>` : ''}
+        ${c ? `<span class="drv-ok">${ICON.check} Confirmado por ${esc(primeiro(c.actor.name))} às ${hhmm(c.occurredAt)}</span>` : dv ? `<span class="drv-bad">Não confirmado: ${esc(dv.payload.note)}</span>` : ''}
+        ${!c && !dv ? msgs.map((m) => linhaZap(m, ev)).join('') : ''}</div></li>`;
+    }).join('');
+
+    // Cartão principal
+    let agora = '';
+    if (op.tacUserId !== S.user.id) {
+      agora = '';
+    } else if (confLibPortal) {
+      const lib = reg.LIBERACAO;
+      agora = `<div class="drv-card now"><span class="drv-step">A portaria informou</span><h2>Você foi liberado às ${hhmm(lib.occurredAt)}?</h2>
+        <button class="drv-big ok" data-conflib="1">SIM, FUI LIBERADO</button><button class="drv-big alt" data-naolib="1">NÃO</button></div>`;
+    } else if (!d.timeline.some((e) => e.type === 'DADOS_INFORMADOS') && !reg.CHEGADA && !sessionStorage.getItem('estadia.pularDados.' + id)) {
+      const linha = (k, v) => (v ? `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>` : '');
+      agora = `<div class="drv-card now"><span class="drv-step">Antes de começar</span><h2>Confira sua carga</h2>
+        <dl class="drv-dados">${linha('Placa', placaFmt(op.placa))}${linha('Carga', op.mercadoria)}${linha('Peso', op.pesoToneladas != null ? `${num(op.pesoToneladas)} toneladas` : null)}${linha('Nota fiscal', op.nfe)}${linha('Destino', op.localNome)}</dl>
+        <button class="drv-big ok" id="dados-ok">ESTÁ CERTO</button><a class="drv-big alt" href="#/amelia/${op.id}">TEM ERRO · FALAR COM A AMÉLIA</a>
+        <button class="drv-link" id="dados-pular">Conferir depois</button></div>`;
+    } else if (atual) {
+      agora = `<div class="drv-card now"><span class="drv-step">Passo ${idx + 1} de ${ps.length}</span>
+        <button class="drv-giant" data-passo="${atual.k}">${ICON[atual.icon]}<span>${esc(atual.botao)}</span></button>
+        <p class="drv-muted center">${atual.foto === 'required' ? `${ICON.cam} Vai abrir a câmera. ` : ''}Avisamos ${atual.avisa} pelo WhatsApp.</p></div>`;
+    } else {
+      const f = d.financeiro;
+      agora = `<div class="drv-card done-card"><span class="drv-ok-big">${ICON.check}</span><h2>Viagem concluída</h2>
+        ${!ap.pendente ? `<div class="drv-sum"><div><span class="drv-label">Tempo de estadia</span><b>${dur(ap.tempoMin)}</b></div><div><span class="drv-label">Valor da estadia</span><b>${brl(f.devido != null ? f.devido : ap.valorDevido)}</b></div>
+          ${f.devido ? `<div><span class="drv-label">Você recebeu</span><b>${brl(f.pago)}</b></div><div><span class="drv-label">Falta receber</span><b>${brl(f.saldo)}</b></div>` : ''}</div>` : ''}
+        ${f.devido > 0 && f.saldo > 0 ? '<button class="drv-big" id="recebi">RECEBI UM VALOR</button>' : ''}
+        <a class="drv-big alt" href="#/" id="inicio">VOLTAR AO INÍCIO</a></div>`;
+    }
+
+    const desl = d.alertas.find((a) => a.codigo === 'DESLOCAMENTO_FORA_DO_LIMITE');
+    main.innerHTML = `<div class="drv">
+      <a href="#/" class="drv-back" id="voltar">← Início</a>
+      ${!online() ? '<div class="drv-off">Sem internet. Pode continuar: guardamos tudo no celular e enviamos quando o sinal voltar.</div>' : ''}
+      <div class="drv-head"><span class="drv-tag">${op.tipo === 'CARGA' ? 'CARGA' : 'DESCARGA'}</span><h1>${esc(op.localNome)}</h1><span class="drv-muted">${esc(op.destinoNome)} · ${esc(op.codigo)}</span></div>
+      ${desl && !encerradoTac ? `<div class="drv-warn"><b>Atenção:</b> seu caminhão foi visto longe do local. Fique a menos de ${d.limiteDeslocamentoM} metros.</div>` : ''}
+      ${encerradoTac ? '' : tempo}
+      ${agora}
+      <h2 class="drv-h">Sua viagem</h2><ol class="drv-steps">${lista}</ol>
+      ${encerradoTac ? msgsDe(reg.SAIDA).map((m) => linhaZap(m, reg.SAIDA)).join('') : ''}
+      ${ajudaHtml(d)}
+      <a class="drv-link" href="#/det/${op.id}">Ver todos os detalhes e documentos</a>
+      ${demoToolsHtml(d)}
+    </div>`;
+
+    // Ações
+    $('#voltar').onclick = () => sessionStorage.setItem('estadia.naoAbrirAtiva', '1');
+    const inicio = $('#inicio'); if (inicio) inicio.onclick = () => sessionStorage.setItem('estadia.naoAbrirAtiva', '1');
+    const passoBtn = $('[data-passo]');
+    if (passoBtn) passoBtn.onclick = () => executarPasso(d, ps.find((p) => p.k === passoBtn.dataset.passo), reg);
+    const ok = $('#dados-ok');
+    if (ok) ok.onclick = async () => { ok.disabled = true; try { await api('POST', `/api/operations/${id}/dados-conferidos`); refresh(); } catch (e) { toast(e.message, true); ok.disabled = false; } };
+    const pular = $('#dados-pular');
+    if (pular) pular.onclick = () => { sessionStorage.setItem('estadia.pularDados.' + id, '1'); refresh(); };
+    const cl = $('[data-conflib]');
+    if (cl) cl.onclick = async () => { cl.disabled = true; try { await sendEvent(id, { type: 'LIBERACAO_CONFIRMADA', occurredAt: new Date().toISOString(), refEventId: confLibPortal.refEventId }); refresh(); } catch (e) { toast(e.message, true); cl.disabled = false; } };
+    const nl = $('[data-naolib]');
+    if (nl) nl.onclick = () => divergenceSheet(id, d.acoes.find((a) => a.kind === 'divergencia' && a.refEventId === confLibPortal.refEventId) || { refEventId: confLibPortal.refEventId }, reg.LIBERACAO);
+    $$('[data-reenviar]').forEach((b) => (b.onclick = async () => { b.disabled = true; try { await api('POST', `/api/operations/${id}/whatsapp/reenviar`, { mensagemId: b.dataset.reenviar }); toast('Mensagem enviada de novo.'); refresh(); } catch (e) { toast(e.message, true); b.disabled = false; } }));
+    $$('[data-manual]').forEach((a) => (a.onclick = () => { api('POST', `/api/operations/${id}/whatsapp/${a.dataset.manual}/enviada`).catch(() => {}); }));
+    $$('[data-print]').forEach((b) => (b.onclick = () => printSheet(id, d.mensagens.find((m) => m.id === b.dataset.print))));
+    $$('form[data-tel]').forEach((f) => (f.onsubmit = async (e) => {
+      e.preventDefault();
+      const [tel, nome] = f.querySelectorAll('input');
+      try { await api('POST', `/api/operations/${id}/contato`, { papel: f.dataset.tel, telefone: tel.value, nome: nome.value }); toast('Número salvo. Aviso enviado.'); refresh(); } catch (err) { toast(err.message, true); }
+    }));
+    const rec = $('#recebi');
+    if (rec) rec.onclick = () => recebiSheet(id, d);
+    bindDemoTools(d, id);
+
+    // Tempo ao vivo e monitoramento de deslocamento (silencioso)
+    if (reg.CHEGADA && !ap.pendente && ap.emCurso) liveT = setInterval(() => { const el = $('#drv-t'); if (el) el.textContent = dur((Date.now() - Date.parse(ap.marcoInicial)) / 60000); }, 30000);
+    if (reg.CHEGADA && !reg.SAIDA && op.tacUserId === S.user.id) {
+      const enviar = async () => { if (!online()) return; const g = await getGps(); if (g.erro) return; try { const x = await api('POST', `/api/operations/${id}/posicao`, g); if (x.registrada) refresh(); } catch { /* silencioso */ } };
+      enviar(); monitorT = setInterval(enviar, 120000);
+    }
+  }
+
+  // Executa um passo: câmera direto quando a foto é obrigatória; senão, uma pergunta simples.
+  function executarPasso(d, p, reg) {
+    const occurredAt = new Date().toISOString();
+    const gpsP = p.gps ? getGps() : Promise.resolve(null);
+    const enviar = async (photo, bg) => {
+      const go = $('#ps-go', bg); if (go) { go.disabled = true; go.textContent = 'ENVIANDO…'; }
+      let gps = await gpsP;
+      if (gps && gps.erro && p.gps === 'opcional') gps = undefined;
+      try {
+        const r = await sendEvent(d.op.id, { type: p.k, occurredAt, gps: gps || undefined, photo: photo || undefined });
+        vibrar(80);
+        $('.sheet', bg).innerHTML = `<div class="drv-done">${ICON.check}<h2>Pronto!</h2><p>${esc(p.titulo)} às <b>${hhmm(occurredAt)}</b>.</p>
+          <p class="drv-muted">${r.offline ? 'Sem internet: guardamos no celular e enviamos sozinho quando o sinal voltar.' : `Avisamos ${p.avisa} pelo WhatsApp.`}</p></div>`;
+        setTimeout(() => { bg.remove(); refresh(); }, 2200);
+      } catch (e) { if (go) { go.disabled = false; go.textContent = 'ENVIAR'; } toast(e.message, true); }
+    };
+    const confirmar = (photo) => {
+      const bg = sheet(`<div class="drv-sheet"><h2>${esc(p.pergunta)}</h2><p class="drv-muted">Horário: <b>${hhmm(occurredAt)}</b></p>
+        ${photo ? `<img class="drv-prev" src="${photo}" alt="Foto tirada">` : ''}
+        <button class="drv-big ok" id="ps-go">SIM, ENVIAR</button>
+        ${photo ? '<button class="drv-big alt" id="ps-again">TIRAR OUTRA FOTO</button>' : ''}
+        ${p.foto === 'optional' && !photo ? '<button class="drv-big alt" id="ps-foto">TIRAR FOTO ANTES</button>' : ''}
+        <button class="drv-link" data-x>Voltar</button></div>`);
+      $('#ps-go', bg).onclick = () => enviar(photo, bg);
+      const again = $('#ps-again', bg); if (again) again.onclick = () => { bg.remove(); abrirCamera(); };
+      const foto = $('#ps-foto', bg); if (foto) foto.onclick = () => { bg.remove(); abrirCamera(); };
+    };
+    const abrirCamera = () => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.hidden = true;
+      document.body.appendChild(inp);
+      inp.onchange = async () => { const f = inp.files[0]; inp.remove(); if (!f) return; try { confirmar(await compressImage(f)); } catch (e) { toast(e.message, true); } };
+      inp.click();
+    };
+    if (p.foto === 'required') abrirCamera(); // abre a câmera no mesmo toque
+    else confirmar(null);
+  }
+
+  function printSheet(opId, m) {
+    let photo = null;
+    const bg = sheet(`<div class="drv-sheet"><h2>${esc(primeiro(m.para.nome))} respondeu no seu WhatsApp?</h2>
+      <p class="drv-muted">Tire um print da conversa e envie aqui. O print fica guardado como prova.</p>
+      <label class="photo-drop" for="pr-file"><span id="pr-prev"><b>ESCOLHER O PRINT</b></span></label><input type="file" id="pr-file" accept="image/*" hidden>
+      <button class="drv-big ok" id="pr-sim" disabled>RESPONDEU SIM</button><button class="drv-big alt" id="pr-nao" disabled>RESPONDEU NÃO</button>
+      <button class="drv-link" data-x>Voltar</button></div>`);
+    $('#pr-file', bg).onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      photo = await compressImage(f, 1800);
+      $('#pr-prev', bg).innerHTML = `<img src="${photo}" alt="Print da conversa">`;
+      $('#pr-sim', bg).disabled = false; $('#pr-nao', bg).disabled = false;
+    };
+    const go = async (resposta) => {
+      try { await api('POST', `/api/operations/${opId}/whatsapp/print`, { mensagemId: m.id, resposta, photo }); bg.remove(); toast('Resposta registrada com o print.'); refresh(); } catch (e) { toast(e.message, true); }
+    };
+    $('#pr-sim', bg).onclick = () => go('SIM');
+    $('#pr-nao', bg).onclick = () => go('NAO');
+  }
+
+  function recebiSheet(opId, d) {
+    const bg = sheet(`<div class="drv-sheet"><h2>Quanto você recebeu?</h2>
+      <div class="drv-money"><span>R$</span><input id="rc-v" inputmode="decimal" placeholder="0,00" aria-label="Valor recebido"></div>
+      <p class="drv-muted">Falta receber ${brl(d.financeiro.saldo)}.</p>
+      <button class="drv-big ok" id="rc-go">CONFIRMAR VALOR</button><button class="drv-link" data-x>Voltar</button></div>`);
+    $('#rc-v', bg).focus();
+    $('#rc-go', bg).onclick = async () => {
+      try { await sendEvent(opId, { type: 'PAGAMENTO_REGISTRADO', occurredAt: new Date().toISOString(), valor: $('#rc-v', bg).value, origem: 'acordo_direto', note: 'Informado pelo motorista' }); bg.remove(); refresh(); } catch (e) { toast(e.message, true); }
+    };
+  }
+
+  function mensagensHtml(d) {
+    if (!d.mensagens || !d.mensagens.length) return '';
+    const evs = Object.fromEntries(d.timeline.map((e) => [e.id, e]));
+    return `<div class="card wa"><div class="card-h"><h3>Mensagens de WhatsApp</h3><span class="pill">${esc({ simulado: 'modo demonstração', api: 'API oficial', manual: 'envio manual' }[d.zapModo] || d.zapModo)}</span></div>
+      ${d.mensagens.slice().reverse().map((m) => {
+        const ref = evs[m.refEventId];
+        const c = m.finalidade === 'CONFIRMAR' && ref && d.timeline.find((x) => x.kind === 'confirmacao' && x.refEventId === ref.id);
+        const [tom, txt] = zapStatus(m, c);
+        return `<div class="linkbox"><div class="row between"><b>${m.finalidade === 'CONFIRMAR' ? 'Pedido de confirmação' : 'Aviso'} · ${esc(ref ? ref.label : '')}</b><span class="mono small">${diaHora(m.enviadaEm)}</span></div>
+          <span class="small">Para ${esc(m.para.nome)} · ${esc(m.telefoneFmt || 'sem número')} ${m.reenvioDe ? '· reenvio' : ''}</span>
+          <span class="pill ${tom}">${esc(txt)}</span>
+          ${m.respostas.map((r) => `<span class="small">Resposta ${hhmm(r.em)}: “${esc(r.texto)}” ${r.origem === 'print_whatsapp' ? '(print enviado pelo motorista)' : ''}</span>`).join('')}
+          ${m.finalidade === 'CONFIRMAR' && !c && !m.reenviada ? `<div class="row"><button class="btn small" data-reenviar="${m.id}">Reenviar</button>${m.whatsappUrl ? `<a class="btn small" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Abrir no WhatsApp</a>` : ''}</div>` : ''}</div>`;
+      }).join('')}
+      <p class="small muted">A resposta SIM/OK da pessoa confirma o evento ou o recebimento. NÃO vira divergência para análise.</p></div>`;
+  }
+
   // ---------------- operação ----------------
   async function viewOp(id) {
     let d;
@@ -546,7 +893,7 @@
         ${confs.map((a) => pendingBox(a, evById[a.refEventId], acoes)).join('')}
         ${registros.filter((a) => role === 'tac' || a.type === 'LIBERACAO').map((a) => `<button class="big" data-act="${a.type}">${esc(a.label)}<small>${a.photo === 'required' ? (a.type === 'SAIDA' ? 'Foto do comprovante · GPS não obrigatório' : 'Captura horário, GPS e foto') : a.gps ? 'Captura horário e GPS' : 'Registra o horário deste momento'}</small></button>`).join('')}
         ${role !== 'tac' && registros.some((a) => a.type !== 'LIBERACAO') ? `<div class="card"><span class="label">Registrar pelo operador do destino</span><div class="row">${registros.filter((a) => a.type !== 'LIBERACAO').map((a) => `<button class="btn" data-act="${a.type}">${esc(a.label)}</button>`).join('')}</div></div>` : ''}
-        ${linksHtml(d)}
+        ${mensagensHtml(d)}
         ${monitorando ? `<div class="card" id="monitor"><div class="card-h"><h3>Limite de Deslocamento do Local</h3><span class="pill">${d.limiteDeslocamentoM} m</span></div>
           <p class="small" id="mon-txt">Monitorando sua posição a cada 2 minutos enquanto esta tela estiver aberta.</p>
           <div class="row"><button class="btn small" id="mon-now">Enviar posição agora</button>${d.demo ? '<button class="btn small" id="mon-sim">Simular afastamento de 450 m (demo)</button>' : ''}</div></div>` : ''}
@@ -554,7 +901,7 @@
         ${d.alertas.length ? `<div class="card"><h3>Ocorrências e alertas</h3>${d.alertas.map((a) => `<div class="alert ${a.nivel}"><b>${a.nivel === 'atencao' ? '!' : 'i'}</b><span>${a.codigo === 'DESLOCAMENTO_FORA_DO_LIMITE' ? '<span class="mono small">DESLOCAMENTO_FORA_DO_LIMITE</span> ' : ''}${esc(a.texto)}</span></div>`).join('')}
           <p class="small muted">Ocorrências são para análise humana. Não indicam fraude ou responsabilidade por si só.</p></div>` : ''}
         ${treatBoxes(d, evById)}
-        <div class="card"><div class="card-h"><h2>Linha do tempo</h2><span class="pill">${d.timeline.length} eventos</span></div>${timelineHtml(d, myPending)}</div>
+        <div class="card"><div class="card-h"><h2>Linha do tempo</h2><span class="pill">${d.timeline.filter((e) => !e.type.startsWith('WHATSAPP_')).length} eventos</span></div>${timelineHtml(d, myPending)}</div>
       </div><div class="col">
         ${apuracaoHtml(d)}
         ${financeiroHtml(d)}
@@ -582,6 +929,7 @@
     const sync = $('#sync'); if (sync) sync.onclick = flush;
     const bind = (sel, fn) => { const el = $(sel); if (el) el.onclick = async () => { el.disabled = true; try { await fn(); } catch (e) { toast(e.message, true); el.disabled = false; } }; };
     bind('#novolink', async () => { await api('POST', `/api/operations/${id}/links`); toast('Novo link de confirmação gerado.'); refresh(); });
+    $$('[data-reenviar]', main).forEach((b) => (b.onclick = async () => { b.disabled = true; try { await api('POST', `/api/operations/${id}/whatsapp/reenviar`, { mensagemId: b.dataset.reenviar }); toast('Mensagem reenviada.'); refresh(); } catch (e) { toast(e.message, true); b.disabled = false; } }));
     bind('#apurar', async () => { await api('POST', `/api/operations/${id}/apuracao`); toast('Nova apuração registrada. Histórico preservado.'); refresh(); });
     bind('#gerar', async () => { const x = await api('POST', `/api/operations/${id}/dossie`); toast('Dossiê gerado.'); location.hash = `#/dossie/${x.hash}`; });
     bind('#encaminhar', async () => { await api('POST', `/api/operations/${id}/encaminhar`, { note: ($('#enc-note') || {}).value }); toast('Dossiê encaminhado ao jurídico.'); refresh(); });
@@ -694,6 +1042,7 @@
   function timelineHtml(d, myPending) {
     const subs = {}, main = [];
     for (const e of d.timeline) {
+      if (e.type.startsWith('WHATSAPP_')) continue; // mensagens ficam no quadro "Mensagens de WhatsApp"
       if (e.refEventId && ['confirmacao', 'divergencia', 'tratamento'].includes(e.kind)) (subs[e.refEventId] = subs[e.refEventId] || []).push(e);
       else main.push(e);
     }
@@ -843,6 +1192,9 @@
         <section><span class="label">Conciliação financeira</span>
           ${f.pagamentos.length ? f.pagamentos.map((p) => `<p class="small" style="margin:4px 0">${brl(p.valor)} · ${esc(p.origem)} · ${dataHora(p.em)} · ${esc(p.por)}${p.observacao ? ' · ' + esc(p.observacao) : ''}</p>`).join('') : '<p class="small muted">Nenhum pagamento registrado.</p>'}
           ${f.negociacoes.map((n) => `<p class="small" style="margin:4px 0">Negociação: ${esc(n.situacao)} · ${dataHora(n.em)}${n.observacao ? ' · ' + esc(n.observacao) : ''}</p>`).join('')}</section>
+        ${(c.mensagensWhatsApp || []).length ? `<section><span class="label">Mensagens de WhatsApp</span><div class="tablewrap"><table><thead><tr><th>Enviada</th><th>Para</th><th>Assunto</th><th>Situação</th><th>Resposta</th></tr></thead><tbody>
+          ${c.mensagensWhatsApp.map((m) => `<tr><td class="mono">${diaHora(m.enviadaEm)}</td><td>${esc(m.para.nome)}<br><span class="small muted">${esc(m.para.papel)}</span></td><td>${m.finalidade === 'CONFIRMAR' ? 'Pedido de confirmação' : 'Aviso'}: ${esc(m.assunto)}</td>
+            <td class="small">${esc(m.status)}${m.erro ? ' · ' + esc(m.erro) : ''}</td><td class="small">${m.respostas.map((r) => `${hhmm(r.em)} “${esc(r.texto)}”${r.origem === 'print_whatsapp' ? ' (print)' : ''}`).join('<br>') || '—'}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
         ${c.notificacoes.length ? `<section><span class="label">Notificações e links</span>${c.notificacoes.map((n) => `<p class="small" style="margin:3px 0">${dataHora(n.em)} · ${esc(n.tipo)}${n.destinatario ? ` · ${esc(n.destinatario.nome)}` : ''} · ${esc(n.por)}</p>`).join('')}</section>` : ''}
         ${c.retificacoes.length ? `<section><span class="label">Retificações</span>${c.retificacoes.map((r) => `<p class="small" style="margin:3px 0">${dataHora(r.em)} · ${esc(r.por)}: ${esc(r.campo)} ${esc(r.anterior ?? '—')} → ${esc(r.novo)} · motivo: ${esc(r.motivo)}</p>`).join('')}</section>` : ''}
         ${c.juridico.length ? `<section><span class="label">Jurídico</span>${c.juridico.map((j) => `<p class="small" style="margin:3px 0">${dataHora(j.em)} · ${esc(j.tipo)} · ${esc(jurLabel(j.status))}${j.observacao ? ' · ' + esc(j.observacao) : ''}${j.resultado ? ' · resultado: ' + esc(j.resultado) : ''}</p>`).join('')}</section>` : ''}

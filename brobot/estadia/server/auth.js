@@ -6,6 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+const TOKEN_TTL_TAC_MS = 30 * 24 * 60 * 60 * 1000; // motorista fica conectado no próprio celular
+const foneDigits = (s) => { let d = String(s || '').replace(/\D/g, ''); if (d && d.length <= 11) d = '55' + d; return d; };
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto.scryptSync(String(password), salt, 32).toString('hex');
@@ -48,10 +50,14 @@ class Directory {
     return org;
   }
 
-  addUser({ email, senha, ...rest }) {
+  addUser({ email, senha, pin, telefone, ...rest }) {
     email = String(email).trim().toLowerCase();
     if (this.data.users.some((u) => u.email === email)) throw Object.assign(new Error('E-mail já cadastrado.'), { status: 409 });
+    const tel = telefone ? foneDigits(telefone) : undefined;
+    if (tel && this.data.users.some((u) => u.telefone === tel)) throw Object.assign(new Error('Celular já cadastrado.'), { status: 409 });
     const user = { id: crypto.randomUUID(), email, senhaHash: hashPassword(senha), ...rest };
+    if (tel) user.telefone = tel;
+    if (pin) user.pinHash = hashPassword(String(pin));
     this.data.users.push(user);
     this.save();
     return user;
@@ -71,8 +77,24 @@ class Directory {
     return { token: this.sign(u.id), user: publicUser(u, this.org(u.orgId)) };
   }
 
-  sign(userId) {
-    const body = Buffer.from(JSON.stringify({ uid: userId, exp: Date.now() + TOKEN_TTL_MS })).toString('base64url');
+  /** Login simplificado do motorista: celular + PIN de 4 dígitos, com limite de tentativas. */
+  loginTelefone(telefone, pin) {
+    const tel = foneDigits(telefone);
+    this.tentativas = this.tentativas || new Map();
+    const t = this.tentativas.get(tel) || { n: 0, ate: 0 };
+    if (t.ate > Date.now()) throw Object.assign(new Error('Muitas tentativas. Espere 10 minutos e tente de novo.'), { status: 429 });
+    const u = this.data.users.find((x) => x.telefone === tel && x.pinHash);
+    if (!u || !checkPassword(String(pin || ''), u.pinHash)) {
+      t.n += 1; if (t.n >= 5) { t.ate = Date.now() + 10 * 60000; t.n = 0; }
+      this.tentativas.set(tel, t);
+      return null;
+    }
+    this.tentativas.delete(tel);
+    return { token: this.sign(u.id, TOKEN_TTL_TAC_MS), user: publicUser(u, this.org(u.orgId)) };
+  }
+
+  sign(userId, ttl = TOKEN_TTL_MS) {
+    const body = Buffer.from(JSON.stringify({ uid: userId, exp: Date.now() + ttl })).toString('base64url');
     const sig = crypto.createHmac('sha256', this.secret).update(body).digest('base64url');
     return `${body}.${sig}`;
   }
@@ -93,7 +115,7 @@ class Directory {
 }
 
 function publicUser(u, org) {
-  return { id: u.id, email: u.email, nome: u.nome, role: u.role, orgId: u.orgId, orgNome: org ? org.nome : null, placa: u.placa || null };
+  return { id: u.id, email: u.email, nome: u.nome, role: u.role, orgId: u.orgId, orgNome: org ? org.nome : null, placa: u.placa || null, telefone: u.telefone || null };
 }
 
 module.exports = { Directory, publicUser, hashPassword, checkPassword };

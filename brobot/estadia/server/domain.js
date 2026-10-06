@@ -27,7 +27,7 @@ const MILESTONES = {
   CHEGADA: { label: 'Chegada registrada', by: ['tac'], requires: ['OPERACAO_IDENTIFICADA'], gps: 'capturar', photo: 'required' },
   INICIO: { label: 'Início registrado', by: ['tac', 'destino'], requires: ['CHEGADA'], gps: 'capturar' },
   TERMINO: { label: 'Término registrado', by: ['tac', 'destino'], requires: ['INICIO'], gps: 'capturar', photo: 'optional' },
-  LIBERACAO: { label: 'Liberação para viagem registrada', by: ['destino'], requires: ['TERMINO'], photo: 'optional' },
+  LIBERACAO: { label: 'Liberação para viagem registrada', by: ['tac', 'destino'], requires: ['TERMINO'], photo: 'optional' },
   SAIDA: { label: 'Saída registrada', by: ['tac'], requires: ['CHEGADA'], gps: 'opcional', photo: 'required', photoLabel: 'Foto do documento/comprovante de liberação ou saída' },
 };
 const SEQUENCE = ['OPERACAO_IDENTIFICADA', 'CHEGADA', 'INICIO', 'TERMINO', 'LIBERACAO', 'SAIDA'];
@@ -64,6 +64,10 @@ const OTHER_LABELS = {
   JURIDICO_STATUS: 'Retorno do jurídico',
   OPERACAO_ENCERRADA: 'Operação encerrada',
   USUARIO_CRIADO: 'Usuário criado',
+  CONTATO_INFORMADO: 'Contato informado',
+  WHATSAPP_ENVIADA: 'Mensagem de WhatsApp enviada',
+  WHATSAPP_STATUS: 'Status da mensagem',
+  WHATSAPP_RESPOSTA: 'Resposta recebida pelo WhatsApp',
   ...OCORRENCIAS,
 };
 
@@ -77,13 +81,13 @@ function kindOf(type) {
   if (MILESTONES[type]) return 'registro';
   if (CONFIRMATION_OF[type]) return 'confirmacao';
   if (OCORRENCIAS[type]) return 'ocorrencia';
-  if (type.startsWith('LINK_')) return 'notificacao';
+  if (type.startsWith('LINK_') || type.startsWith('WHATSAPP_')) return 'notificacao';
   return {
     DIVERGENCIA: 'divergencia', OCORRENCIA_TRATADA: 'tratamento', APURACAO: 'apuracao',
     PAGAMENTO_REGISTRADO: 'financeiro', SITUACAO_FINANCEIRA: 'financeiro',
     DOSSIE_GERADO: 'dossie', ENCAMINHADO_JURIDICO: 'juridico', JURIDICO_STATUS: 'juridico',
     OPERACAO_CRIADA: 'cadastro', OPERACAO_RETIFICADA: 'cadastro', DADOS_INFORMADOS: 'cadastro',
-    OPERACAO_ENCERRADA: 'cadastro', USUARIO_CRIADO: 'admin',
+    OPERACAO_ENCERRADA: 'cadastro', USUARIO_CRIADO: 'admin', CONTATO_INFORMADO: 'cadastro',
   }[type] || 'sistema';
 }
 
@@ -141,12 +145,21 @@ function project(opEvents) {
   const op = { id: created.opId, ...created.payload, criadaEm: created.occurredAt, tacUserId: null };
   const st = {
     op, milestones: {}, confirmations: {}, divergences: [], treatments: {}, apuracoes: [], pagamentos: [],
-    situacoes: [], dossies: [], juridico: [], ocorrencias: [], retificacoes: [], links: [], dadosInformados: null, encerramento: null,
+    situacoes: [], dossies: [], juridico: [], ocorrencias: [], retificacoes: [], links: [], mensagens: [], dadosInformados: null, encerramento: null,
   };
   for (const e of opEvents) {
     const t = e.type;
     if (t === 'OPERACAO_IDENTIFICADA') { op.tacUserId = e.actor.userId; op.tacNome = e.actor.name; }
     if (t === 'OPERACAO_RETIFICADA') { op[e.payload.campo] = e.payload.novo; st.retificacoes.push(e); }
+    if (t === 'CONTATO_INFORMADO') {
+      const k = e.payload.papel === 'transportadora' ? ['transportadoraContatoNome', 'transportadoraContatoTelefone'] : ['responsavelNome', 'responsavelTelefone'];
+      op[k[0]] = e.payload.nome || op[k[0]]; op[k[1]] = e.payload.telefone;
+    }
+    if (t === 'WHATSAPP_ENVIADA') st.mensagens.push({ id: e.payload.mensagemId, eventoId: e.id, externalId: e.payload.externalId || null, para: e.payload.para, finalidade: e.payload.finalidade,
+      confirmType: e.payload.confirmType || null, refEventId: e.payload.refEventId || null, assunto: e.payload.assunto || null, texto: e.payload.texto, linkId: e.payload.linkId || null,
+      modo: e.payload.modo, enviadaEm: e.occurredAt, status: e.payload.status, erro: e.payload.erro || null, historico: [{ status: e.payload.status, em: e.occurredAt }], respostas: [], reenvioDe: e.payload.reenvioDe || null });
+    if (t === 'WHATSAPP_STATUS') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { const ordem = ['falha', 'aguardando_envio', 'enviada', 'enviada_manual', 'entregue', 'lida']; if (ordem.indexOf(e.payload.status) > ordem.indexOf(m.status) || e.payload.status === 'falha') m.status = e.payload.status; m.historico.push({ status: e.payload.status, em: e.occurredAt }); if (e.payload.erro) m.erro = e.payload.erro; } }
+    if (t === 'WHATSAPP_RESPOSTA') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { m.respostas.push({ texto: e.payload.texto, interpretacao: e.payload.interpretacao, em: e.occurredAt, origem: e.origem, eventoId: e.id }); if (m.status !== 'lida') { m.status = 'lida'; } } }
     if (MILESTONES[t]) st.milestones[t] = e;
     else if (CONFIRMATION_OF[t]) st.confirmations[e.refEventId] = e;
     else if (t === 'DIVERGENCIA') st.divergences.push(e);
@@ -158,6 +171,7 @@ function project(opEvents) {
     else if (t === 'ENCAMINHADO_JURIDICO' || t === 'JURIDICO_STATUS') st.juridico.push(e);
     else if (OCORRENCIAS[t]) st.ocorrencias.push(e);
     else if (t.startsWith('LINK_')) st.links.push(e);
+    else if (t.startsWith('WHATSAPP_') || t === 'CONTATO_INFORMADO') { /* projetado acima */ }
     else if (t === 'DADOS_INFORMADOS') st.dadosInformados = e;
     else if (t === 'OPERACAO_ENCERRADA') st.encerramento = e;
   }
@@ -429,6 +443,14 @@ function alertas(st) {
   if (ms.SAIDA && ms.LIBERACAO) {
     const gap = minutesBetween(ms.LIBERACAO.occurredAt, ms.SAIDA.occurredAt);
     out.push({ nivel: gap > 60 ? 'atencao' : 'info', codigo: 'LIBERACAO_SAIDA', eventoId: ms.SAIDA.id, texto: `Intervalo entre liberação e saída: ${fmtDur(gap)}.` });
+  }
+  const agora = Date.now();
+  for (const m of st.mensagens) {
+    if (m.finalidade !== 'CONFIRMAR' || m.respostas.some((r) => r.interpretacao !== 'OUTRO')) continue;
+    const ref = Object.values(ms).find((e) => e.id === m.refEventId);
+    if (!ref || st.confirmations[ref.id] || st.mensagens.some((x) => x.reenvioDe === m.id)) continue;
+    if (m.status === 'falha') out.push({ nivel: 'atencao', codigo: 'WHATSAPP_FALHA', eventoId: m.eventoId, texto: `Mensagem para ${m.para.nome} não foi enviada: ${m.erro || 'falha no envio'}.` });
+    else { const min = Math.round((agora - Date.parse(m.enviadaEm)) / 60000); if (min >= 15) out.push({ nivel: 'atencao', codigo: 'SEM_RESPOSTA', eventoId: m.eventoId, texto: `${m.para.nome} ainda não respondeu (${fmtDur(min)}) sobre "${MILESTONES[ref.type].label}". Tentativa registrada.` }); }
   }
   for (const d of st.divergenciasAbertas) out.push({ nivel: 'atencao', codigo: 'DIVERGENCIA', eventoId: d.id, texto: `Divergência aberta: ${d.payload.note}` });
   return out;

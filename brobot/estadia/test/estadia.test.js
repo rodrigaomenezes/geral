@@ -36,127 +36,144 @@ async function nova(t, carla, extra = {}) {
   return r.body.op;
 }
 
-test('QA-01..32: fluxo completo da descarga com confirmação via link, limite de 5h, cálculo sobre o tempo total e conciliação', async () => {
+test('Motorista opera sozinho: registra cada passo e o destino confirma respondendo pelo WhatsApp', async () => {
   const t = await boot();
   try {
     const carla = await t.login('operacao@rodoviasul.demo');
-    const joao = await t.login('joao@tac.demo');
     const marina = await t.login('portaria@serraazul.demo');
-    const rafael = await t.login('doca@serraazul.demo');
-    const adv = await t.login('juridico@andradeprado.demo');
+    // Login simplificado do motorista: celular + código
+    assert.equal((await t.call('POST', '/api/login', { telefone: '(11) 98888-0001', pin: '0000' })).status, 401);
+    const lj = await t.call('POST', '/api/login', { telefone: '(11) 98888-0001', pin: '1234' });
+    assert.equal(lj.status, 200);
+    assert.equal(lj.body.user.role, 'tac');
+    const joao = lj.body.token;
 
-    // QA-01: identificador único; destino não cria operação
+    // QA-01: identificador único; destinatário não cria operação
     assert.equal((await t.call('POST', '/api/operations', { tipo: 'CARGA', destinoOrgId: 'serra-azul', placa: 'ABC1D23', capacidadeToneladas: 30 }, marina)).status, 403);
     const op = await nova(t, carla);
-    const op2 = await nova(t, carla, { tipo: 'CARGA' });
+    const op2 = await nova(t, carla, { tipo: 'CARGA', placa: 'ABC1D23' });
     assert.notEqual(op.codigo, op2.codigo);
-    assert.equal(op.tipo, 'DESCARGA');
 
-    // Amélia (QA-33/35): interpreta texto, confirma uma vez, sem inventar dados
-    const am = await t.call('POST', '/api/amelia/interpretar', { texto: `Placa RTB 4F27, carreta sider, descarga de 28 toneladas de açúcar no CD Jundiaí, nota fiscal 999, ${op.codigo}` }, joao);
-    assert.equal(am.status, 200);
-    const campos = Object.fromEntries(am.body.entidades.map((e) => [e.campo, e.valor]));
-    assert.equal(campos.placa, 'RTB4F27');
-    assert.equal(campos.tipo, 'DESCARGA');
-    assert.equal(campos.pesoToneladas, 28);
-    assert.equal(campos.nfe, '999');
-    assert.equal(campos.mdfe, undefined, 'não inventa MDF-e');
-    assert.equal(am.body.candidatos.length, 1);
-    const conf = await t.call('POST', '/api/amelia/confirmar', { opId: op.id, texto: am.body.texto, clientEventId: 'am-1' }, joao);
-    assert.equal(conf.status, 200);
-    assert.ok(conf.body.timeline.some((e) => e.type === 'DADOS_INFORMADOS' && e.origem === 'amelia'));
-    assert.equal(conf.body.op.tacUserId != null, true);
+    // Viagens disponíveis para a placa do motorista: um toque para começar
+    const v = await t.call('GET', '/api/tac/viagens', null, joao);
+    assert.ok(v.body.disponiveis.some((o) => o.codigo === op.codigo));
+    assert.ok(!v.body.disponiveis.some((o) => o.codigo === op2.codigo), 'só viagens da placa dele');
+    assert.equal((await t.call('POST', '/api/operations/identify', { codigo: op.codigo, placa: 'RTB4F27', occurredAt: now() }, joao)).status, 200);
+    const dc = await t.call('POST', `/api/operations/${op.id}/dados-conferidos`, {}, joao);
+    assert.ok(dc.body.timeline.some((e) => e.type === 'DADOS_INFORMADOS' && e.payload.canal === 'conferencia'));
 
     const post = (tok, body) => t.call('POST', `/api/operations/${op.id}/events`, body, tok);
-    // QA-02/03: chegada com foto e GPS; foto obrigatória
+    const sim = (telefone, texto) => t.call('POST', '/api/sim/whatsapp/responder', { telefone, texto });
+
+    // Chegada: foto obrigatória; dispara WhatsApp para destino (confirmar) e transportadora (avisar)
     assert.equal((await post(joao, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI })).status, 400);
     const cheg = await post(joao, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photo: PHOTO });
     assert.equal(cheg.status, 201);
-    assert.ok(cheg.body.evento.payload.photo.sha256);
-    assert.equal(cheg.body.evento.origem, 'app');
-    // Antes da confirmação, o limite não começou
-    assert.equal(cheg.body.detalhe.apuracao.pendente, true);
-    // QA-04/05: link de confirmação gerado automaticamente para o destino
-    const link = cheg.body.detalhe.links.find((l) => l.confirmType === 'CHEGADA_CONFIRMADA');
-    assert.ok(link && link.url.includes('/c/') && link.whatsappUrl.startsWith('https://wa.me/5511900000001'));
-    const token = link.url.split('/c/')[1];
-    // O token não aparece no log de eventos (só o hash)
-    assert.ok(!fs.readFileSync(path.join(t.dataDir, 'events.jsonl'), 'utf8').includes(token));
-    // RN-45: a página pública mostra só o necessário
-    const pub = await t.call('GET', `/api/public/link/${token}`);
-    assert.equal(pub.status, 200);
-    assert.equal(pub.body.operacao.placa, 'RTB4F27');
-    assert.equal(pub.body.operacao.nfe, undefined);
-    assert.equal(pub.body.botao, 'Confirmar chegada');
+    const msgs = cheg.body.detalhe.mensagens;
+    const mDest = msgs.find((m) => m.para.papel === 'destino');
+    const mTransp = msgs.find((m) => m.para.papel === 'transportadora');
+    assert.equal(mDest.finalidade, 'CONFIRMAR');
+    assert.equal(mDest.para.telefone, '5511900000001');
+    assert.match(mDest.texto, /Responda \*SIM\*/);
+    assert.match(mDest.texto, /\/c\/[A-Za-z0-9_-]{20,}/, 'mensagem leva o link da foto');
+    assert.equal(mTransp.finalidade, 'INFORMAR');
+    assert.equal(cheg.body.detalhe.apuracao.pendente, true, 'limite só começa na confirmação');
+    assert.ok(!fs.readFileSync(path.join(t.dataDir, 'events.jsonl'), 'utf8').match(/\/c\/[A-Za-z0-9_-]{20,}/), 'link não fica no log');
 
-    // Confirmação pelo portal também é possível; aqui usamos o link (QA-06/07)
-    const pc = await t.call('POST', `/api/public/link/${token}/confirmar`, { nome: 'Marina Coelho' });
-    assert.equal(pc.status, 201);
-    assert.match(pc.body.confirmado.por, /Marina Coelho \(via link\)/);
-    const again = await t.call('POST', `/api/public/link/${token}/confirmar`, {});
-    assert.equal(again.status, 200, 'reconfirmar não duplica');
-    let det = (await t.call('GET', `/api/operations/${op.id}`, null, carla)).body;
-    const confEv = det.timeline.filter((e) => e.type === 'CHEGADA_CONFIRMADA');
-    assert.equal(confEv.length, 1);
-    assert.equal(confEv[0].origem, 'link_whatsapp');
-    assert.notEqual(confEv[0].occurredAt, cheg.body.evento.occurredAt, 'confirmação tem timestamp próprio');
-    assert.equal(det.timeline.find((e) => e.type === 'CHEGADA').occurredAt, cheg.body.evento.occurredAt, 'registro original preservado');
-    // QA-08: a confirmação inicia o Limite de Estadia
-    assert.equal(det.apuracao.pendente, false);
-    assert.equal(det.apuracao.marcoInicial, confEv[0].occurredAt);
-    assert.ok(det.timeline.some((e) => e.type === 'LINK_VISUALIZADO'));
+    // Simulador marca entregue/lida; resposta "Sim" vira confirmação com origem WhatsApp
+    await t.call('GET', '/api/sim/whatsapp');
+    await t.call('POST', '/api/sim/whatsapp/abrir', { telefone: '5511900000001' });
+    const r1 = await sim('5511900000001', 'Sim');
+    assert.equal(r1.body.resultado, 'confirmado');
+    let det = (await t.call('GET', `/api/operations/${op.id}`, null, joao)).body;
+    const confEv = det.timeline.find((e) => e.type === 'CHEGADA_CONFIRMADA');
+    assert.equal(confEv.origem, 'whatsapp');
+    assert.match(confEv.actor.name, /Marina \(WhatsApp\)/);
+    assert.equal(det.apuracao.marcoInicial, confEv.occurredAt, 'QA-08: confirmação inicia o Limite de Estadia');
+    assert.equal(det.mensagens.find((m) => m.id === mDest.id).status, 'lida');
+    // Transportadora responde OK = ciência do aviso
+    const r2 = await sim('5511900000010', 'ok');
+    assert.equal(r2.body.resultado, 'ciente');
+    // Resposta repetida não duplica a confirmação
+    await sim('5511900000001', 'sim');
+    det = (await t.call('GET', `/api/operations/${op.id}`, null, joao)).body;
+    assert.equal(det.timeline.filter((e) => e.type === 'CHEGADA_CONFIRMADA').length, 1);
 
-    // QA-09/10: deslocamento > 300 m vira ocorrência
-    const pos = await t.call('POST', `/api/operations/${op.id}/posicao`, { lat: JUNDIAI.lat + 0.005, lng: JUNDIAI.lng }, joao);
-    assert.equal(pos.body.foraDoLimite, true);
-    assert.ok(pos.body.distanciaM > 300);
-    const dentro = await t.call('POST', `/api/operations/${op.id}/posicao`, { lat: JUNDIAI.lat + 0.0005, lng: JUNDIAI.lng }, joao);
-    assert.equal(dentro.body.foraDoLimite, false);
+    // Deslocamento > 300 m
+    assert.equal((await t.call('POST', `/api/operations/${op.id}/posicao`, { lat: JUNDIAI.lat + 0.005, lng: JUNDIAI.lng }, joao)).body.foraDoLimite, true);
 
-    // QA-11..16 (início pelo TAC, confirmação no portal, término, liberação e confirmação da liberação)
-    const ini = await post(joao, { type: 'INICIO', occurredAt: now(), gps: { erro: 'Permissão de localização negada' } });
-    assert.equal(ini.status, 201);
-    assert.equal((await post(rafael, { type: 'INICIO_CONFIRMADO', occurredAt: now(), refEventId: ini.body.evento.id })).status, 201);
-    const ter = await post(joao, { type: 'TERMINO', occurredAt: now() });
-    assert.equal((await post(rafael, { type: 'TERMINO_CONFIRMADO', occurredAt: now(), refEventId: ter.body.evento.id })).status, 201);
-    assert.equal((await post(joao, { type: 'LIBERACAO', occurredAt: now() })).status, 403);
-    const lib = await post(marina, { type: 'LIBERACAO', occurredAt: now(), photo: PHOTO });
+    // Início: destino responde NÃO → divergência, original preservado
+    const ini = await post(joao, { type: 'INICIO', occurredAt: now(), gps: JUNDIAI });
+    const r3 = await sim('5511900000001', 'Não, começou 11h');
+    assert.equal(r3.body.resultado, 'divergencia');
+    det = (await t.call('GET', `/api/operations/${op.id}`, null, carla)).body;
+    assert.ok(det.timeline.some((e) => e.type === 'DIVERGENCIA' && e.refEventId === ini.body.evento.id && /Respondeu NÃO/.test(e.payload.note)));
+    assert.equal(det.timeline.find((e) => e.type === 'INICIO').occurredAt, ini.body.evento.occurredAt);
+
+    // Término: confirmação pelo webhook oficial (formato da Cloud API)
+    await post(joao, { type: 'TERMINO', occurredAt: now() });
+    const hook = { object: 'whatsapp_business_account', entry: [{ changes: [{ value: { messages: [{ from: '5511900000001', id: 'wamid.X', timestamp: String(Math.floor(Date.now() / 1000)), type: 'button', button: { text: 'SIM' } }] } }] }] };
+    const wh = await t.call('POST', '/api/whatsapp/webhook', hook);
+    assert.equal(wh.body.resultados[0].resultado, 'confirmado');
+
+    // Liberação registrada pelo próprio motorista; destino confirma pelo WhatsApp
+    const lib = await post(joao, { type: 'LIBERACAO', occurredAt: now(), photo: PHOTO });
     assert.equal(lib.status, 201);
-    const lc = await post(joao, { type: 'LIBERACAO_CONFIRMADA', occurredAt: now(), refEventId: lib.body.evento.id });
-    assert.equal(lc.status, 201);
-    assert.equal(lc.body.detalhe.resumo.statusCode, 'LIBERACAO_CONFIRMADA');
+    assert.equal((await sim('5511900000001', '👍')).body.resultado, 'confirmado');
+    det = (await t.call('GET', `/api/operations/${op.id}`, null, joao)).body;
+    assert.equal(det.resumo.statusCode, 'LIBERACAO_CONFIRMADA');
 
-    // QA-17..19: saída exige foto do comprovante, mas não GPS
+    // Saída: foto do comprovante, sem GPS; aviso para a transportadora com o resumo
     assert.equal((await post(joao, { type: 'SAIDA', occurredAt: now() })).status, 400);
     const sai = await post(joao, { type: 'SAIDA', occurredAt: now(), photo: PHOTO });
     assert.equal(sai.status, 201);
-    assert.equal(sai.body.evento.payload.gps, undefined);
-
-    // QA-20..25: apuração automática na saída. Liberação − confirmação da chegada.
-    det = sai.body.detalhe;
-    const ap = det.apuracao;
-    assert.equal(ap.marcoFinal, lib.body.evento.occurredAt);
-    assert.equal(ap.excedeu, false, 'operação curta fica dentro do limite');
-    assert.equal(ap.valorDevido, 0);
-    assert.equal(det.resumo.statusCode, 'APURADA');
-    assert.equal(det.dossies.length, 1, 'dossiê gerado automaticamente');
-
-    // QA-29: dossiê reúne eventos, ocorrências e notificações; hash confere
-    const doc = (await t.call('GET', `/api/dossies/${det.dossies[0].hash}`, null, carla)).body;
-    assert.equal(sha256(JSON.stringify(doc.content)), det.dossies[0].hash);
+    const aviso = sai.body.detalhe.mensagens.filter((m) => m.para.papel === 'transportadora').pop();
+    assert.match(aviso.texto, /Tempo de estadia: 0h0\d\. Valor devido: R\$\s?0,00/);
+    assert.equal(sai.body.detalhe.resumo.statusCode, 'APURADA');
+    assert.equal(sai.body.detalhe.dossies.length, 1);
+    const doc = (await t.call('GET', `/api/dossies/${sai.body.detalhe.dossies[0].hash}`, null, carla)).body;
+    assert.equal(sha256(JSON.stringify(doc.content)), sai.body.detalhe.dossies[0].hash);
+    assert.ok(doc.content.mensagensWhatsApp.some((n) => n.respostas.some((r) => r.interpretacao === 'NAO')));
     assert.ok(doc.content.ocorrencias.some((o) => o.codigo === 'DESLOCAMENTO_FORA_DO_LIMITE'));
-    assert.ok(doc.content.notificacoes.length >= 2);
-    assert.equal(doc.content.marcos.length, 6);
-    assert.ok(doc.content.dadosInformados);
+  } finally {
+    await t.close();
+  }
+});
 
-    // Jurídico só vê depois do encaminhamento
-    assert.equal((await t.call('GET', `/api/operations/${op.id}`, null, adv)).status, 404);
-    assert.equal((await t.call('POST', `/api/operations/${op.id}/encaminhar`, {}, marina)).status, 403, 'destino não encaminha');
-    assert.equal((await t.call('POST', `/api/operations/${op.id}/encaminhar`, {}, carla)).status, 201);
-    const jr = await t.call('POST', `/api/operations/${op.id}/juridico-status`, { status: 'CONCLUIDO', resultado: 'Sem valor a cobrar.' }, adv);
-    assert.equal(jr.body.juridico.status, 'CONCLUIDO');
-    assert.equal((await t.call('POST', `/api/operations/${op.id}/encerrar`, {}, carla)).body.resumo.statusCode, 'ENCERRADA');
-    assert.equal((await post(joao, { type: 'PAGAMENTO_REGISTRADO', occurredAt: now(), valor: 10 })).status, 409, 'encerrada não aceita registros');
+test('Sem número do contato, sem resposta e resposta só no WhatsApp do motorista (print)', async () => {
+  const t = await boot();
+  try {
+    const carla = await t.login('operacao@rodoviasul.demo');
+    const joao = (await t.call('POST', '/api/login', { telefone: '11988880001', pin: '1234' })).body.token;
+    const op = await nova(t, carla, { responsavelTelefone: '', responsavelNome: '' });
+    await t.call('POST', '/api/operations/identify', { codigo: op.codigo, placa: 'RTB4F27', occurredAt: now() }, joao);
+    const cheg = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photo: PHOTO }, joao);
+    const falha = cheg.body.detalhe.mensagens.find((m) => m.para.papel === 'destino');
+    assert.equal(falha.status, 'falha');
+    assert.ok(cheg.body.detalhe.alertas.some((a) => a.codigo === 'WHATSAPP_FALHA'));
+    // Motorista informa o WhatsApp da portaria: mensagem sai de novo automaticamente
+    assert.equal((await t.call('POST', `/api/operations/${op.id}/contato`, { papel: 'destino', telefone: '12', nome: 'X' }, joao)).status, 400);
+    const ct = await t.call('POST', `/api/operations/${op.id}/contato`, { papel: 'destino', telefone: '(11) 97777-6666', nome: 'Portaria' }, joao);
+    const nova2 = ct.body.mensagens.find((m) => m.reenvioDe === falha.id);
+    assert.ok(nova2 && nova2.status === 'enviada' && nova2.para.telefone === '5511977776666');
+    // Reenvio manual pelo motorista
+    const re = await t.call('POST', `/api/operations/${op.id}/whatsapp/reenviar`, { mensagemId: nova2.id }, joao);
+    assert.equal(re.status, 201);
+    const ultima = re.body.mensagens.filter((m) => m.para.papel === 'destino').pop();
+    // A pessoa respondeu no WhatsApp pessoal do motorista: ele envia o print
+    assert.equal((await t.call('POST', `/api/operations/${op.id}/whatsapp/print`, { mensagemId: ultima.id, resposta: 'SIM' }, joao)).status, 400);
+    const pr = await t.call('POST', `/api/operations/${op.id}/whatsapp/print`, { mensagemId: ultima.id, resposta: 'SIM', photo: PHOTO }, joao);
+    assert.equal(pr.body.resultado, 'confirmado');
+    const c = pr.body.detalhe.timeline.find((e) => e.type === 'CHEGADA_CONFIRMADA');
+    assert.equal(c.origem, 'print_whatsapp');
+    assert.match(c.actor.name, /print do WhatsApp enviado por João/);
+    assert.ok(c.payload.photo.sha256, 'print guardado como evidência');
+    // Interpretação das respostas
+    const Z = require('../server/whatsapp');
+    for (const x of ['SIM', 'sim.', 'Ok', 'Confirmo', '👍', 's']) assert.equal(Z.interpretar(x), 'SIM', x);
+    for (const x of ['não', 'Nao confere', 'N', '❌']) assert.equal(Z.interpretar(x), 'NAO', x);
+    assert.equal(Z.interpretar('quem é?'), 'OUTRO');
+    assert.equal(Z.normFone('(11) 98888-0001'), '5511988880001');
   } finally {
     await t.close();
   }

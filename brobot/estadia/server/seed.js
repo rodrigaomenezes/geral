@@ -6,6 +6,7 @@ const Amelia = require('./amelia');
 const zlib = require('node:zlib');
 
 const SENHA_DEMO = 'estadia123';
+const PIN_DEMO = '1234';
 const CD_JUNDIAI = { lat: -23.18571, lng: -46.89784 };
 const USINA_UBERLANDIA = { lat: -18.91861, lng: -48.27722 };
 
@@ -67,8 +68,8 @@ function seed(dir, store, { quiet = false } = {}) {
     rafael: dir.addUser({ email: 'doca@serraazul.demo', senha: SENHA_DEMO, nome: 'Rafael Toledo', role: 'destino', orgId: o.serra.id }),
     usina: dir.addUser({ email: 'expedicao@usinaboavista.demo', senha: SENHA_DEMO, nome: 'Sérgio Lima', role: 'destino', orgId: o.usina.id }),
     paulo: dir.addUser({ email: 'cd@horizonte.demo', senha: SENHA_DEMO, nome: 'Paulo Reis', role: 'destino', orgId: o.horizonte.id }),
-    joao: dir.addUser({ email: 'joao@tac.demo', senha: SENHA_DEMO, nome: 'João Batista Ferreira', role: 'tac', orgId: o.tac.id, placa: 'RTB4F27' }),
-    ana: dir.addUser({ email: 'ana@tac.demo', senha: SENHA_DEMO, nome: 'Ana Lúcia Prado', role: 'tac', orgId: o.tac.id, placa: 'QPE2H91' }),
+    joao: dir.addUser({ email: 'joao@tac.demo', senha: SENHA_DEMO, nome: 'João Batista Ferreira', role: 'tac', orgId: o.tac.id, placa: 'RTB4F27', telefone: '+55 11 98888-0001', pin: PIN_DEMO }),
+    ana: dir.addUser({ email: 'ana@tac.demo', senha: SENHA_DEMO, nome: 'Ana Lúcia Prado', role: 'tac', orgId: o.tac.id, placa: 'QPE2H91', telefone: '+55 11 98888-0002', pin: PIN_DEMO }),
     adv: dir.addUser({ email: 'juridico@andradeprado.demo', senha: SENHA_DEMO, nome: 'Dra. Helena Andrade', role: 'advocacia', orgId: o.adv.id }),
   };
   const actor = (x) => ({ userId: x.id, name: x.nome, role: x.role, orgId: x.orgId });
@@ -78,7 +79,7 @@ function seed(dir, store, { quiet = false } = {}) {
     const opId = crypto.randomUUID();
     const dest = dir.org(payload.destinoOrgId);
     store.append({ opId, type: 'OPERACAO_CRIADA', actor: actor(u.carla), origem: 'portal', occurredAt: when, receivedAt: when,
-      payload: { transportadoraOrgId: o.rodovia.id, transportadoraNome: o.rodovia.nome, destinoNome: dest.nome, ...payload } });
+      payload: { transportadoraOrgId: o.rodovia.id, transportadoraNome: o.rodovia.nome, transportadoraContatoNome: 'Carla Mendes', transportadoraContatoTelefone: '+55 11 90000-0010', destinoNome: dest.nome, ...payload } });
     return opId;
   };
   const todayStart = at(0, 5, 0) < new Date().toISOString() ? at(0, 5, 0) : new Date().toISOString();
@@ -100,7 +101,6 @@ function seed(dir, store, { quiet = false } = {}) {
   const mk = (opId) => (type, by, t, extra = {}, recv) => store.append({ opId, type, actor: by.id ? actor(by) : by, origem: extra.origem || (by.role === 'tac' ? 'app' : 'portal'),
     occurredAt: at(...t), receivedAt: recv ? at(...recv) : at(...t), refEventId: extra.refEventId, payload: extra.payload || {} }).event;
   const sistema = { userId: 'sistema', name: 'Estadia BR', role: 'sistema', orgId: 'estadia-br' };
-  const viaLink = (nome) => ({ userId: 'link', name: `${nome} (via link)`, role: 'destino', orgId: o.serra.id });
 
   // 3) Carga na origem, dois dias atrás: dentro do limite (R$ 0,00) e encerrada.
   const op4 = createOp({ codigo: 'OP-2026-0004', tipo: 'CARGA', destinoOrgId: o.usina.id, placa: 'QPE2H91', implemento: 'carreta sider', capacidadeToneladas: 30,
@@ -109,14 +109,14 @@ function seed(dir, store, { quiet = false } = {}) {
   const e4 = mk(op4);
   e4('OPERACAO_IDENTIFICADA', u.ana, [-2, 6, 40]);
   const c4 = e4('CHEGADA', u.ana, [-2, 7, 0], { payload: { gps: near(USINA_UBERLANDIA, 0.0003, 0.0002), photo } });
-  e4('CHEGADA_CONFIRMADA', viaLink('Sérgio Lima'), [-2, 7, 5], { refEventId: c4.id, origem: 'link_whatsapp' });
+  e4('CHEGADA_CONFIRMADA', { userId: 'whatsapp:5534900000004', name: 'Sérgio Lima (WhatsApp)', role: 'destino', orgId: o.usina.id }, [-2, 7, 5], { refEventId: c4.id, origem: 'whatsapp' });
   const i4 = e4('INICIO', u.ana, [-2, 7, 30]);
   e4('INICIO_CONFIRMADO', u.usina, [-2, 7, 32], { refEventId: i4.id });
   const t4 = e4('TERMINO', u.ana, [-2, 9, 55]);
   e4('TERMINO_CONFIRMADO', u.usina, [-2, 10, 0], { refEventId: t4.id });
   const l4 = e4('LIBERACAO', u.usina, [-2, 10, 40], { payload: { photo: doc } });
   e4('LIBERACAO_CONFIRMADA', u.ana, [-2, 10, 42], { refEventId: l4.id });
-  e4('SAIDA', u.ana, [-2, 10, 50], { payload: { photo: doc, gps: { erro: 'Não exigido na saída' } } });
+  e4('SAIDA', u.ana, [-2, 10, 50], { payload: { photo: doc } });
 
   // 4) Descarga de ontem com a mesma NF-e: excedeu o limite, divergência, deslocamento e pagamento parcial.
   const op3 = createOp({ codigo: 'OP-2026-0003', tipo: 'DESCARGA', destinoOrgId: o.serra.id, placa: 'QPE2H91', implemento: 'carreta sider', capacidadeToneladas: 30,
@@ -127,23 +127,40 @@ function seed(dir, store, { quiet = false } = {}) {
   const texto3 = 'Placa QPE 2H91, carreta sider, descarga de 30 toneladas de açúcar no CD Jundiaí, NF-e 35261000179040';
   const op3dados = store.forOp(op3)[0].payload;
   e3('DADOS_INFORMADOS', u.ana, [-1, 5, 40], { origem: 'amelia', payload: { canal: 'texto', texto: texto3, entidades: Amelia.comparar(Amelia.interpretar(texto3).entidades, op3dados) } });
+  // Mensagens e respostas pelo WhatsApp: o motorista registra, o destino responde SIM/NÃO.
+  const marinaZap = { nome: 'Marina Coelho', telefone: '5511900000001', papel: 'destino' };
+  const carlaZap = { nome: 'Carla Mendes', telefone: '5511900000010', papel: 'transportadora' };
+  const viaZap = (p) => ({ userId: `whatsapp:${p.telefone}`, name: `${p.nome} (WhatsApp)`, role: p.papel, orgId: p.papel === 'destino' ? o.serra.id : o.rodovia.id });
+  let nMsg = 0;
+  const zap = (para, t, finalidade, ref, confirmType, assunto, resposta, tResp) => {
+    const mensagemId = `demo-${++nMsg}`;
+    e3('WHATSAPP_ENVIADA', sistema, t, { payload: { mensagemId, para, finalidade, confirmType, refEventId: ref && ref.id, assunto, modo: 'simulado', status: 'enviada',
+      texto: `*Estadia BR* · OP-2026-0003\nAna Lúcia Prado (placa QPE-2H91): ${assunto}. ${finalidade === 'CONFIRMAR' ? 'Responda SIM para confirmar ou NÃO se não reconhece.' : 'Responda OK para confirmar o recebimento.'}` } });
+    e3('WHATSAPP_STATUS', sistema, [t[0], t[1], t[2] + 1], { payload: { mensagemId, status: 'entregue' } });
+    if (resposta) {
+      e3('WHATSAPP_STATUS', sistema, [tResp[0], tResp[1], tResp[2] - 1], { payload: { mensagemId, status: 'lida' } });
+      e3('WHATSAPP_RESPOSTA', viaZap(para), tResp, { origem: 'whatsapp', payload: { mensagemId, de: para.telefone, texto: resposta, interpretacao: /^n/i.test(resposta) ? 'NAO' : 'SIM' } });
+      if (confirmType && !/^n/i.test(resposta)) e3(confirmType, viaZap(para), tResp, { refEventId: ref.id, origem: 'whatsapp', payload: { mensagemId, resposta } });
+    }
+    return mensagemId;
+  };
   const c3 = e3('CHEGADA', u.ana, [-1, 6, 12], { payload: { gps: near(CD_JUNDIAI, 0.0004, -0.0003), photo } }, [-1, 6, 14]);
-  e3('LINK_GERADO', sistema, [-1, 6, 14], { payload: { linkId: 'demo-op3', refEventId: c3.id, confirmType: 'CHEGADA_CONFIRMADA', canal: 'whatsapp', modo: 'manual',
-    destinatario: { nome: 'Marina Coelho', telefone: '+55 11 90000-0001' }, expiraEm: at(0, 6, 14), tokenHash: 'demo' } });
-  e3('LINK_ENVIADO', u.ana, [-1, 6, 15], { payload: { linkId: 'demo-op3', canal: 'whatsapp', modo: 'manual' } });
-  e3('LINK_VISUALIZADO', viaLink('Marina Coelho'), [-1, 6, 18], { origem: 'link_whatsapp', payload: { linkId: 'demo-op3' } });
-  e3('CHEGADA_CONFIRMADA', viaLink('Marina Coelho'), [-1, 6, 20], { refEventId: c3.id, origem: 'link_whatsapp', payload: { linkId: 'demo-op3' } });
+  zap(marinaZap, [-1, 6, 14], 'CONFIRMAR', c3, 'CHEGADA_CONFIRMADA', 'chegou ao CD Jundiaí · Doca 3 às 06:12', 'Sim', [-1, 6, 20]);
+  zap(carlaZap, [-1, 6, 14], 'INFORMAR', c3, null, 'chegou ao CD Jundiaí · Doca 3 às 06:12', 'ok', [-1, 6, 31]);
   e3('DESLOCAMENTO_FORA_DO_LIMITE', sistema, [-1, 8, 47], { payload: { distanciaM: 612, limiteM: 300, posicao: near(CD_JUNDIAI, 0.0052, 0.0021, 15), referencia: { ...CD_JUNDIAI, fonte: 'local cadastrado' } } });
   const i3 = e3('INICIO', u.ana, [-1, 10, 48], { payload: { gps: near(CD_JUNDIAI, 0.0002, 0.0001) } });
-  e3('DIVERGENCIA', u.rafael, [-1, 10, 58], { refEventId: i3.id, payload: { note: 'Início efetivo na doca às 11:05, conforme apontamento da equipe.', alegadoEm: at(-1, 11, 5) } });
+  const mi = zap(marinaZap, [-1, 10, 48], 'CONFIRMAR', i3, 'INICIO_CONFIRMADO', 'iniciou a descarga às 10:48', 'Não, começou 11:05', [-1, 10, 58]);
+  e3('DIVERGENCIA', viaZap(marinaZap), [-1, 10, 58], { refEventId: i3.id, origem: 'whatsapp', payload: { note: 'Respondeu NÃO pelo WhatsApp: "Não, começou 11:05"', mensagemId: mi, alegadoEm: at(-1, 11, 5) } });
   const t3 = e3('TERMINO', u.ana, [-1, 15, 5], { payload: { photo } });
-  e3('TERMINO_CONFIRMADO', u.rafael, [-1, 15, 10], { refEventId: t3.id });
-  const l3 = e3('LIBERACAO', u.marina, [-1, 17, 32], { payload: { photo: doc } });
-  e3('LIBERACAO_CONFIRMADA', u.ana, [-1, 17, 35], { refEventId: l3.id });
-  e3('SAIDA', u.ana, [-1, 17, 41], { payload: { photo: doc, gps: { erro: 'Não exigido na saída' } } });
+  zap(marinaZap, [-1, 15, 5], 'CONFIRMAR', t3, 'TERMINO_CONFIRMADO', 'terminou a descarga às 15:05', 'SIM', [-1, 15, 10]);
+  const l3 = e3('LIBERACAO', u.ana, [-1, 17, 32], { payload: { photo: doc } });
+  zap(marinaZap, [-1, 17, 32], 'CONFIRMAR', l3, 'LIBERACAO_CONFIRMADA', 'foi liberado para viagem às 17:32', 'sim', [-1, 17, 35]);
+  zap(carlaZap, [-1, 17, 32], 'INFORMAR', l3, null, 'foi liberado para viagem às 17:32', 'Recebido', [-1, 17, 50]);
+  const s3 = e3('SAIDA', u.ana, [-1, 17, 41], { payload: { photo: doc } });
+  zap(carlaZap, [-1, 17, 42], 'INFORMAR', s3, null, 'saiu do local às 17:41. Tempo de estadia 11h12, valor devido R$ 840,00', 'ok', [-1, 18, 2]);
 
   if (!quiet) console.log('Dados de demonstração criados. Senha de todos os usuários:', SENHA_DEMO);
   return { orgs: o, users: u, ops: { op3, op4 }, at };
 }
 
-module.exports = { seed, SENHA_DEMO, demoPhotoPng, demoDocPng };
+module.exports = { seed, SENHA_DEMO, PIN_DEMO, demoPhotoPng, demoDocPng };
