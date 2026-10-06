@@ -244,7 +244,8 @@ body.motorista { font-size: 17px; }
 body.motorista .page { max-width: 560px; padding-block: 12px 48px; }
 .bar-sair { margin-left: auto; }
 .drv { display: flex; flex-direction: column; gap: 14px; }
-.drv svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; }
+.drv svg, .sheet svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; flex: none; }
+.drv-mid svg { width: 24px; height: 24px; }
 .drv-hello { font-size: 34px; }
 .drv-h { font-size: 22px; margin-top: 6px; }
 .drv-muted { color: var(--muted); font-size: 15px; }
@@ -327,3 +328,9 @@ body.motorista .bar { flex-wrap: nowrap; gap: 10px; }
 body.motorista .bar .brand b { font-size: 19px; }
 body.motorista .bar .net { white-space: nowrap; }
 @media (max-width: 360px) { body.motorista .bar .brand b { display: none; } }
+.envio { display: flex; flex-direction: column; gap: 10px; }
+.envio-para { margin: 0; font-size: 16px; }
+.envio-para .mono { font-size: 18px; }
+.chk { display: flex; gap: 8px; align-items: center; font-weight: 400 !important; font-size: 15px; }
+.chk input { width: 22px; height: 22px; }
+.drv-link.left { text-align: left; padding: 4px 0; }

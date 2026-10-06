@@ -324,3 +324,51 @@ test('cadeia de hash detecta adulteração e o reinício da demonstração recri
     await t.close();
   }
 });
+
+test('Modo manual: WhatsApp do próprio motorista, número informado na hora e confirmação pelo link', async () => {
+  const antes = process.env.WHATSAPP_MODE;
+  process.env.WHATSAPP_MODE = 'manual';
+  const t = await boot();
+  try {
+    const carla = await t.login('operacao@rodoviasul.demo');
+    const joao = (await t.call('POST', '/api/login', { telefone: '11988880001', pin: '1234' })).body.token;
+    const op = await nova(t, carla, { responsavelTelefone: '', responsavelNome: '' });
+    await t.call('POST', '/api/operations/identify', { codigo: op.codigo, placa: 'RTB4F27', occurredAt: now() }, joao);
+    const cheg = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photo: PHOTO }, joao);
+    const ms = cheg.body.detalhe.mensagens;
+    assert.equal(ms.length, 1, 'um envio por passo: só a portaria');
+    const m = ms[0];
+    assert.equal(m.status, 'aguardando_envio');
+    assert.match(m.texto, /Para \*CONFIRMAR\*, toque no link/);
+    assert.match(m.whatsappUrl, /^https:\/\/wa\.me\/\?text=/, 'sem número: motorista escolhe o contato');
+    // Motorista digita na hora o número de quem está na portaria
+    assert.equal((await t.call('POST', `/api/operations/${op.id}/whatsapp/destinatario`, { mensagemId: m.id, telefone: '123' }, joao)).status, 400);
+    const dst = await t.call('POST', `/api/operations/${op.id}/whatsapp/destinatario`, { mensagemId: m.id, telefone: '(11) 96666-5555', nome: 'Sr. Carlos', salvar: true }, joao);
+    const m2 = dst.body.mensagens.find((x) => x.id === m.id);
+    assert.equal(m2.para.telefone, '5511966665555');
+    assert.match(m2.whatsappUrl, /^https:\/\/wa\.me\/5511966665555\?text=/);
+    assert.equal(dst.body.op.responsavelTelefone, '+5511966665555', 'salvo para as próximas mensagens');
+    await t.call('POST', `/api/operations/${op.id}/whatsapp/${m.id}/enviada`, {}, joao);
+    // A pessoa abre o link e marca NÃO CONFERE
+    const token = m2.texto.match(/\/c\/([A-Za-z0-9_-]{20,})/)[1];
+    assert.equal((await t.call('GET', `/api/public/link/${token}`)).status, 200);
+    const dv = await t.call('POST', `/api/public/link/${token}/divergir`, { nome: 'Carlos', motivo: 'Chegou às 06:31' });
+    assert.equal(dv.status, 201);
+    let det = (await t.call('GET', `/api/operations/${op.id}`, null, joao)).body;
+    assert.ok(det.timeline.some((e) => e.type === 'DIVERGENCIA' && /Não confere/.test(e.payload.note)));
+    assert.equal(det.mensagens[0].status, 'enviada_manual');
+    assert.ok(det.mensagens[0].linkAbertoEm);
+    // Próximo passo já vai com o número salvo; confirmação pelo link
+    const ini = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'INICIO', occurredAt: now(), gps: JUNDIAI }, joao);
+    const mi = ini.body.detalhe.mensagens.find((x) => x.refEventId === ini.body.evento.id);
+    assert.equal(mi.para.telefone, '5511966665555');
+    const tk2 = mi.texto.match(/\/c\/([A-Za-z0-9_-]{20,})/)[1];
+    assert.equal((await t.call('POST', `/api/public/link/${tk2}/confirmar`, { nome: 'Carlos' })).status, 201);
+    det = (await t.call('GET', `/api/operations/${op.id}`, null, joao)).body;
+    assert.equal(det.timeline.find((e) => e.type === 'INICIO_CONFIRMADO').origem, 'link_whatsapp');
+    assert.equal((await t.call('GET', '/api/sim/whatsapp')).status, 404, 'simulador desligado no modo manual');
+  } finally {
+    await t.close();
+    if (antes === undefined) delete process.env.WHATSAPP_MODE; else process.env.WHATSAPP_MODE = antes;
+  }
+});

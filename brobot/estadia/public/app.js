@@ -621,9 +621,47 @@
     if (r && r.interpretacao === 'NAO') return ['crit', `${nome} respondeu NÃO: “${r.texto}”`];
     if (r) return ['warn', `${nome} respondeu: “${r.texto}”`];
     return {
-      aguardando_envio: ['warn', 'Falta enviar pelo WhatsApp'], enviada: ['', `Enviado para ${nome} ✓`], enviada_manual: ['', `Enviado para ${nome} pelo seu WhatsApp`],
+      aguardando_envio: ['warn', 'Falta avisar pelo WhatsApp'], enviada: ['', `Enviado para ${nome} ✓`],
+      enviada_manual: [m.linkAbertoEm ? 'sys' : '', m.linkAbertoEm ? `${nome} abriu o link · esperando confirmar` : `Você enviou para ${nome} · esperando ${nome} tocar no link`],
       entregue: ['', `Chegou no celular de ${nome} ✓✓ · esperando resposta`], lida: ['sys', `${nome} leu ✓✓ · esperando resposta`], falha: ['crit', `Não foi enviado para ${nome}`],
     }[m.status] || ['', m.status];
+  }
+
+  // Bloco de envio pelo WhatsApp do motorista: número já preenchido, trocar na hora ou escolher contato.
+  function envioBloco(m) {
+    const quem = m.para.papel === 'destino' ? 'a portaria' : 'a transportadora';
+    const temNum = !!m.para.telefone;
+    const semNumUrl = `https://wa.me/?text=${encodeURIComponent(m.texto)}`;
+    return `<div class="envio" data-envio="${m.id}">
+      ${temNum ? `<p class="envio-para">Enviar para <b>${esc(m.para.nome)}</b><br><span class="mono">${esc(m.telefoneFmt)}</span></p>
+        <a class="drv-mid zapbtn" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR NO WHATSAPP</a>`
+        : `<p class="envio-para">Não temos o número de ${quem}. Escolha o contato no seu WhatsApp ou digite o número abaixo.</p>
+        <a class="drv-mid zapbtn" href="${esc(semNumUrl)}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ESCOLHER CONTATO NO WHATSAPP</a>`}
+      <button type="button" class="drv-link" data-trocar="${m.id}">${temNum ? 'Mandar para outra pessoa / trocar número' : 'Digitar o número'}</button>
+      <form class="drv-tel" data-dest="${m.id}" hidden>
+        <label for="dn-${m.id}">Número de quem vai receber</label>
+        <input id="dn-${m.id}" type="tel" inputmode="tel" autocomplete="off" placeholder="(11) 99999-9999" required>
+        <input type="text" placeholder="Nome (ex.: Portaria, Sr. Carlos)" aria-label="Nome de quem vai receber">
+        <label class="chk"><input type="checkbox" checked> Usar este número nas próximas mensagens</label>
+        <button class="drv-mid" type="submit">USAR ESTE NÚMERO</button>
+        ${temNum ? `<a class="drv-link" href="${esc(semNumUrl)}" target="_blank" rel="noopener" data-manual="${m.id}">Ou escolher o contato no WhatsApp</a>` : ''}
+      </form></div>`;
+  }
+  function bindEnvio(root, opId, depois) {
+    $$('[data-trocar]', root).forEach((b) => (b.onclick = () => { const f = $(`form[data-dest="${b.dataset.trocar}"]`, root); f.hidden = false; b.hidden = true; f.querySelector('input').focus(); }));
+    $$('a[data-manual]', root).forEach((a) => (a.onclick = () => { api('POST', `/api/operations/${opId}/whatsapp/${a.dataset.manual}/enviada`).catch(() => {}); if (depois) setTimeout(depois, 600); }));
+    $$('form[data-dest]', root).forEach((f) => (f.onsubmit = async (e) => {
+      e.preventDefault();
+      const [tel, nome, chk] = f.querySelectorAll('input');
+      const btn = f.querySelector('button'); btn.disabled = true;
+      try {
+        const d = await api('POST', `/api/operations/${opId}/whatsapp/destinatario`, { mensagemId: f.dataset.dest, telefone: tel.value, nome: nome.value, salvar: chk.checked });
+        const m = d.mensagens.filter((x) => x.id === f.dataset.dest || x.reenvioDe === f.dataset.dest).pop();
+        toast(S.config.zapModo === 'manual' ? 'Número salvo. Agora toque em ENVIAR NO WHATSAPP.' : 'Mensagem enviada para o novo número.');
+        if (m && m.status === 'aguardando_envio') { const box = f.closest('.envio'); box.outerHTML = envioBloco(m); bindEnvio(root, opId, depois); }
+        else refresh();
+      } catch (err) { toast(err.message, true); btn.disabled = false; }
+    }));
   }
 
   async function viewOpMotorista(id) {
@@ -674,8 +712,10 @@
       return `<div class="zap ${tom}"><span class="zap-ico">${ICON.zap}</span><div class="zap-b"><span>${esc(txt)}</span>
         ${aberto && semNumero ? `<form class="drv-tel" data-tel="${m.para.papel}"><label for="tel-${m.id}">Qual o WhatsApp ${m.para.papel === 'destino' ? 'da portaria' : 'da transportadora'}?</label>
           <input id="tel-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome do contato"><button class="drv-mid" type="submit">ENVIAR AVISO</button></form>` : ''}
-        ${aberto && !semNumero && (minutos >= 5 || m.status === 'falha' || m.status === 'aguardando_envio' || S.config.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém respondeu ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
-          ${m.status === 'aguardando_envio' || S.config.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR PELO MEU WHATSAPP</a>` : ''}
+        ${aberto && m.status === 'aguardando_envio' ? envioBloco(m) : ''}
+        ${aberto && m.status !== 'aguardando_envio' && !semNumero && S.config.zapModo !== 'manual' ? `<button type="button" class="drv-link left" data-trocar="${m.id}">Mandar para outra pessoa</button><form class="drv-tel" data-dest="${m.id}" hidden><label for="dn-${m.id}">Número de quem vai receber</label><input id="dn-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome"><label class="chk"><input type="checkbox" checked> Usar nas próximas mensagens</label><button class="drv-mid" type="submit">ENVIAR PARA ESTE NÚMERO</button></form>` : ''}
+        ${aberto && m.status !== 'aguardando_envio' && !semNumero && (minutos >= 5 || m.status === 'falha' || S.config.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém respondeu ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
+          ${S.config.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR DE NOVO NO WHATSAPP</a>` : ''}
           ${m.status !== 'aguardando_envio' && (minutos >= 5 || m.status === 'falha') ? `<button class="btn" data-reenviar="${m.id}">Mandar de novo</button>` : ''}
           ${m.status !== 'aguardando_envio' && S.config.zapModo !== 'manual' && m.whatsappUrl ? `<a class="btn" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Mandar pelo meu WhatsApp</a>` : ''}
           <button class="btn" data-print="${m.id}">Responderam no meu WhatsApp</button></div>` : ''}</div></div>`;
@@ -709,7 +749,7 @@
     } else if (atual) {
       agora = `<div class="drv-card now"><span class="drv-step">Passo ${idx + 1} de ${ps.length}</span>
         <button class="drv-giant" data-passo="${atual.k}">${ICON[atual.icon]}<span>${esc(atual.botao)}</span></button>
-        <p class="drv-muted center">${atual.foto === 'required' ? `${ICON.cam} Vai abrir a câmera. ` : ''}Avisamos ${atual.avisa} pelo WhatsApp.</p></div>`;
+        <p class="drv-muted center">${atual.foto === 'required' ? `${ICON.cam} Vai abrir a câmera. ` : ''}${S.config.zapModo === 'manual' ? `Depois você avisa ${atual.avisa} pelo seu WhatsApp.` : `Avisamos ${atual.avisa} pelo WhatsApp.`}</p></div>`;
     } else {
       const f = d.financeiro;
       agora = `<div class="drv-card done-card"><span class="drv-ok-big">${ICON.check}</span><h2>Viagem concluída</h2>
@@ -748,7 +788,7 @@
     const nl = $('[data-naolib]');
     if (nl) nl.onclick = () => divergenceSheet(id, d.acoes.find((a) => a.kind === 'divergencia' && a.refEventId === confLibPortal.refEventId) || { refEventId: confLibPortal.refEventId }, reg.LIBERACAO);
     $$('[data-reenviar]').forEach((b) => (b.onclick = async () => { b.disabled = true; try { await api('POST', `/api/operations/${id}/whatsapp/reenviar`, { mensagemId: b.dataset.reenviar }); toast('Mensagem enviada de novo.'); refresh(); } catch (e) { toast(e.message, true); b.disabled = false; } }));
-    $$('[data-manual]').forEach((a) => (a.onclick = () => { api('POST', `/api/operations/${id}/whatsapp/${a.dataset.manual}/enviada`).catch(() => {}); }));
+    bindEnvio(main, id, () => refresh());
     $$('[data-print]').forEach((b) => (b.onclick = () => printSheet(id, d.mensagens.find((m) => m.id === b.dataset.print))));
     $$('form[data-tel]').forEach((f) => (f.onsubmit = async (e) => {
       e.preventDefault();
@@ -778,6 +818,15 @@
       try {
         const r = await sendEvent(d.op.id, { type: p.k, occurredAt, gps: gps || undefined, photo: photo || undefined });
         vibrar(80);
+        const pendente = !r.offline && r.detalhe && r.detalhe.mensagens.find((m) => m.refEventId === r.evento.id && m.status === 'aguardando_envio');
+        if (pendente) {
+          $('.sheet', bg).innerHTML = `<div class="drv-done">${ICON.check}<h2>Registrado às ${hhmm(occurredAt)}</h2></div>
+            <div class="drv-sheet"><h2>Agora avise ${esc(p.avisa)}</h2><p class="drv-muted">A mensagem já está pronta. Ela leva um link para a pessoa confirmar com um toque.</p>
+            ${envioBloco(pendente)}<button class="drv-link" data-x>Avisar depois</button></div>`;
+          bindEnvio(bg, d.op.id, () => { bg.remove(); refresh(); });
+          bg.addEventListener('click', (e) => { if (e.target.closest('[data-x]')) refresh(); });
+          return;
+        }
         $('.sheet', bg).innerHTML = `<div class="drv-done">${ICON.check}<h2>Pronto!</h2><p>${esc(p.titulo)} às <b>${hhmm(occurredAt)}</b>.</p>
           <p class="drv-muted">${r.offline ? 'Sem internet: guardamos no celular e enviamos sozinho quando o sinal voltar.' : `Avisamos ${p.avisa} pelo WhatsApp.`}</p></div>`;
         setTimeout(() => { bg.remove(); refresh(); }, 2200);

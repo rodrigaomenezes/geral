@@ -68,6 +68,7 @@ const OTHER_LABELS = {
   WHATSAPP_ENVIADA: 'Mensagem de WhatsApp enviada',
   WHATSAPP_STATUS: 'Status da mensagem',
   WHATSAPP_RESPOSTA: 'Resposta recebida pelo WhatsApp',
+  WHATSAPP_DESTINATARIO: 'Número de envio informado pelo motorista',
   ...OCORRENCIAS,
 };
 
@@ -159,6 +160,7 @@ function project(opEvents) {
       confirmType: e.payload.confirmType || null, refEventId: e.payload.refEventId || null, assunto: e.payload.assunto || null, texto: e.payload.texto, linkId: e.payload.linkId || null,
       modo: e.payload.modo, enviadaEm: e.occurredAt, status: e.payload.status, erro: e.payload.erro || null, historico: [{ status: e.payload.status, em: e.occurredAt }], respostas: [], reenvioDe: e.payload.reenvioDe || null });
     if (t === 'WHATSAPP_STATUS') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { const ordem = ['falha', 'aguardando_envio', 'enviada', 'enviada_manual', 'entregue', 'lida']; if (ordem.indexOf(e.payload.status) > ordem.indexOf(m.status) || e.payload.status === 'falha') m.status = e.payload.status; m.historico.push({ status: e.payload.status, em: e.occurredAt }); if (e.payload.erro) m.erro = e.payload.erro; } }
+    if (t === 'WHATSAPP_DESTINATARIO') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { m.para = { ...m.para, ...e.payload.para }; m.historico.push({ status: 'destinatario_alterado', em: e.occurredAt }); } }
     if (t === 'WHATSAPP_RESPOSTA') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { m.respostas.push({ texto: e.payload.texto, interpretacao: e.payload.interpretacao, em: e.occurredAt, origem: e.origem, eventoId: e.id }); if (m.status !== 'lida') { m.status = 'lida'; } } }
     if (MILESTONES[t]) st.milestones[t] = e;
     else if (CONFIRMATION_OF[t]) st.confirmations[e.refEventId] = e;

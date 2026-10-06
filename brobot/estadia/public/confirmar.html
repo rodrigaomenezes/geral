@@ -35,6 +35,10 @@
         ${reg ? `<dt>Registro</dt><dd>${esc(reg.label)}</dd><dt>Data e hora</dt><dd class="mono">${dt(reg.em)}</dd>` : ''}
         ${reg && reg.gps && !reg.gps.erro ? `<dt>Localização</dt><dd class="mono">${reg.gps.lat.toFixed(5)}, ${reg.gps.lng.toFixed(5)} <a href="https://www.openstreetmap.org/?mlat=${reg.gps.lat}&mlon=${reg.gps.lng}#map=17/${reg.gps.lat}/${reg.gps.lng}" target="_blank" rel="noopener">ver mapa</a></dd>` : ''}</dl>
         ${reg && reg.temFoto && status !== 410 ? `<img class="confirm-photo" src="${base}/foto" alt="Foto do registro do motorista">` : ''}</div>`;
+      if (info.contestado) {
+        main.innerHTML = head + `<div class="card"><h2>Registrado: não confere</h2><p>${esc(info.contestado.motivo)}</p><p class="small muted">O registro do motorista foi mantido e a divergência será analisada. Você já pode fechar esta página.</p></div>`;
+        return;
+      }
       if (info.confirmado) {
         main.innerHTML = head + `<div class="card ok-card"><h2>Confirmado</h2><p>Registrado em <b class="mono">${dt(info.confirmado.em)}</b> por ${esc(info.confirmado.por)}. O horário do registro do motorista foi mantido.</p><p class="small muted">Você já pode fechar esta página.</p></div>`;
         return;
@@ -47,7 +51,20 @@
       main.innerHTML = head + `<div class="card"><div class="field"><label class="label" for="nome">Seu nome (opcional)</label><input id="nome" autocomplete="name" placeholder="Para identificar quem confirmou"></div>
         <button class="big ok" id="confirmar">${esc(info.botao.toUpperCase())}</button>
         <p class="small muted">Sua confirmação fica registrada com data e hora do servidor, separada do registro do motorista. Este link vale só para esta confirmação e expira em ${dt(info.expiraEm)}.</p>
-        <p class="err" id="err" hidden></p></div>`;
+        <p class="err" id="err" hidden></p>
+        <button class="btn danger" id="nao" style="width:100%;min-height:52px;font-size:17px">NÃO CONFERE</button>
+        <div id="naobox" hidden><div class="field"><label class="label" for="motivo">O que não confere?</label><textarea id="motivo" rows="3" placeholder="Ex.: o veículo chegou às 06:31, não às 06:12."></textarea></div>
+          <button class="btn danger" id="naogo" style="width:100%;min-height:52px">ENVIAR</button></div></div>`;
+      $('#nao').onclick = () => { $('#naobox').hidden = false; $('#nao').hidden = true; $('#motivo').focus(); };
+      $('#naogo').onclick = async () => {
+        $('#naogo').disabled = true;
+        try {
+          const res = await fetch(`${base}/divergir`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: $('#nome').value, motivo: $('#motivo').value }) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.mensagem || 'Não foi possível enviar.');
+          render(data, res.status);
+        } catch (e) { $('#naogo').disabled = false; const el = $('#err'); el.textContent = e.message || 'Sem conexão. Tente de novo.'; el.hidden = false; }
+      };
       $('#confirmar').onclick = async () => {
         $('#confirmar').disabled = true;
         try {

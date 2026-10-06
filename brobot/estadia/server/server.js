@@ -130,12 +130,16 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     let linkId = null;
     if (finalidade === 'CONFIRMAR' && baseUrl) linkId = createLink(st, ev, confirmType, by, false).id;
     const assunto = frase(ev.type, op);
-    const texto = `*Estadia BR* · ${op.codigo}\n${op.tacNome || 'O motorista'} (placa ${placaF(op.placa)}) informou que *${assunto}* às *${fmtH(ev.occurredAt)}* de ${fmtD(ev.occurredAt)}.${extra}`
-      + (finalidade === 'CONFIRMAR' ? '\n\nVocê confirma? Responda *SIM* para confirmar ou *NÃO* se não reconhece.' : '\n\nResponda *OK* para confirmar que recebeu.')
-      + (linkId ? '\n\nVer foto e local: {{link}}' : '');
+    const cab = `*Estadia BR* · ${op.codigo}\n${op.tacNome || 'O motorista'} (placa ${placaF(op.placa)}) informou que *${assunto}* às *${fmtH(ev.occurredAt)}* de ${fmtD(ev.occurredAt)}.${extra}`;
+    // Modo manual: a mensagem sai do WhatsApp do motorista e a resposta não volta ao sistema; por isso a confirmação é pelo link.
+    const texto = zcfg.mode === 'manual'
+      ? cab + (linkId ? '\n\n👉 Para *CONFIRMAR*, toque no link:\n{{link}}\n\nSe não estiver correto, abra o link e toque em *NÃO CONFERE*.' : '')
+      : cab + (finalidade === 'CONFIRMAR' ? '\n\nVocê confirma? Responda *SIM* para confirmar ou *NÃO* se não reconhece.' : '\n\nResponda *OK* para confirmar que recebeu.')
+        + (linkId ? '\n\nVer foto e local: {{link}}' : '');
     const mensagemId = crypto.randomUUID();
     let status, externalId = null, erro = null;
-    if (!para.telefone) { status = 'falha'; erro = 'Contato sem número de WhatsApp'; }
+    if (zcfg.mode === 'manual') status = 'aguardando_envio'; // sem número, o WhatsApp abre para o motorista escolher o contato
+    else if (!para.telefone) { status = 'falha'; erro = 'Contato sem número de WhatsApp'; }
     else if (zcfg.mode === 'api') {
       try { ({ externalId } = await Z.enviarApi(zcfg, para.telefone, textoReal({ texto, linkId }, baseUrl))); status = 'enviada'; } catch (e) { status = 'falha'; erro = e.message; }
     } else status = zcfg.mode === 'simulado' ? 'enviada' : 'aguardando_envio';
@@ -150,6 +154,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     if (D.CONFIRMATIONS[ev.type] && ['CHEGADA', 'INICIO', 'TERMINO', 'LIBERACAO'].includes(ev.type)) {
       await enviarZap(st, c.destino, { finalidade: 'CONFIRMAR', ev, confirmType: D.CONFIRMATIONS[ev.type].type, baseUrl });
     }
+    if (zcfg.mode === 'manual') return; // um envio por passo: a transportadora acompanha pelo portal
     if (['CHEGADA', 'LIBERACAO'].includes(ev.type)) await enviarZap(stateOf(st.op.id), c.transportadora, { finalidade: 'INFORMAR', ev, baseUrl });
     if (ev.type === 'SAIDA') {
       const s2 = stateOf(st.op.id);
@@ -210,7 +215,9 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   function mensagensView(st, baseUrl) {
     return st.mensagens.map((m) => {
       const real = textoReal(m, baseUrl);
-      return { ...m, texto: real, telefoneFmt: Z.fmtFone(m.para.telefone), whatsappUrl: m.para.telefone ? `https://wa.me/${m.para.telefone}?text=${encodeURIComponent(real)}` : null,
+      const aberto = m.linkId && st.links.find((l) => l.type === 'LINK_VISUALIZADO' && l.payload.linkId === m.linkId);
+      return { ...m, texto: real, telefoneFmt: Z.fmtFone(m.para.telefone), linkAbertoEm: aberto ? aberto.occurredAt : null,
+        whatsappUrl: `https://wa.me/${m.para.telefone || ''}?text=${encodeURIComponent(real)}`,
         respondida: m.respostas.length > 0, ultimaResposta: m.respostas[m.respostas.length - 1] || null, reenviada: st.mensagens.some((x) => x.reenvioDe === m.id) };
     });
   }
@@ -431,13 +438,27 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       acao: D.labelOf(link.confirmType), botao: { CHEGADA_CONFIRMADA: 'Confirmar chegada', INICIO_CONFIRMADO: 'Confirmar início', TERMINO_CONFIRMADO: 'Confirmar término' }[link.confirmType] || 'Confirmar', registro: ref ? { label: ref.type === 'CHEGADA' ? 'Chegada registrada pelo motorista' : D.labelOf(ref.type), em: ref.occurredAt, gps: ref.payload.gps || null, temFoto: !!ref.payload.photo } : null,
       expiraEm: link.expiraEm, destinatario: link.destinatario.nome,
       confirmado: conf ? { em: conf.occurredAt, por: conf.actor.name } : null,
+      contestado: (() => { const dv = st.divergences.find((x) => x.refEventId === link.refEventId && x.payload.linkId === link.id); return dv ? { em: dv.occurredAt, motivo: dv.payload.note } : null; })(),
     };
     if (expirado && !conf) {
       if (!st.links.some((l) => l.type === 'LINK_EXPIRADO_ACESSO' && l.payload.linkId === link.id)) store.append({ opId: st.op.id, type: 'LINK_EXPIRADO_ACESSO', actor: viaLink, origem: 'link_whatsapp', ...m, payload: { linkId: link.id } });
       return send(res, 410, { erro: 'LINK_EXPIRADO', mensagem: 'Este link expirou.', ...info });
     }
+    if (action === 'divergir' && req.method === 'POST') {
+      if (conf || info.contestado) return send(res, 200, info);
+      const b = await readBody(req);
+      const nome = String(b.nome || '').trim().slice(0, 80);
+      const motivo = String(b.motivo || '').trim().slice(0, 500);
+      if (motivo.length < 3) return fail(res, 400, 'MOTIVO', 'Escreva o que não confere.');
+      const actor = nome ? { ...viaLink, name: `${nome} (via link)` } : viaLink;
+      store.append({ opId: st.op.id, type: 'DIVERGENCIA', actor, origem: 'link_whatsapp', ...m, refEventId: link.refEventId, payload: { linkId: link.id, note: `Não confere (pelo link): ${motivo}` } });
+      link.usadoEm = new Date().toISOString();
+      store.saveLinks(links);
+      return send(res, 201, { ...info, contestado: { em: new Date().toISOString(), motivo } });
+    }
     if (action === 'confirmar' && req.method === 'POST') {
       if (conf) return send(res, 200, info);
+      if (info.contestado) return send(res, 200, info);
       const b = await readBody(req);
       const nome = String(b.nome || '').trim().slice(0, 80);
       const actor = nome ? { ...viaLink, name: `${nome} (via link)` } : viaLink;
@@ -461,7 +482,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     if (p === '/api/health') return send(res, 200, { ok: true, eventos: store.events.length });
 
     let m;
-    if ((m = /^\/api\/public\/link\/([A-Za-z0-9_-]{20,})(?:\/(foto|confirmar|renovar))?$/.exec(p))) return handlePublic(req, res, m[1], m[2]);
+    if ((m = /^\/api\/public\/link\/([A-Za-z0-9_-]{20,})(?:\/(foto|confirmar|renovar|divergir))?$/.exec(p))) return handlePublic(req, res, m[1], m[2]);
 
     if (p === '/api/login' && req.method === 'POST') {
       const { email, senha, telefone, pin } = await readBody(req);
@@ -707,6 +728,26 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         if (msg.finalidade === 'CONFIRMAR' && st.confirmations[ev.id]) return fail(res, 409, 'JA_CONFIRMADO', 'Já foi confirmado. Não é preciso reenviar.');
         const extra = msg.texto.includes('Tempo de estadia') ? msg.texto.slice(msg.texto.indexOf('\nTempo de estadia'), msg.texto.indexOf('\n\nResponda')) : '';
         await enviarZap(st, contatos(st.op)[msg.para.papel], { finalidade: msg.finalidade, ev, confirmType: msg.confirmType, extra, baseUrl, reenvioDe: msg.id, by: actorOf(user) });
+        return send(res, 201, fresh());
+      }
+
+      // O motorista informa na hora o número de quem vai receber (portaria ou outra pessoa).
+      if (sub === '/whatsapp/destinatario' && req.method === 'POST') {
+        if (!ehParte || user.role === 'destino') return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não altera o destinatário.');
+        const b = await readBody(req);
+        const msg = st.mensagens.find((x) => x.id === b.mensagemId);
+        if (!msg) return fail(res, 404, 'MENSAGEM', 'Mensagem não encontrada.');
+        const tel = Z.normFone(b.telefone);
+        if (!tel || tel.length < 12 || tel.length > 13) return fail(res, 400, 'TELEFONE', 'Número inválido. Digite com DDD, por exemplo (11) 99999-9999.');
+        const nome = String(b.nome || '').trim().slice(0, 60) || 'Contato informado pelo motorista';
+        const para = { nome, telefone: tel, papel: msg.para.papel };
+        if (b.salvar !== false) append({ opId, type: 'CONTATO_INFORMADO', payload: { papel: msg.para.papel, nome, telefone: `+${tel}` } });
+        if (zcfg.mode === 'manual' && ['aguardando_envio', 'falha'].includes(msg.status)) {
+          append({ opId, type: 'WHATSAPP_DESTINATARIO', payload: { mensagemId: msg.id, para } });
+        } else {
+          const ev = Object.values(st.milestones).find((e) => e.id === msg.refEventId);
+          if (ev && !(msg.finalidade === 'CONFIRMAR' && st.confirmations[ev.id])) await enviarZap(stateOf(opId), para, { finalidade: msg.finalidade, ev, confirmType: msg.confirmType, baseUrl, reenvioDe: msg.id, by: actorOf(user) });
+        }
         return send(res, 201, fresh());
       }
 
