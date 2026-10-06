@@ -535,7 +535,7 @@
   // ================= MODO MOTORISTA (TAC) =================
   // Uma tela, um passo de cada vez, botões grandes e frases do dia a dia.
   const tipoTxt = (op) => (op.tipo === 'CARGA' ? 'carga' : 'descarga');
-  const primeiro = (n) => String(n || '').split(/[\s(]/)[0];
+  const primeiro = (n) => { const p = String(n || '').split(/[\s(]+/).filter(Boolean); return /^(sr|sra|dr|dra|seu|dona|d)\.?$/i.test(p[0] || '') && p[1] ? `${p[0]} ${p[1]}` : p[0] || ''; };
   const vibrar = (p = 200) => { try { navigator.vibrate && navigator.vibrate(p); } catch { /* opcional */ } };
   const ICON = {
     pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
@@ -597,7 +597,7 @@
 
   function demoToolsHtml(d) {
     if (!(S.config && S.config.demo)) return '';
-    return `<details class="drv-demo"><summary>Ferramentas da demonstração</summary>
+    return `<details class="drv-demo"><summary>Ferramentas da demonstração · WhatsApp: ${esc({ manual: 'pelo celular do motorista', simulado: 'simulador', api: 'API oficial' }[S.config.zapModo] || S.config.zapModo)}</summary>
       <div class="row"><button class="btn small" id="dm-off">${S.simOffline ? 'Reativar sinal' : 'Simular sem sinal'}</button>
       ${d && d.referencia ? '<button class="btn small" id="dm-desl">Simular afastamento de 450 m</button>' : ''}
       ${S.config.zapModo === 'simulado' ? '<a class="btn small" href="/whatsapp.html" target="_blank" rel="noopener">Abrir celular do destino (simulador)</a>' : ''}
@@ -628,7 +628,9 @@
   }
 
   // Bloco de envio pelo WhatsApp do motorista: número já preenchido, trocar na hora ou escolher contato.
+  const MSG_CACHE = new Map();
   function envioBloco(m) {
+    MSG_CACHE.set(m.id, m);
     const quem = m.para.papel === 'destino' ? 'a portaria' : 'a transportadora';
     const temNum = !!m.para.telefone;
     const semNumUrl = `https://wa.me/?text=${encodeURIComponent(m.texto)}`;
@@ -643,24 +645,28 @@
         <input id="dn-${m.id}" type="tel" inputmode="tel" autocomplete="off" placeholder="(11) 99999-9999" required>
         <input type="text" placeholder="Nome (ex.: Portaria, Sr. Carlos)" aria-label="Nome de quem vai receber">
         <label class="chk"><input type="checkbox" checked> Usar este número nas próximas mensagens</label>
-        <button class="drv-mid" type="submit">USAR ESTE NÚMERO</button>
+        <button class="drv-mid" type="submit">${ICON.zap} ENVIAR PARA ESTE NÚMERO</button>
         ${temNum ? `<a class="drv-link" href="${esc(semNumUrl)}" target="_blank" rel="noopener" data-manual="${m.id}">Ou escolher o contato no WhatsApp</a>` : ''}
       </form></div>`;
   }
   function bindEnvio(root, opId, depois) {
     $$('[data-trocar]', root).forEach((b) => (b.onclick = () => { const f = $(`form[data-dest="${b.dataset.trocar}"]`, root); f.hidden = false; b.hidden = true; f.querySelector('input').focus(); }));
     $$('a[data-manual]', root).forEach((a) => (a.onclick = () => { api('POST', `/api/operations/${opId}/whatsapp/${a.dataset.manual}/enviada`).catch(() => {}); if (depois) setTimeout(depois, 600); }));
-    $$('form[data-dest]', root).forEach((f) => (f.onsubmit = async (e) => {
+    // Enviar para outro número: abre o WhatsApp do motorista NO MESMO TOQUE (senão o celular bloqueia) e depois registra.
+    $$('form[data-dest]', root).forEach((f) => (f.onsubmit = (e) => {
       e.preventDefault();
       const [tel, nome, chk] = f.querySelectorAll('input');
+      let num = tel.value.replace(/\D/g, '');
+      if (num && num.length <= 11) num = '55' + num.replace(/^0+/, '');
+      if (num.length < 12 || num.length > 13) { toast('Número incompleto. Digite com DDD, por exemplo (11) 99999-9999.', true); tel.focus(); return; }
+      const m = MSG_CACHE.get(f.dataset.dest);
+      const url = `https://wa.me/${num}?text=${encodeURIComponent((m && (m.textoManual || m.texto)) || '')}`;
+      const w = window.open(url, '_blank');
+      if (!w) location.href = url;
       const btn = f.querySelector('button'); btn.disabled = true;
-      try {
-        const d = await api('POST', `/api/operations/${opId}/whatsapp/destinatario`, { mensagemId: f.dataset.dest, telefone: tel.value, nome: nome.value, salvar: chk.checked });
-        const m = d.mensagens.filter((x) => x.id === f.dataset.dest || x.reenvioDe === f.dataset.dest).pop();
-        toast(S.config.zapModo === 'manual' ? 'Número salvo. Agora toque em ENVIAR NO WHATSAPP.' : 'Mensagem enviada para o novo número.');
-        if (m && m.status === 'aguardando_envio') { const box = f.closest('.envio'); box.outerHTML = envioBloco(m); bindEnvio(root, opId, depois); }
-        else refresh();
-      } catch (err) { toast(err.message, true); btn.disabled = false; }
+      api('POST', `/api/operations/${opId}/whatsapp/destinatario`, { mensagemId: f.dataset.dest, telefone: num, nome: nome.value, salvar: chk.checked, viaMotorista: true })
+        .then(() => { toast('Abrimos o seu WhatsApp. Toque em enviar lá.'); if (depois) setTimeout(depois, 600); else refresh(); })
+        .catch((err) => { toast(err.message, true); btn.disabled = false; });
     }));
   }
 
@@ -704,6 +710,7 @@
     // Mensagens ligadas a cada passo
     const msgsDe = (ev) => (ev && !ev.pendente ? d.mensagens.filter((m) => m.refEventId === ev.id && !m.reenviada) : []);
     const linhaZap = (m, ev) => {
+      MSG_CACHE.set(m.id, m);
       const c = m.finalidade === 'CONFIRMAR' ? conf(ev) : null;
       const [tom, txt] = zapStatus(m, c);
       const aberto = m.finalidade === 'CONFIRMAR' && !c && !(m.ultimaResposta && m.ultimaResposta.interpretacao !== 'OUTRO');
@@ -713,7 +720,7 @@
         ${aberto && semNumero ? `<form class="drv-tel" data-tel="${m.para.papel}"><label for="tel-${m.id}">Qual o WhatsApp ${m.para.papel === 'destino' ? 'da portaria' : 'da transportadora'}?</label>
           <input id="tel-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome do contato"><button class="drv-mid" type="submit">ENVIAR AVISO</button></form>` : ''}
         ${aberto && m.status === 'aguardando_envio' ? envioBloco(m) : ''}
-        ${aberto && m.status !== 'aguardando_envio' && !semNumero && S.config.zapModo !== 'manual' ? `<button type="button" class="drv-link left" data-trocar="${m.id}">Mandar para outra pessoa</button><form class="drv-tel" data-dest="${m.id}" hidden><label for="dn-${m.id}">Número de quem vai receber</label><input id="dn-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome"><label class="chk"><input type="checkbox" checked> Usar nas próximas mensagens</label><button class="drv-mid" type="submit">ENVIAR PARA ESTE NÚMERO</button></form>` : ''}
+        ${aberto && m.status !== 'aguardando_envio' && !semNumero ? `<button type="button" class="drv-link left" data-trocar="${m.id}">Mandar para outra pessoa</button><form class="drv-tel" data-dest="${m.id}" hidden><label for="dn-${m.id}">Número de quem vai receber</label><input id="dn-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome"><label class="chk"><input type="checkbox" checked> Usar nas próximas mensagens</label><button class="drv-mid" type="submit">${ICON.zap} ENVIAR PARA ESTE NÚMERO</button></form>` : ''}
         ${aberto && m.status !== 'aguardando_envio' && !semNumero && (minutos >= 5 || m.status === 'falha' || S.config.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém respondeu ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
           ${S.config.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR DE NOVO NO WHATSAPP</a>` : ''}
           ${m.status !== 'aguardando_envio' && (minutos >= 5 || m.status === 'falha') ? `<button class="btn" data-reenviar="${m.id}">Mandar de novo</button>` : ''}

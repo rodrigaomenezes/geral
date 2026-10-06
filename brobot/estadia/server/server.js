@@ -125,26 +125,31 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   }
   const textoReal = (m, baseUrl) => { const tk = m.linkId && tokenDoLink(m.linkId); return String(m.texto || '').replace('{{link}}', tk && baseUrl ? `${baseUrl}/c/${tk}` : '(link indisponível)'); };
 
-  async function enviarZap(st, para, { finalidade, ev, confirmType, extra = '', baseUrl, reenvioDe, by = SYS }) {
-    const op = st.op;
-    let linkId = null;
-    if (finalidade === 'CONFIRMAR' && baseUrl) linkId = createLink(st, ev, confirmType, by, false).id;
+  // Texto da mensagem. No modo manual a mensagem sai do WhatsApp do motorista e a resposta não volta
+  // ao sistema; por isso a confirmação é pelo link.
+  function montarTexto(op, ev, finalidade, extra, linkId, modo) {
     const assunto = frase(ev.type, op);
-    const cab = `*Estadia BR* · ${op.codigo}\n${op.tacNome || 'O motorista'} (placa ${placaF(op.placa)}) informou que *${assunto}* às *${fmtH(ev.occurredAt)}* de ${fmtD(ev.occurredAt)}.${extra}`;
-    // Modo manual: a mensagem sai do WhatsApp do motorista e a resposta não volta ao sistema; por isso a confirmação é pelo link.
-    const texto = zcfg.mode === 'manual'
+    const cab = `*Estadia BR* · ${op.codigo}\n${op.tacNome || 'O motorista'} (placa ${placaF(op.placa)}) informou que *${assunto}* às *${fmtH(ev.occurredAt)}* de ${fmtD(ev.occurredAt)}.${extra || ''}`;
+    return modo === 'manual'
       ? cab + (linkId ? '\n\n👉 Para *CONFIRMAR*, toque no link:\n{{link}}\n\nSe não estiver correto, abra o link e toque em *NÃO CONFERE*.' : '')
       : cab + (finalidade === 'CONFIRMAR' ? '\n\nVocê confirma? Responda *SIM* para confirmar ou *NÃO* se não reconhece.' : '\n\nResponda *OK* para confirmar que recebeu.')
         + (linkId ? '\n\nVer foto e local: {{link}}' : '');
+  }
+
+  async function enviarZap(st, para, { finalidade, ev, confirmType, extra = '', baseUrl, reenvioDe, by = SYS, modo = zcfg.mode, linkId = null }) {
+    const op = st.op;
+    if (!linkId && finalidade === 'CONFIRMAR' && baseUrl) linkId = createLink(st, ev, confirmType, by, false).id;
+    const assunto = frase(ev.type, op);
+    const texto = montarTexto(op, ev, finalidade, extra, linkId, modo);
     const mensagemId = crypto.randomUUID();
     let status, externalId = null, erro = null;
-    if (zcfg.mode === 'manual') status = 'aguardando_envio'; // sem número, o WhatsApp abre para o motorista escolher o contato
+    if (modo === 'manual') status = 'aguardando_envio'; // sem número, o WhatsApp abre para o motorista escolher o contato
     else if (!para.telefone) { status = 'falha'; erro = 'Contato sem número de WhatsApp'; }
     else if (zcfg.mode === 'api') {
       try { ({ externalId } = await Z.enviarApi(zcfg, para.telefone, textoReal({ texto, linkId }, baseUrl))); status = 'enviada'; } catch (e) { status = 'falha'; erro = e.message; }
     } else status = zcfg.mode === 'simulado' ? 'enviada' : 'aguardando_envio';
     store.append({ opId: op.id, type: 'WHATSAPP_ENVIADA', actor: by, origem: 'sistema', payload: {
-      mensagemId, externalId, para, finalidade, confirmType: confirmType || null, refEventId: ev.id, assunto, texto, linkId, modo: zcfg.mode, status, erro: erro || undefined, reenvioDe: reenvioDe || undefined } });
+      mensagemId, externalId, para, finalidade, confirmType: confirmType || null, refEventId: ev.id, assunto, texto, linkId, modo, status, erro: erro || undefined, reenvioDe: reenvioDe || undefined } });
     return { mensagemId, status };
   }
 
@@ -216,7 +221,9 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     return st.mensagens.map((m) => {
       const real = textoReal(m, baseUrl);
       const aberto = m.linkId && st.links.find((l) => l.type === 'LINK_VISUALIZADO' && l.payload.linkId === m.linkId);
-      return { ...m, texto: real, telefoneFmt: Z.fmtFone(m.para.telefone), linkAbertoEm: aberto ? aberto.occurredAt : null,
+      const ev = Object.values(st.milestones).find((e) => e.id === m.refEventId);
+      const textoManual = ev ? textoReal({ texto: montarTexto(st.op, ev, m.finalidade, '', m.linkId, 'manual'), linkId: m.linkId }, baseUrl) : real;
+      return { ...m, texto: real, textoManual, telefoneFmt: Z.fmtFone(m.para.telefone), linkAbertoEm: aberto ? aberto.occurredAt : null,
         whatsappUrl: `https://wa.me/${m.para.telefone || ''}?text=${encodeURIComponent(real)}`,
         respondida: m.respostas.length > 0, ultimaResposta: m.respostas[m.respostas.length - 1] || null, reenviada: st.mensagens.some((x) => x.reenvioDe === m.id) };
     });
@@ -744,6 +751,14 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         if (b.salvar !== false) append({ opId, type: 'CONTATO_INFORMADO', payload: { papel: msg.para.papel, nome, telefone: `+${tel}` } });
         if (zcfg.mode === 'manual' && ['aguardando_envio', 'falha'].includes(msg.status)) {
           append({ opId, type: 'WHATSAPP_DESTINATARIO', payload: { mensagemId: msg.id, para } });
+          if (b.viaMotorista) append({ opId, type: 'WHATSAPP_STATUS', payload: { mensagemId: msg.id, status: 'enviada_manual' } });
+        } else if (b.viaMotorista) {
+          // O motorista mandou pelo próprio WhatsApp para outro número: registra como envio manual, com o mesmo link.
+          const ev = Object.values(st.milestones).find((e) => e.id === msg.refEventId);
+          if (ev) {
+            const r = await enviarZap(stateOf(opId), para, { finalidade: msg.finalidade, ev, confirmType: msg.confirmType, baseUrl, reenvioDe: msg.id, by: actorOf(user), modo: 'manual', linkId: msg.linkId });
+            append({ opId, type: 'WHATSAPP_STATUS', payload: { mensagemId: r.mensagemId, status: 'enviada_manual' } });
+          }
         } else {
           const ev = Object.values(st.milestones).find((e) => e.id === msg.refEventId);
           if (ev && !(msg.finalidade === 'CONFIRMAR' && st.confirmations[ev.id])) await enviarZap(stateOf(opId), para, { finalidade: msg.finalidade, ev, confirmType: msg.confirmType, baseUrl, reenvioDe: msg.id, by: actorOf(user) });
