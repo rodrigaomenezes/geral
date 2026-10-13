@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#15212C">
+  <meta name="theme-color" content="#0F3B1E">
   <meta name="robots" content="noindex">
   <title>Confirmação · Estadia BR</title>
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -30,11 +31,11 @@
       if (status === 404) { main.innerHTML = `<div class="card"><h1>Link inválido</h1><p>Confira se o endereço foi copiado inteiro. Se o problema continuar, peça um novo link ao motorista ou à transportadora.</p></div>`; return; }
       const op = info.operacao, reg = info.registro;
       const head = `<div class="card"><span class="label">${esc(op.codigo)} · ${op.tipo === 'CARGA' ? 'Carga' : 'Descarga'}</span><h1>${esc(info.botao)}</h1>
-        <dl class="kv"><dt>Placa</dt><dd class="mono">${esc(placa(op.placa))}${op.implemento ? ' · ' + esc(op.implemento) : ''}</dd><dt>Motorista (TAC)</dt><dd>${esc(op.tac || '—')}</dd>
+        <dl class="kv"><dt>Placa</dt><dd class="mono">${esc(placa(op.placa))}${(op.placasImplementos || []).map((x) => ' + ' + esc(placa(x))).join('')}${op.implemento ? '<br><span class="small">' + esc(op.implemento) + '</span>' : ''}</dd><dt>Motorista (TAC)</dt><dd>${esc(op.tac || '—')}</dd>
         <dt>Local</dt><dd>${esc(op.localNome)}</dd><dt>Destino</dt><dd>${esc(op.destinoNome)}</dd>
         ${reg ? `<dt>Registro</dt><dd>${esc(reg.label)}</dd><dt>Data e hora</dt><dd class="mono">${dt(reg.em)}</dd>` : ''}
         ${reg && reg.gps && !reg.gps.erro ? `<dt>Localização</dt><dd class="mono">${reg.gps.lat.toFixed(5)}, ${reg.gps.lng.toFixed(5)} <a href="https://www.openstreetmap.org/?mlat=${reg.gps.lat}&mlon=${reg.gps.lng}#map=17/${reg.gps.lat}/${reg.gps.lng}" target="_blank" rel="noopener">ver mapa</a></dd>` : ''}</dl>
-        ${reg && reg.temFoto && status !== 410 ? `<img class="confirm-photo" src="${base}/foto" alt="Foto do registro do motorista">` : ''}</div>`;
+        ${reg && reg.temFoto && status !== 410 ? Array.from({ length: Math.min(reg.fotos || 1, 12) }, (_, i) => `<img class="confirm-photo" src="${base}/foto?i=${i}" alt="Foto ${i + 1} do registro do motorista" loading="lazy">`).join('') : ''}</div>`;
       if (info.contestado) {
         main.innerHTML = head + `<div class="card"><h2>Registrado: não confere</h2><p>${esc(info.contestado.motivo)}</p><p class="small muted">O registro do motorista foi mantido e a divergência será analisada. Você já pode fechar esta página.</p></div>`;
         return;

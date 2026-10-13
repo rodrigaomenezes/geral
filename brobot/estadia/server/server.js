@@ -7,7 +7,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { EventStore, sha256 } = require('./store');
-const { Directory, publicUser } = require('./auth');
+const { Directory, publicUser, foneDigits } = require('./auth');
+const C = require('./cadastros');
 const D = require('./domain');
 const Amelia = require('./amelia');
 const Z = require('./whatsapp');
@@ -15,6 +16,7 @@ const { seed } = require('./seed');
 
 const MAX_BODY = 12 * 1024 * 1024;
 const LINK_TTL_H = Number(process.env.ESTADIA_LINK_TTL_HORAS) || 24;
+const MAX_FOTOS = 6; // fotos por registro no momento do toque (mais podem ser adicionadas depois)
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
@@ -23,14 +25,26 @@ const MIME = {
 };
 const normPlaca = (p) => String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const digits = (s) => String(s || '').replace(/\D/g, '');
+function cpfValido(c) {
+  if (!/^\d{11}$/.test(c) || /^(\d)\1{10}$/.test(c)) return false;
+  const dv = (n) => { let s = 0; for (let i = 0; i < n; i++) s += Number(c[i]) * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+  return dv(9) === Number(c[9]) && dv(10) === Number(c[10]);
+}
+function cnpjValido(c) {
+  if (!/^\d{14}$/.test(c) || /^(\d)\1{13}$/.test(c)) return false;
+  const dv = (n) => { const w = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]; const s = w.reduce((a, k, i) => a + Number(c[i]) * k, 0) % 11; return s < 2 ? 0 : 11 - s; };
+  return dv(12) === Number(c[12]) && dv(13) === Number(c[13]);
+}
 
 function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), seedIfEmpty = true, quiet = false } = {}) {
   const store = new EventStore(dataDir);
   const dir = new Directory(dataDir);
   const demo = process.env.ESTADIA_DEMO_RESET !== '0';
+  const autoCadastro = process.env.ESTADIA_AUTOCADASTRO !== '0';
   const SYS = { userId: 'sistema', name: 'Estadia BR', role: 'sistema', orgId: 'estadia-br' };
   const zcfg = Z.config(process.env);
   const autoRespostas = []; // respostas automáticas do número Estadia BR (exibidas no simulador)
+  const cadastros = new Map(); // limite de autocadastros por IP
   const actorOf = (u) => ({ userId: u.id, name: u.nome, role: u.role, orgId: u.orgId });
   const origemDe = (u) => (u.role === 'tac' ? 'app' : 'portal');
   const stateOf = (opId) => D.project(store.forOp(opId));
@@ -64,13 +78,13 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       formato: 'estadia-br-dossie/2',
       geradoEm: occurredAt || new Date().toISOString(),
       geradoPor: { nome: by.name || by.nome, perfil: by.role },
-      operacao: st.op,
+      operacao: { ...st.op, composicaoNome: st.op.composicao ? (C.composicao(st.op.composicao) || {}).nome || null : null, carroceriaNome: C.nomeDe(C.CARROCERIAS, st.op.carroceria), tipoCargaNome: C.nomeDe(C.TIPOS_CARGA, st.op.tipoCarga) },
       status: { codigo: st.statusCode, descricao: st.status },
       dadosInformados: st.dadosInformados ? { em: st.dadosInformados.occurredAt, canal: st.dadosInformados.payload.canal, texto: st.dadosInformados.payload.texto, entidades: st.dadosInformados.payload.entidades, audio: st.dadosInformados.payload.audio || null } : null,
       marcos: D.SEQUENCE.filter((t) => st.milestones[t]).map((t) => {
         const m = st.milestones[t];
         return {
-          tipo: t, marco: D.labelOf(t), ...ev(m), gps: m.payload.gps || null, foto: m.payload.photo || null, observacao: m.payload.note || null,
+          tipo: t, marco: D.labelOf(t), ...ev(m), gps: m.payload.gps || null, foto: m.payload.photo || null, fotos: D.fotosDo(st, m), observacao: m.payload.note || null,
           confirmacao: st.confirmations[m.id] ? { tipo: D.labelOf(st.confirmations[m.id].type), ...ev(st.confirmations[m.id]) } : null,
           divergencias: st.divergences.filter((d) => d.refEventId === m.id).map((d) => ({ ...ev(d), descricao: d.payload.note, alegadoEm: d.payload.alegadoEm || null,
             tratamento: st.treatments[d.id] ? { ...ev(st.treatments[d.id]), resolucao: st.treatments[d.id].payload.resolucao, descricao: st.treatments[d.id].payload.note } : null })),
@@ -369,8 +383,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   }
   if (dir.empty && seedIfEmpty) seedAll();
   function resetDemo() { store.reset(); dir.reset(); autoRespostas.length = 0; seedAll(); }
-  // Dados de demonstração da versão 1.0 (sem transportadora) são recriados no formato 2.0.
-  if (demo && !dir.empty && (!dir.data.orgs.some((o) => o.tipo === 'transportadora') || dir.data.users.some((u) => u.role === 'tac' && !u.pinHash))) {
+  // Dados de demonstração de versões anteriores (sem transportadora, sem PIN ou sem frota) são recriados no formato atual.
+  if (demo && !dir.empty && (!dir.data.orgs.some((o) => o.tipo === 'transportadora') || dir.data.users.some((u) => u.role === 'tac' && !u.pinHash) || !dir.data.conjuntos.length)) {
     if (!quiet) console.log('Dados de demonstração de versão anterior encontrados: recriando no formato atual.');
     resetDemo();
   }
@@ -402,6 +416,15 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     return store.savePhoto(buf, m[1]);
   }
 
+  /** Fotos de um registro: `photo` (uma) e/ou `photos` (várias). Devolve a lista salva, sem repetidas. */
+  function parseFotos(b, max = MAX_FOTOS) {
+    const lista = [b.photo, ...(Array.isArray(b.photos) ? b.photos : [])].filter(Boolean);
+    if (lista.length > max) throw new D.DomainError(400, 'FOTOS_DEMAIS', `Envie no máximo ${max} fotos por registro.`);
+    const salvas = [];
+    for (const f of lista) { const x = parseFile(f); if (!salvas.some((y) => y.sha256 === x.sha256)) salvas.push(x); }
+    return salvas;
+  }
+
   function serveFile(res, file) {
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     fs.createReadStream(file).pipe(res);
@@ -431,7 +454,9 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     const viaLink = { userId: `link:${link.id}`, name: `${link.destinatario.nome} (via link)`, role: 'destino', orgId: st.op.destinoOrgId };
 
     if (action === 'foto') {
-      const file = ref && ref.payload.photo && store.photoPath(ref.payload.photo.file);
+      const i = Math.max(0, Number(new URL(req.url, 'http://x').searchParams.get('i')) || 0);
+      const f = ref && D.fotosDo(st, ref)[i];
+      const file = f && store.photoPath(f.file);
       if (!file || expirado) return fail(res, 404, 'SEM_FOTO', 'Foto indisponível.');
       return serveFile(res, file);
     }
@@ -441,8 +466,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       return send(res, 200, { ok: true, mensagem: 'Pedido registrado. A transportadora ou o motorista enviará um novo link.' });
     }
     const info = {
-      operacao: { codigo: st.op.codigo, tipo: st.op.tipo, placa: st.op.placa, implemento: st.op.implemento || null, tac: st.op.tacNome || null, localNome: st.op.localNome, destinoNome: st.op.destinoNome },
-      acao: D.labelOf(link.confirmType), botao: { CHEGADA_CONFIRMADA: 'Confirmar chegada', INICIO_CONFIRMADO: 'Confirmar início', TERMINO_CONFIRMADO: 'Confirmar término' }[link.confirmType] || 'Confirmar', registro: ref ? { label: ref.type === 'CHEGADA' ? 'Chegada registrada pelo motorista' : D.labelOf(ref.type), em: ref.occurredAt, gps: ref.payload.gps || null, temFoto: !!ref.payload.photo } : null,
+      operacao: { codigo: st.op.codigo, tipo: st.op.tipo, placa: st.op.placa, implemento: st.op.implemento || null, placasImplementos: st.op.placasImplementos || [], tac: st.op.tacNome || null, localNome: st.op.localNome, destinoNome: st.op.destinoNome },
+      acao: D.labelOf(link.confirmType), botao: { CHEGADA_CONFIRMADA: 'Confirmar chegada', INICIO_CONFIRMADO: 'Confirmar início', TERMINO_CONFIRMADO: 'Confirmar término' }[link.confirmType] || 'Confirmar', registro: ref ? { label: ref.type === 'CHEGADA' ? 'Chegada registrada pelo motorista' : D.labelOf(ref.type), em: ref.occurredAt, gps: ref.payload.gps || null, temFoto: D.fotosDo(st, ref).length > 0, fotos: D.fotosDo(st, ref).length } : null,
       expiraEm: link.expiraEm, destinatario: link.destinatario.nome,
       confirmado: conf ? { em: conf.occurredAt, por: conf.actor.name } : null,
       contestado: (() => { const dv = st.divergences.find((x) => x.refEventId === link.refEventId && x.payload.linkId === link.id); return dv ? { em: dv.occurredAt, motivo: dv.payload.note } : null; })(),
@@ -499,6 +524,51 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       }
       const r = dir.login(email, senha);
       return r ? send(res, 200, r) : fail(res, 401, 'CREDENCIAIS', 'E-mail ou senha incorretos.');
+    }
+
+    if (p === '/api/catalogos' && req.method === 'GET') return send(res, 200, { ...C.catalogos(), autoCadastro });
+
+    // Autocadastro: motorista (celular + PIN) e empresa (transportadora ou embarcador/destinatário).
+    if (p.startsWith('/api/cadastro/') && req.method === 'POST') {
+      if (!autoCadastro) return fail(res, 403, 'DESATIVADO', 'O autocadastro está desativado. Fale com a administração.');
+      const ip = meta(req).ip || 'sem-ip';
+      const lim = cadastros.get(ip) || { n: 0, desde: Date.now() };
+      if (Date.now() - lim.desde > 3600000) { lim.n = 0; lim.desde = Date.now(); }
+      if (++lim.n > 20) return fail(res, 429, 'MUITAS_TENTATIVAS', 'Muitos cadastros a partir desta conexão. Tente mais tarde.');
+      cadastros.set(ip, lim);
+      const b = await readBody(req);
+      const nome = String(b.nome || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+      if (nome.length < 3) return fail(res, 400, 'NOME', 'Escreva seu nome.');
+      if (b.aceite !== true) return fail(res, 400, 'ACEITE', 'Para continuar, aceite o uso dos seus dados para registrar as viagens.');
+      const tel = foneDigits(b.telefone);
+      if (p === '/api/cadastro/motorista') {
+        if (tel.length < 12 || tel.length > 13) return fail(res, 400, 'TELEFONE', 'Celular inválido. Digite com DDD, por exemplo (11) 99999-9999.');
+        if (!/^\d{4}$/.test(String(b.pin || ''))) return fail(res, 400, 'PIN', 'O código precisa ter 4 números.');
+        if (/^(\d)\1{3}$/.test(b.pin)) return fail(res, 400, 'PIN', 'Escolha um código menos óbvio (não use 4 números iguais).');
+        if (dir.data.users.some((u) => u.telefone === tel)) return fail(res, 409, 'JA_CADASTRADO', 'Este celular já tem conta. Volte e entre com ele e o seu código.');
+        const cpf = digits(b.cpf);
+        if (cpf && !cpfValido(cpf)) return fail(res, 400, 'CPF', 'CPF inválido. Confira os números.');
+        const org = dir.data.orgs.find((o) => o.tipo === 'tac') || dir.addOrg({ id: 'tac-autonomos', nome: 'Transportadores autônomos', tipo: 'tac' });
+        const u = dir.addUser({ email: `${tel}@motorista.estadiabr`, senha: crypto.randomBytes(18).toString('hex'), nome, role: 'tac', orgId: org.id, telefone: tel, pin: String(b.pin), cpf: cpf || undefined, autoCadastro: true });
+        store.append({ type: 'AUTO_CADASTRO', actor: actorOf(u), origem: 'app', ...meta(req), payload: { userId: u.id, perfil: 'tac', telefone: `+${tel}` } });
+        return send(res, 201, dir.loginTelefone(tel, b.pin));
+      }
+      if (p === '/api/cadastro/empresa') {
+        const tipo = ['transportadora', 'destino'].includes(b.tipo) ? b.tipo : null;
+        if (!tipo) return fail(res, 400, 'TIPO', 'Escolha se a empresa é transportadora ou embarcador/destinatário.');
+        const empresa = String(b.empresa || '').trim().slice(0, 80);
+        if (empresa.length < 3) return fail(res, 400, 'EMPRESA', 'Informe o nome da empresa.');
+        const cnpj = digits(b.cnpj);
+        if (!cnpjValido(cnpj)) return fail(res, 400, 'CNPJ', 'CNPJ inválido. Confira os números.');
+        if (dir.data.orgs.some((o) => o.cnpj === cnpj)) return fail(res, 409, 'CNPJ', 'Esta empresa já está cadastrada. Peça acesso ao responsável dela.');
+        if (!/^\S+@\S+\.\S+$/.test(String(b.email || ''))) return fail(res, 400, 'EMAIL', 'E-mail inválido.');
+        if (String(b.senha || '').length < 8) return fail(res, 400, 'SENHA', 'A senha precisa de ao menos 8 caracteres.');
+        if (dir.data.users.some((u) => u.email === String(b.email).trim().toLowerCase())) return fail(res, 409, 'EMAIL', 'E-mail já cadastrado.');
+        const org = dir.addOrg({ id: `org-${crypto.randomUUID().slice(0, 8)}`, nome: empresa, tipo, cnpj, autoCadastro: true, criadaEm: new Date().toISOString() });
+        const u = dir.addUser({ email: b.email, senha: b.senha, nome, role: tipo, orgId: org.id, telefone: tel.length >= 12 ? tel : undefined, autoCadastro: true });
+        store.append({ type: 'AUTO_CADASTRO', actor: actorOf(u), origem: 'portal', ...meta(req), payload: { userId: u.id, perfil: tipo, orgId: org.id, empresa, cnpj } });
+        return send(res, 201, dir.login(b.email, b.senha));
+      }
     }
 
     // Webhook oficial do WhatsApp (Cloud API): verificação e recebimento de respostas e status.
@@ -578,7 +648,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
 
     if (p === '/api/config') {
-      return send(res, 200, { demo, zapModo: zcfg.mode, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS,
+      return send(res, 200, { demo, zapModo: zcfg.mode, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS, catalogos: C.catalogos(), maxFotos: MAX_FOTOS,
         destinos: dir.data.orgs.filter((o) => o.tipo === 'destino').map((o) => ({ id: o.id, nome: o.nome })), permissoes: D.PERMISSOES });
     }
 
@@ -587,6 +657,9 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     if (p === '/api/operations' && req.method === 'POST') {
       if (!D.can(user, 'criar')) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não cadastra operações.');
       const b = await readBody(req);
+      const conj = b.conjuntoId ? dir.frotaDe(user).conjuntos.find((c) => c.id === b.conjuntoId) : null;
+      if (b.conjuntoId && !conj) return fail(res, 400, 'CONJUNTO', 'Veículo não encontrado na sua frota.');
+      if (conj) { b.placa = conj.placa; if (b.capacidadeToneladas === '' || b.capacidadeToneladas == null) b.capacidadeToneladas = conj.capacidadeToneladas; if (!b.implemento) b.implemento = C.descreverConjunto(conj); }
       const placa = normPlaca(b.placa);
       if (!/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(placa)) return fail(res, 400, 'PLACA', 'Placa inválida. Use o formato ABC1D23 ou ABC1234.');
       if (!['CARGA', 'DESCARGA'].includes(b.tipo)) return fail(res, 400, 'TIPO', 'Informe se é operação de carga ou descarga.');
@@ -602,7 +675,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       const opId = crypto.randomUUID();
       append({ opId, type: 'OPERACAO_CRIADA', payload: {
         codigo, tipo: b.tipo, transportadoraOrgId: transp.id, transportadoraNome: transp.nome, destinoOrgId: dest.id, destinoNome: dest.nome,
-        placa, implemento: s(b.implemento, 40), capacidadeToneladas: cap, pesoToneladas: numOrNull(b.pesoToneladas), volume: s(b.volume, 40), mercadoria: s(b.mercadoria, 60),
+        placa, implemento: s(b.implemento, 60), capacidadeToneladas: cap, tipoCarga: C.TIPOS_CARGA.some((t) => t.id === b.tipoCarga) ? b.tipoCarga : null,
+        ...(conj ? { conjuntoId: conj.id, composicao: conj.composicao, carroceria: conj.carroceria, placasImplementos: conj.placasImplementos } : {}), pesoToneladas: numOrNull(b.pesoToneladas), volume: s(b.volume, 40), mercadoria: s(b.mercadoria, 60),
         nfe: s(b.nfe, 60), cte: s(b.cte, 60), mdfe: s(b.mdfe, 60), origem: s(b.origem), localNome: s(b.localNome) || dest.nome,
         lat: numOrNull(b.lat), lng: numOrNull(b.lng), dataPrevista: b.dataPrevista ? new Date(b.dataPrevista).toISOString() : null,
         responsavelNome: s(b.responsavelNome), responsavelTelefone: s(b.responsavelTelefone, 30), observacoes: s(b.observacoes, 500),
@@ -651,13 +725,74 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       return send(res, 200, detail(stateOf(st.op.id), user, baseUrl));
     }
 
-    if (p === '/api/tac/viagens') {
+    if (p === '/api/tac/viagens' && req.method === 'GET') {
       if (user.role !== 'tac') return fail(res, 403, 'SEM_PERMISSAO', 'Somente motoristas.');
       const sts = allStates();
       const minhas = sts.filter((st) => st.op.tacUserId === user.id).map(summary).reverse();
-      const disponiveis = sts.filter((st) => !st.op.tacUserId && st.op.placa === user.placa && !st.encerrada)
+      const frota = dir.frotaDe(user);
+      const placas = new Set([user.placa, ...frota.conjuntos.map((c) => c.placa)].filter(Boolean));
+      const disponiveis = sts.filter((st) => !st.op.tacUserId && placas.has(st.op.placa) && !st.encerrada)
         .map((st) => ({ ...summary(st), mercadoria: st.op.mercadoria, pesoToneladas: st.op.pesoToneladas, dataPrevista: st.op.dataPrevista || null, origem: st.op.origem }));
-      return send(res, 200, { minhas, disponiveis, placa: user.placa });
+      const padrao = frota.conjuntos.find((c) => c.padrao) || null;
+      return send(res, 200, { minhas, disponiveis, placa: user.placa, conjunto: padrao ? { ...padrao, descricao: C.descreverConjunto(padrao) } : null, totalConjuntos: frota.conjuntos.length });
+    }
+
+    // ---------- frota: veículos, implementos e conjuntos ----------
+    const frotaView = () => {
+      const f = dir.frotaDe(user);
+      const vById = Object.fromEntries(dir.data.veiculos.map((v) => [v.id, v]));
+      return {
+        conjuntos: f.conjuntos.map((c) => ({ ...c, composicaoNome: (C.composicao(c.composicao) || {}).nome || c.composicao, carroceriaNome: C.nomeDe(C.CARROCERIAS, c.carroceria), descricao: C.descreverConjunto(c), veiculo: vById[c.veiculoId] || null })),
+        veiculos: f.veiculos, implementos: f.implementos,
+      };
+    };
+    if (p === '/api/frota' && req.method === 'GET') return send(res, 200, frotaView());
+    if (p === '/api/frota/conjuntos' && req.method === 'POST') {
+      if (!['tac', 'transportadora', 'admin'].includes(user.role)) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não cadastra veículos.');
+      const b = await readBody(req);
+      const v = C.validarConjunto(b);
+      const conj = dir.salvarConjunto(v, user.role === 'tac' ? { orgId: user.orgId, userId: user.id } : { orgId: user.orgId });
+      if (user.role === 'tac' && b.padrao) dir.definirPadrao(user, conj.id);
+      append({ type: 'CONJUNTO_CADASTRADO', payload: { conjuntoId: conj.id, composicao: conj.composicao, placa: conj.placa, placasImplementos: conj.placasImplementos, carroceria: conj.carroceria, capacidadeToneladas: conj.capacidadeToneladas } });
+      return send(res, 201, { conjunto: conj, frota: frotaView(), me: publicUser(dir.user(user.id), dir.org(user.orgId)) });
+    }
+    if ((m = /^\/api\/frota\/conjuntos\/([0-9a-f-]{36})\/(padrao|desativar)$/.exec(p)) && req.method === 'POST') {
+      if (m[2] === 'padrao') {
+        if (user.role !== 'tac') return fail(res, 403, 'SEM_PERMISSAO', 'Somente o motorista escolhe o caminhão em uso.');
+        if (!dir.definirPadrao(user, m[1])) return fail(res, 404, 'NAO_ENCONTRADO', 'Veículo não encontrado.');
+      } else {
+        const c = dir.desativarConjunto(user, m[1]);
+        if (!c) return fail(res, 404, 'NAO_ENCONTRADO', 'Veículo não encontrado.');
+        append({ type: 'CONJUNTO_DESATIVADO', payload: { conjuntoId: c.id, placa: c.placa } });
+      }
+      return send(res, 200, { frota: frotaView(), me: publicUser(dir.user(user.id), dir.org(user.orgId)) });
+    }
+
+    // O motorista autônomo cadastra a própria viagem (sem transportadora), já vinculada a ele.
+    if (p === '/api/tac/viagens' && req.method === 'POST') {
+      if (user.role !== 'tac') return fail(res, 403, 'SEM_PERMISSAO', 'Somente motoristas.');
+      const b = await readBody(req);
+      if (b.clientEventId && store.byClientId.has(b.clientEventId)) return send(res, 200, detail(stateOf(store.byClientId.get(b.clientEventId).opId), user, baseUrl));
+      const conj = dir.frotaDe(user).conjuntos.find((c) => c.id === b.conjuntoId) || dir.frotaDe(user).conjuntos.find((c) => c.padrao);
+      if (!conj) return fail(res, 409, 'SEM_VEICULO', 'Cadastre seu caminhão antes de criar a viagem.');
+      if (!['CARGA', 'DESCARGA'].includes(b.tipo)) return fail(res, 400, 'TIPO', 'Escolha se vai carregar ou descarregar.');
+      const destOrg = b.destinoOrgId ? dir.org(b.destinoOrgId) : null;
+      const s = (v, n = 80) => String(v || '').trim().slice(0, n) || null;
+      const destinoNome = destOrg && destOrg.tipo === 'destino' ? destOrg.nome : s(b.destinoNome);
+      if (!destinoNome) return fail(res, 400, 'DESTINO', 'Informe a empresa onde vai carregar ou descarregar.');
+      const tipoCarga = C.TIPOS_CARGA.some((t) => t.id === b.tipoCarga) ? b.tipoCarga : null;
+      const peso = Number(String(b.pesoToneladas ?? '').replace(',', '.'));
+      const lat = Number(b.lat), lng = Number(b.lng);
+      const codigo = `OP-${new Date().getFullYear()}-${String(store.opIds().length + 1).padStart(4, '0')}`;
+      const opId = crypto.randomUUID();
+      append({ opId, type: 'OPERACAO_CRIADA', clientEventId: b.clientEventId, payload: {
+        codigo, tipo: b.tipo, criadaPor: 'tac', transportadoraOrgId: null, transportadoraNome: null, destinoOrgId: destOrg && destOrg.tipo === 'destino' ? destOrg.id : null, destinoNome,
+        placa: conj.placa, placasImplementos: conj.placasImplementos, composicao: conj.composicao, carroceria: conj.carroceria, conjuntoId: conj.id, implemento: C.descreverConjunto(conj),
+        capacidadeToneladas: conj.capacidadeToneladas, pesoToneladas: peso > 0 && peso < 100 ? peso : null, tipoCarga, mercadoria: s(b.mercadoria, 60), nfe: s(b.nfe, 60),
+        localNome: s(b.localNome) || destinoNome, lat: Number.isFinite(lat) && Number.isFinite(lng) ? lat : null, lng: Number.isFinite(lat) && Number.isFinite(lng) ? lng : null,
+        responsavelNome: s(b.responsavelNome), responsavelTelefone: s(b.responsavelTelefone, 30) } });
+      append({ opId, type: 'OPERACAO_IDENTIFICADA', payload: { placa: conj.placa, via: 'cadastro_tac' } });
+      return send(res, 201, detail(stateOf(opId), user, baseUrl));
     }
 
     if (p === '/api/relatorios') {
@@ -677,10 +812,11 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       if (sub === '/events' && req.method === 'POST') {
         const b = await readBody(req);
         if (b.clientEventId && store.byClientId.has(b.clientEventId)) return send(res, 200, { duplicado: true, evento: store.byClientId.get(b.clientEventId), detalhe: fresh() });
-        const v = D.validateEvent(st, user, { ...b, hasPhoto: !!b.photo });
+        const v = D.validateEvent(st, user, { ...b, hasPhoto: !!(b.photo || (Array.isArray(b.photos) && b.photos.length)) });
         const payload = {};
         for (const k of ['gps', 'note', 'alegadoEm', 'resolucao', 'valor', 'origem', 'situacao']) if (v[k] !== undefined && v[k] !== null) payload[k] = v[k];
-        if (b.photo) payload.photo = parseFile(b.photo);
+        const fotos = parseFotos(b);
+        if (fotos.length) { payload.photo = fotos[0]; payload.photos = fotos; }
         const ev = append({ opId, type: v.type, occurredAt: v.occurredAt, refEventId: v.refEventId, clientEventId: b.clientEventId, payload });
         await aposRegistro(stateOf(opId), ev, baseUrl);
         return send(res, 201, { duplicado: false, evento: ev, detalhe: fresh() });
@@ -851,7 +987,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
 
     if ((m = /^\/api\/(?:photos|evidencias)\/([a-f0-9]{64}\.(?:jpg|png|webp|webm|ogg|m4a|mp3))$/.exec(p))) {
-      const owner = store.events.find((e) => e.payload && ((e.payload.photo && e.payload.photo.file === m[1]) || (e.payload.audio && e.payload.audio.file === m[1])));
+      const owner = store.events.find((e) => e.payload && ((e.payload.photo && e.payload.photo.file === m[1]) || (e.payload.audio && e.payload.audio.file === m[1]) || (Array.isArray(e.payload.photos) && e.payload.photos.some((f) => f.file === m[1]))));
       if (!owner || !canSee(user, stateOf(owner.opId))) return fail(res, 404, 'NAO_ENCONTRADA', 'Evidência não encontrada.');
       return serveFile(res, store.photoPath(m[1]));
     }

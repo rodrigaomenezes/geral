@@ -69,6 +69,11 @@ const OTHER_LABELS = {
   WHATSAPP_STATUS: 'Status da mensagem',
   WHATSAPP_RESPOSTA: 'Resposta recebida pelo WhatsApp',
   WHATSAPP_DESTINATARIO: 'Número de envio informado pelo motorista',
+  EVIDENCIA_ADICIONADA: 'Fotos adicionadas ao registro',
+  VIAGEM_CADASTRADA_TAC: 'Viagem cadastrada pelo motorista',
+  CONJUNTO_CADASTRADO: 'Veículo/conjunto cadastrado',
+  CONJUNTO_DESATIVADO: 'Veículo/conjunto desativado',
+  AUTO_CADASTRO: 'Autocadastro',
   ...OCORRENCIAS,
 };
 
@@ -88,7 +93,8 @@ function kindOf(type) {
     PAGAMENTO_REGISTRADO: 'financeiro', SITUACAO_FINANCEIRA: 'financeiro',
     DOSSIE_GERADO: 'dossie', ENCAMINHADO_JURIDICO: 'juridico', JURIDICO_STATUS: 'juridico',
     OPERACAO_CRIADA: 'cadastro', OPERACAO_RETIFICADA: 'cadastro', DADOS_INFORMADOS: 'cadastro',
-    OPERACAO_ENCERRADA: 'cadastro', USUARIO_CRIADO: 'admin', CONTATO_INFORMADO: 'cadastro',
+    OPERACAO_ENCERRADA: 'cadastro', USUARIO_CRIADO: 'admin', CONTATO_INFORMADO: 'cadastro', EVIDENCIA_ADICIONADA: 'evidencia',
+    CONJUNTO_CADASTRADO: 'admin', CONJUNTO_DESATIVADO: 'admin', AUTO_CADASTRO: 'admin',
   }[type] || 'sistema';
 }
 
@@ -146,7 +152,7 @@ function project(opEvents) {
   const op = { id: created.opId, ...created.payload, criadaEm: created.occurredAt, tacUserId: null };
   const st = {
     op, milestones: {}, confirmations: {}, divergences: [], treatments: {}, apuracoes: [], pagamentos: [],
-    situacoes: [], dossies: [], juridico: [], ocorrencias: [], retificacoes: [], links: [], mensagens: [], dadosInformados: null, encerramento: null,
+    situacoes: [], dossies: [], juridico: [], ocorrencias: [], retificacoes: [], links: [], mensagens: [], evidencias: [], dadosInformados: null, encerramento: null,
   };
   for (const e of opEvents) {
     const t = e.type;
@@ -175,6 +181,7 @@ function project(opEvents) {
     else if (t.startsWith('LINK_')) st.links.push(e);
     else if (t.startsWith('WHATSAPP_') || t === 'CONTATO_INFORMADO') { /* projetado acima */ }
     else if (t === 'DADOS_INFORMADOS') st.dadosInformados = e;
+    else if (t === 'EVIDENCIA_ADICIONADA') st.evidencias.push(e);
     else if (t === 'OPERACAO_ENCERRADA') st.encerramento = e;
   }
   st.encaminhado = st.juridico.find((e) => e.type === 'ENCAMINHADO_JURIDICO') || null;
@@ -283,6 +290,15 @@ function validateEvent(st, user, input, nowMs = Date.now()) {
     if (!['tac', 'destino', 'admin'].includes(role) || !isParty(st, user)) throw new DomainError(403, 'SEM_PERMISSAO', 'Somente as partes da operação confirmam.');
     if (ref.actor.role === role) throw new DomainError(403, 'MESMA_PARTE', 'A confirmação deve ser feita pela outra parte da operação.');
     if (st.confirmations[ref.id]) throw new DomainError(409, 'JA_CONFIRMADO', 'Este registro já foi confirmado.');
+    return { type, occurredAt, refEventId: ref.id, note };
+  }
+
+  if (type === 'EVIDENCIA_ADICIONADA') {
+    const ref = Object.values(st.milestones).find((e) => e.id === input.refEventId);
+    if (!ref || ref.type === 'OPERACAO_IDENTIFICADA') throw new DomainError(400, 'REF_INVALIDA', 'Escolha o registro que vai receber as fotos.');
+    if (!['tac', 'destino', 'admin'].includes(role) || !isParty(st, user)) throw new DomainError(403, 'SEM_PERMISSAO', 'Somente as partes da operação adicionam fotos.');
+    if (!input.hasPhoto) throw new DomainError(400, 'FOTO_OBRIGATORIA', 'Tire ou escolha ao menos uma foto.');
+    if (st.evidencias.filter((e) => e.refEventId === ref.id).length >= 10) throw new DomainError(409, 'LIMITE_FOTOS', 'Este registro já recebeu fotos adicionais demais.');
     return { type, occurredAt, refEventId: ref.id, note };
   }
 
@@ -467,6 +483,13 @@ function elegivelJuridico(st) {
   return { apto: motivos.length === 0, motivos };
 }
 
+/** Fotos de um registro: as tiradas no momento e as adicionadas depois (cada uma com seu evento). */
+function fotosDo(st, ev) {
+  const proprias = (ev.payload.photos || (ev.payload.photo ? [ev.payload.photo] : [])).map((f) => ({ ...f, em: ev.occurredAt, por: ev.actor.name, adicionada: false }));
+  const extras = st.evidencias.filter((e) => e.refEventId === ev.id).flatMap((e) => (e.payload.photos || []).map((f) => ({ ...f, em: e.occurredAt, por: e.actor.name, adicionada: true, note: e.payload.note || null })));
+  return proprias.concat(extras);
+}
+
 const CAMPOS_RETIFICAVEIS = {
   capacidadeToneladas: 'Capacidade do veículo (t)', pesoToneladas: 'Peso (t)', volume: 'Volume', mercadoria: 'Carga',
   implemento: 'Implemento', nfe: 'NF-e', cte: 'CT-e', mdfe: 'MDF-e', localNome: 'Local', responsavelNome: 'Responsável no destino',
@@ -477,5 +500,5 @@ module.exports = {
   DomainError, PERMISSOES, can, MILESTONES, SEQUENCE, CONFIRMATIONS, CONFIRMATION_OF, OCORRENCIAS, STATUS, RULES, ruleFor,
   LIMITE_DESLOCAMENTO_M, ORIGENS_PAGAMENTO, CAMPOS_RETIFICAVEIS,
   labelOf, kindOf, project, validateEvent, nextActions, apurar, alertas, haversineM, verificarDeslocamento,
-  pontoReferencia, fmtDur, elegivelJuridico, financeiro, round2, isParty,
+  pontoReferencia, fmtDur, elegivelJuridico, financeiro, round2, isParty, fotosDo,
 };

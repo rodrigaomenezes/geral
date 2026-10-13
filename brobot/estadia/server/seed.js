@@ -3,6 +3,7 @@
 
 const crypto = require('node:crypto');
 const Amelia = require('./amelia');
+const C = require('./cadastros');
 const zlib = require('node:zlib');
 
 const SENHA_DEMO = 'estadia123';
@@ -72,6 +73,13 @@ function seed(dir, store, { quiet = false } = {}) {
     ana: dir.addUser({ email: 'ana@tac.demo', senha: SENHA_DEMO, nome: 'Ana Lúcia Prado', role: 'tac', orgId: o.tac.id, placa: 'QPE2H91', telefone: '+55 11 98888-0002', pin: PIN_DEMO }),
     adv: dir.addUser({ email: 'juridico@andradeprado.demo', senha: SENHA_DEMO, nome: 'Dra. Helena Andrade', role: 'advocacia', orgId: o.adv.id }),
   };
+  // Frota: conjuntos dos motoristas e da transportadora (tabelas de veículos e implementos).
+  const conj = (dados, dono) => dir.salvarConjunto(C.validarConjunto(dados), dono);
+  conj({ composicao: 'CARRETA', placaVeiculo: 'RTB4F27', placasImplementos: ['RTC5A12'], carroceria: 'SIDER', capacidadeToneladas: 30, categoriaVeiculo: '6X2', marca: 'Scania', modelo: 'R 450', ano: 2019 }, { orgId: o.tac.id, userId: u.joao.id });
+  conj({ composicao: 'CARRETA', placaVeiculo: 'QPE2H91', placasImplementos: ['QPF3B77'], carroceria: 'SIDER', capacidadeToneladas: 30, categoriaVeiculo: '6X2', marca: 'Volvo', modelo: 'FH 460', ano: 2021 }, { orgId: o.tac.id, userId: u.ana.id });
+  conj({ composicao: 'BITREM', placaVeiculo: 'RSU2C45', placasImplementos: ['RSV4D11', 'RSV4D12'], carroceria: 'GRANELEIRO', capacidadeToneladas: 37, categoriaVeiculo: '6X4', apelido: 'Bitrem 01' }, { orgId: o.rodovia.id });
+  conj({ composicao: 'TRUCK', placaVeiculo: 'RSA7E90', placasImplementos: [], carroceria: 'BAU', capacidadeToneladas: 14, apelido: 'Truck baú 03' }, { orgId: o.rodovia.id });
+  const carreta = (placa, imp) => ({ composicao: 'CARRETA', carroceria: 'SIDER', placasImplementos: [imp], implemento: 'Carreta · Sider' });
   const actor = (x) => ({ userId: x.id, name: x.nome, role: x.role, orgId: x.orgId });
   const day = (offset) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + offset); return d; };
   const at = (offset, hh, mm) => { const d = day(offset); d.setUTCHours(hh + 3, mm, 0, 0); return d.toISOString(); }; // horário de Brasília
@@ -85,13 +93,13 @@ function seed(dir, store, { quiet = false } = {}) {
   const todayStart = at(0, 5, 0) < new Date().toISOString() ? at(0, 5, 0) : new Date().toISOString();
 
   // 1) Operação pronta para a demonstração ao vivo.
-  createOp({ codigo: 'OP-2026-0001', tipo: 'DESCARGA', destinoOrgId: o.serra.id, placa: 'RTB4F27', implemento: 'carreta sider', capacidadeToneladas: 30,
+  createOp({ codigo: 'OP-2026-0001', tipo: 'DESCARGA', destinoOrgId: o.serra.id, placa: 'RTB4F27', ...carreta('RTB4F27', 'RTC5A12'), tipoCarga: 'CARGA_GERAL', capacidadeToneladas: 30,
     pesoToneladas: 28, mercadoria: 'açúcar cristal', volume: '560 sacas', nfe: '35261000184552', cte: '35261000099871', mdfe: '35261000044120',
     origem: 'Ribeirão Preto/SP', localNome: 'CD Jundiaí · Doca 7', ...CD_JUNDIAI, dataPrevista: at(0, 9, 0),
     responsavelNome: 'Marina Coelho', responsavelTelefone: '+55 11 90000-0001' }, todayStart);
 
   // 2) Operação de outro destino (isolamento entre organizações).
-  createOp({ codigo: 'OP-2026-0002', tipo: 'DESCARGA', destinoOrgId: o.horizonte.id, placa: 'QPE2H91', implemento: 'baú', capacidadeToneladas: 24,
+  createOp({ codigo: 'OP-2026-0002', tipo: 'DESCARGA', destinoOrgId: o.horizonte.id, placa: 'QPE2H91', ...carreta('QPE2H91', 'QPF3B77'), tipoCarga: 'CARGA_GERAL', capacidadeToneladas: 24,
     pesoToneladas: 22, mercadoria: 'bebidas', nfe: '35261000201118', origem: 'Sorocaba/SP', localNome: 'CD Campinas · Doca 2', lat: -22.90556, lng: -47.06083,
     responsavelNome: 'Paulo Reis', responsavelTelefone: '+55 19 90000-0002' }, todayStart);
 
@@ -103,7 +111,7 @@ function seed(dir, store, { quiet = false } = {}) {
   const sistema = { userId: 'sistema', name: 'Estadia BR', role: 'sistema', orgId: 'estadia-br' };
 
   // 3) Carga na origem, dois dias atrás: dentro do limite (R$ 0,00) e encerrada.
-  const op4 = createOp({ codigo: 'OP-2026-0004', tipo: 'CARGA', destinoOrgId: o.usina.id, placa: 'QPE2H91', implemento: 'carreta sider', capacidadeToneladas: 30,
+  const op4 = createOp({ codigo: 'OP-2026-0004', tipo: 'CARGA', destinoOrgId: o.usina.id, placa: 'QPE2H91', ...carreta('QPE2H91', 'QPF3B77'), tipoCarga: 'CARGA_GERAL', capacidadeToneladas: 30,
     pesoToneladas: 30, mercadoria: 'açúcar cristal', volume: '600 sacas', nfe: '35261000179040', cte: '35261000088015', mdfe: '35261000040772',
     localNome: 'Usina Boa Vista · Expedição', ...USINA_UBERLANDIA, responsavelNome: 'Sérgio Lima', responsavelTelefone: '+55 34 90000-0004' }, at(-3, 18, 0));
   const e4 = mk(op4);
@@ -119,7 +127,7 @@ function seed(dir, store, { quiet = false } = {}) {
   e4('SAIDA', u.ana, [-2, 10, 50], { payload: { photo: doc } });
 
   // 4) Descarga de ontem com a mesma NF-e: excedeu o limite, divergência, deslocamento e pagamento parcial.
-  const op3 = createOp({ codigo: 'OP-2026-0003', tipo: 'DESCARGA', destinoOrgId: o.serra.id, placa: 'QPE2H91', implemento: 'carreta sider', capacidadeToneladas: 30,
+  const op3 = createOp({ codigo: 'OP-2026-0003', tipo: 'DESCARGA', destinoOrgId: o.serra.id, placa: 'QPE2H91', ...carreta('QPE2H91', 'QPF3B77'), tipoCarga: 'CARGA_GERAL', capacidadeToneladas: 30,
     pesoToneladas: 30, mercadoria: 'açúcar cristal', volume: '600 sacas', nfe: '35261000179040', cte: '35261000088015', mdfe: '35261000040772',
     origem: 'Uberlândia/MG', localNome: 'CD Jundiaí · Doca 3', ...CD_JUNDIAI, responsavelNome: 'Marina Coelho', responsavelTelefone: '+55 11 90000-0001' }, at(-2, 12, 0));
   const e3 = mk(op3);

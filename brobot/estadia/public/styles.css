@@ -1,7 +1,7 @@
-/* Estadia BR — tokens: asfalto/ardósia + âmbar de sinalização viária. */
+/* Estadia BR — tokens: verde da marca (logo) sobre asfalto/ardósia. */
 :root {
   --bg: #E9EDF1; --surface: #FFFFFF; --surface-2: #F3F5F8; --ink: #15212C; --muted: #5A6774; --line: #D3DAE1;
-  --accent: #F2A900; --accent-ink: #1A1405; --accent-soft: #FDF1D2;
+  --accent: #1E7B36; --accent-ink: #FFFFFF; --accent-soft: #E2F2DC; --brand-deep: #0F3B1E; --brand-light: #7BC043;
   --ok: #1C7F55; --ok-soft: #DDF1E7; --warn: #B86B00; --warn-soft: #FBEBD3; --crit: #B83A28; --crit-soft: #F8E0DB;
   --sys: #2B62C9; --sys-soft: #DFE8FA;
   --f-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
@@ -13,7 +13,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0E151C; --surface: #16202A; --surface-2: #1C2833; --ink: #E5EBF0; --muted: #93A1AE; --line: #283643;
-    --accent: #F5B829; --accent-ink: #1A1405; --accent-soft: #3A2E0F;
+    --accent: #5DBB4F; --accent-ink: #0A1A0C; --accent-soft: #173320; --brand-deep: #0B2414; --brand-light: #7BC043;
     --ok: #4CC28C; --ok-soft: #14352A; --warn: #E8A33A; --warn-soft: #3A2A12; --crit: #EE7B66; --crit-soft: #3D1D18;
     --sys: #7FA6F0; --sys-soft: #1A2A47; color-scheme: dark;
   }
@@ -38,9 +38,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--sys); outline-offset: 2px; }
 
 /* Top bar */
-.bar { position: sticky; top: 0; z-index: 10; background: var(--ink); color: var(--bg); padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bar { position: sticky; top: 0; z-index: 10; background: var(--brand-deep); color: #F2F7F1; padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .bar .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-.bar .mark { width: 28px; height: 28px; border-radius: 6px; background: repeating-linear-gradient(135deg, var(--accent) 0 6px, #15212C 6px 12px); flex: none; }
+.bar .mark { width: 32px; height: 32px; border-radius: 8px; background: #fff url(/favicon.png) center / 92% no-repeat; flex: none; }
 .bar .brand b { font-family: var(--f-display); font-size: 22px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
 .nav { display: flex; gap: 4px; flex-wrap: wrap; }
 .navlink { color: inherit; text-decoration: none; font-size: 14px; padding: 5px 10px; border-radius: 6px; opacity: .85; }
@@ -93,7 +93,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Login */
 .login { max-width: 980px; margin: 0 auto; padding-inline: 16px; padding-block: 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .login .hero h1 { font-size: 56px; text-transform: uppercase; font-weight: 700; letter-spacing: .02em; }
-.login .hero .mark { width: 56px; height: 56px; border-radius: 10px; background: repeating-linear-gradient(135deg, var(--accent) 0 10px, var(--ink) 10px 20px); margin-bottom: 14px; }
+.login .hero .logo { width: 260px; max-width: 70%; border-radius: 20px; background: #fff; display: block; margin-bottom: 14px; }
+.login .hero .slogan { font-family: var(--f-display); font-size: 20px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-top: 4px; }
 .login .hero p { color: var(--muted); max-width: 44ch; margin-top: 8px; }
 .demo-users { display: flex; flex-direction: column; gap: 6px; }
 .demo-users button { text-align: left; border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -334,3 +335,39 @@ body.motorista .bar .net { white-space: nowrap; }
 .chk { display: flex; gap: 8px; align-items: center; font-weight: 400 !important; font-size: 15px; }
 .chk input { width: 22px; height: 22px; }
 .drv-link.left { text-align: left; padding: 4px 0; }
+
+/* ===== Frota, cadastros e fotos ===== */
+svg.comp-svg, .drv svg.comp-svg, .sheet svg.comp-svg { width: auto; height: 30px; fill: currentColor; stroke: none; color: var(--accent); vertical-align: middle; flex: none; }
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.comp-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; text-align: left; min-height: 112px; }
+.comp-card b { font-size: 18px; } .comp-card span { font-size: 13px; color: var(--muted); }
+.comp-card.sel, .comp-card:hover { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.comp-sel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.comp-sel svg.comp-svg { height: 36px; }
+.dots { display: flex; gap: 6px; } .dots i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); } .dots i.on { background: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; } .chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip span { padding: 8px 14px; border-radius: 999px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; font-size: 15px; }
+.chip input:checked + span { border-color: var(--accent); background: var(--accent-soft); }
+.chip input:focus-visible + span { outline: 2px solid var(--sys); outline-offset: 2px; }
+.chip-btn { padding: 12px 16px; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; font-size: 16px; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.chip-btn small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.chip-btn.sel { border-color: var(--accent); background: var(--accent-soft); }
+.chips.grande .chip-btn { flex: 1 1 140px; min-height: 56px; }
+.drv-giant.alt2 { background: var(--brand-deep); color: #fff; }
+.drv-truck { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); color: inherit; text-decoration: none; }
+.drv-truck svg.comp-svg { height: 34px; }
+.drv-input { font-size: 18px; padding: 12px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); width: 100%; }
+.big-chk { font-size: 15px; line-height: 1.35; align-items: flex-start !important; }
+.big-chk input, .login-m .big-chk input { width: 26px; height: 26px; flex: none; margin-top: 2px; }
+.drv-money span:last-child { font-size: 22px; color: var(--muted); }
+.placa-in { text-transform: uppercase; font-family: var(--f-mono); }
+.fotos-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fotos-grid figure { margin: 0; position: relative; }
+.fotos-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; background: #000; }
+.foto-x { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
+.fotos-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
+.fotos-col img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.thumbs .thumb { margin: 0; }
+.login .hero img.logo { box-shadow: 0 2px 10px rgba(0,0,0,.08); }

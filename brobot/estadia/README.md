@@ -98,6 +98,21 @@ Para iniciar conversas fora da janela de 24h, a Meta exige *templates* aprovados
 
 **Para repetir:** use **Administração → Reiniciar demonstração**.
 
+## Melhorias da reunião de 13/10/2026
+
+| Pedido | Como ficou |
+|---|---|
+| Logo | Logo Estadia BR ("Seu tempo. Seu direito. Sua prova.") no login, no topo, no ícone do app instalado e nas páginas. As cores do app passaram a seguir o verde da marca |
+| Tabela de veículos | Cavalo mecânico ou caminhão, com placa, tração/categoria, marca, modelo, ano e RNTRC (**Frota e cadastros**) |
+| Tabela de implementos | Semirreboques e reboques, com placa, categoria e carroceria |
+| Tipos de composição | VUC, Toco, Truck, Bitruck, Carreta, Vanderleia, Bitrem, Rodotrem, Tritrem, Romeu e Julieta, Treminhão. Cada tipo exige o número certo de placas de implementos e tem um desenho para o motorista reconhecer o seu |
+| Carga | Tabela de tipos de carga (granel sólido, granel líquido, frigorificada, carga geral, neogranel, perigosas etc.) usada na operação e na viagem do motorista |
+| Mais fotos por registro | Até **6 fotos** no momento do registro (câmera ou galeria) e **Adicionar fotos** depois, como evento próprio que não altera o registro original. Todas entram na linha do tempo, no link de confirmação e no Dossiê |
+| Autocadastro | **Motorista:** "Primeira vez? Criar minha conta" (nome, celular, código de 4 números, CPF opcional, aceite LGPD). **Empresa:** transportadora ou embarcador/destinatário com CNPJ validado, e-mail e senha. Pode ser desligado com `ESTADIA_AUTOCADASTRO=0` |
+| Motorista cadastra os dados de forma intuitiva | Assistente **Seu caminhão** em 5 telas (tipo pelo desenho → placas → carroceria → toneladas → conferir) e **Nova viagem** em 4 telas (carregar/descarregar → empresa → tipo de carga → nota e WhatsApp da portaria). A viagem já sai com placas, composição e capacidade do caminhão em uso |
+
+A transportadora escolhe o conjunto da frota ao criar a operação: placa, implementos, composição e capacidade são preenchidos sozinhos.
+
 ## O que mudou na versão 2.0
 
 | Item do documento | Implementação |
@@ -136,6 +151,7 @@ brobot/estadia/
 ├── server/
 │   ├── server.js   API REST, página pública do link, eventos em tempo real (SSE)
 │   ├── domain.js   regras: marcos, status, permissões, apuração, conciliação, deslocamento
+│   ├── cadastros.js tabelas de composições, veículos, carrocerias e tipos de carga; validação do conjunto
 │   ├── amelia.js   interpretação de texto em dados estruturados
 │   ├── whatsapp.js envio (API/simulado/manual), webhook e leitura das respostas
 │   ├── store.js    log de eventos append-only com cadeia de hash, evidências, links e dossiês
@@ -152,12 +168,13 @@ Os dados ficam em `data/` (ou no caminho de `ESTADIA_DATA`):
 - `photos/`: fotos e áudios, nomeados pelo próprio hash;
 - `links.json`: tokens dos links (no log fica só o hash do token);
 - `dossies/`: dossiês gerados;
-- `directory.json`: organizações e usuários.
+- `directory.json`: organizações, usuários, veículos, implementos e conjuntos (cada cadastro também gera um evento no log).
 
 | Variável | Uso |
 |---|---|
 | `PORT` | Porta HTTP |
 | `ESTADIA_DATA` | Pasta de dados (no Railway, o volume em `/data`) |
+| `ESTADIA_AUTOCADASTRO` | `0` desliga o autocadastro de motoristas e empresas (padrão: ligado) |
 | `ESTADIA_SECRET` | Chave de assinatura das sessões |
 | `ESTADIA_DEMO_RESET` | `0` desativa o reinício da demonstração e a simulação de deslocamento |
 | `ESTADIA_LINK_TTL_HORAS` | Validade dos links de confirmação (padrão 24) |

@@ -373,3 +373,67 @@ test('Modo manual: WhatsApp do próprio motorista, número informado na hora e c
     if (antes === undefined) delete process.env.WHATSAPP_MODE; else process.env.WHATSAPP_MODE = antes;
   }
 });
+
+test('Autocadastro do motorista, cadastro guiado do caminhão, viagem própria e várias fotos por registro', async () => {
+  const t = await boot();
+  try {
+    // Autocadastro: código óbvio recusado, celular repetido recusado
+    assert.equal((await t.call('POST', '/api/cadastro/motorista', { nome: 'José Ribeiro', telefone: '11977776666', pin: '1111', aceite: true })).status, 400);
+    assert.equal((await t.call('POST', '/api/cadastro/motorista', { nome: 'José Ribeiro', telefone: '11977776666', pin: '2580' })).status, 400, 'sem aceite');
+    const c = await t.call('POST', '/api/cadastro/motorista', { nome: 'José Ribeiro', telefone: '(11) 97777-6666', pin: '2580', cpf: '529.982.247-25', aceite: true });
+    assert.equal(c.status, 201);
+    assert.equal(c.body.user.role, 'tac');
+    assert.equal((await t.call('POST', '/api/cadastro/motorista', { nome: 'Outro', telefone: '11977776666', pin: '2581', aceite: true })).status, 409);
+    const ze = c.body.token;
+
+    // Sem caminhão não cria viagem; composição exige o número certo de placas
+    assert.equal((await t.call('POST', '/api/tac/viagens', { tipo: 'DESCARGA', destinoNome: 'Coop' }, ze)).status, 409);
+    assert.equal((await t.call('POST', '/api/frota/conjuntos', { composicao: 'BITREM', placaVeiculo: 'ABC1D23', placasImplementos: ['ABC1D24'], carroceria: 'GRANELEIRO', capacidadeToneladas: 37 }, ze)).status, 400);
+    const cj = await t.call('POST', '/api/frota/conjuntos', { composicao: 'BITREM', placaVeiculo: 'abc-1d23', placasImplementos: ['ABC1D24', 'ABC1D25'], carroceria: 'GRANELEIRO', capacidadeToneladas: '37,5', padrao: true }, ze);
+    assert.equal(cj.status, 201, JSON.stringify(cj.body));
+    assert.equal(cj.body.me.placa, 'ABC1D23');
+    assert.deepEqual(cj.body.conjunto.placasImplementos, ['ABC1D24', 'ABC1D25']);
+
+    // Viagem cadastrada pelo motorista: já vinculada, com placas, composição e capacidade do conjunto; idempotente
+    const body = { tipo: 'DESCARGA', destinoOrgId: 'serra-azul', tipoCarga: 'GRANEL_SOLIDO', mercadoria: 'soja', responsavelTelefone: '11900000001', clientEventId: 'viagem-1' };
+    const v = await t.call('POST', '/api/tac/viagens', body, ze);
+    assert.equal(v.status, 201);
+    assert.equal(v.body.op.tacUserId, c.body.user.id);
+    assert.equal(v.body.op.capacidadeToneladas, 37.5);
+    assert.equal(v.body.op.composicao, 'BITREM');
+    assert.equal((await t.call('POST', '/api/tac/viagens', body, ze)).body.op.id, v.body.op.id);
+    // Viagem própria aparece para o destino escolhido; frota isolada entre donos
+    const marina = await t.login('portaria@serraazul.demo');
+    assert.ok((await t.call('GET', '/api/operations', null, marina)).body.some((o) => o.id === v.body.op.id));
+    assert.equal((await t.call('GET', '/api/frota', null, await t.login('operacao@rodoviasul.demo'))).body.conjuntos.some((x) => x.placa === 'ABC1D23'), false);
+
+    // Várias fotos no mesmo registro e fotos adicionadas depois (evento próprio)
+    const p2 = 'data:image/png;base64,' + demoPhotoPng(41, 30).toString('base64');
+    const ch = await t.call('POST', `/api/operations/${v.body.op.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photos: [PHOTO, p2] }, ze);
+    assert.equal(ch.status, 201);
+    assert.equal(ch.body.evento.payload.photos.length, 2);
+    assert.equal((await t.call('POST', `/api/operations/${v.body.op.id}/events`, { type: 'INICIO', occurredAt: now(), photos: Array(7).fill(PHOTO) }, ze)).status, 400, 'máximo de fotos');
+    const ex = await t.call('POST', `/api/operations/${v.body.op.id}/events`, { type: 'EVIDENCIA_ADICIONADA', occurredAt: now(), refEventId: ch.body.evento.id, photos: [p2.replace('A', 'A')], note: 'lacre' }, ze);
+    assert.equal(ex.status, 201);
+    const st = D.project(t.app.store.forOp(v.body.op.id));
+    assert.equal(D.fotosDo(st, st.milestones.CHEGADA).length, 3);
+    assert.equal(st.milestones.CHEGADA.payload.photos.length, 2, 'registro original não muda');
+  } finally { await t.close(); }
+});
+
+test('Autocadastro de empresa com CNPJ válido e operação a partir do conjunto da frota', async () => {
+  const t = await boot();
+  try {
+    assert.equal((await t.call('POST', '/api/cadastro/empresa', { tipo: 'transportadora', empresa: 'Teste', cnpj: '11.222.333/0001-00', nome: 'Maria', email: 'm@t.com', senha: 'segredo123', aceite: true })).status, 400);
+    const e = await t.call('POST', '/api/cadastro/empresa', { tipo: 'transportadora', empresa: 'Transportes Teste', cnpj: '11.222.333/0001-81', nome: 'Maria', email: 'm@t.com', senha: 'segredo123', aceite: true });
+    assert.equal(e.status, 201);
+    assert.equal(e.body.user.role, 'transportadora');
+    const carla = await t.login('operacao@rodoviasul.demo');
+    const fr = (await t.call('GET', '/api/frota', null, carla)).body;
+    const bitrem = fr.conjuntos.find((x) => x.composicao === 'BITREM');
+    const op = await nova(t, carla, { conjuntoId: bitrem.id, placa: '', capacidadeToneladas: '', tipoCarga: 'GRANEL_SOLIDO' });
+    assert.equal(op.placa, bitrem.placa);
+    assert.equal(op.capacidadeToneladas, bitrem.capacidadeToneladas);
+    assert.deepEqual(op.placasImplementos, bitrem.placasImplementos);
+  } finally { await t.close(); }
+});

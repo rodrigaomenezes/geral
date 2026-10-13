@@ -179,12 +179,13 @@
   // Folha de captura: horário do toque + GPS + foto, conforme o marco.
   function captureSheet(opId, action) {
     const occurredAt = new Date().toISOString();
-    const st = { gps: null, photo: null, sending: false };
+    const st = { gps: null, photos: [], sending: false };
+    const MAXF = (S.config && S.config.maxFotos) || 6;
     const photoTitle = action.photoLabel || (action.type === 'LIBERACAO' ? 'Documento de liberação (se houver)' : 'Foto');
     const bg = sheet(`<div class="card-h"><h2>${esc(action.label)}</h2><button class="btn small" data-x>Cancelar</button></div>
       ${action.aviso ? `<div class="alert atencao"><b>!</b><span>${esc(action.aviso)}</span></div>` : ''}
       <div class="capt"><div>Horário<b>${hhmm(occurredAt)}</b></div><div>GPS<b id="sh-gps">${action.gps === 'capturar' ? 'obtendo…' : action.gps ? 'se disponível' : 'não exigido'}</b></div><div>Foto<b>${action.photo === 'required' ? 'obrigatória' : action.photo ? 'opcional' : '—'}</b></div></div>
-      ${action.photo ? `<label class="photo-drop" for="sh-file"><span id="sh-prev"><b>${esc(photoTitle)}</b><br><span class="muted small">Toque para abrir a câmera</span></span></label><input type="file" id="sh-file" accept="image/*" capture="environment" hidden>` : ''}
+      ${action.photo ? `<label class="photo-drop" for="sh-file"><span id="sh-prev"><b>${esc(photoTitle)}</b><br><span class="muted small">Toque para escolher (até ${MAXF} fotos)</span></span></label><input type="file" id="sh-file" accept="image/*" multiple hidden>` : ''}
       <div class="field"><label class="label" for="sh-note">Observação (opcional)</label><textarea id="sh-note" maxlength="500"></textarea></div>
       <p class="err" id="sh-err" hidden></p>
       <button class="big" id="sh-go">Confirmar registro<small>Horário registrado: ${hhmm(occurredAt)}, momento em que você tocou no botão</small></button>`);
@@ -192,17 +193,21 @@
     if (action.gps) getGps().then((g) => { st.gps = g; const el = $('#sh-gps', bg); if (el) el.textContent = g.erro ? (action.gps === 'opcional' ? 'indisponível' : g.erro) : `±${g.acc} m`; });
     const file = $('#sh-file', bg);
     if (file) file.addEventListener('change', async () => {
-      if (!file.files[0]) return;
-      try { st.photo = await compressImage(file.files[0]); $('#sh-prev', bg).innerHTML = `<img src="${st.photo}" alt="Foto capturada"><br><span class="muted small">Toque para trocar</span>`; } catch (e) { showErr(e.message); }
+      if (!file.files.length) return;
+      try {
+        st.photos = [];
+        for (const f of [...file.files].slice(0, MAXF)) st.photos.push(await compressImage(f));
+        $('#sh-prev', bg).innerHTML = `<span class="fotos-grid">${st.photos.map((x, i) => `<img src="${x}" alt="Foto ${i + 1}">`).join('')}</span><br><span class="muted small">${st.photos.length} foto(s) · toque para trocar</span>`;
+      } catch (e) { showErr(e.message); }
     });
     $('#sh-go', bg).addEventListener('click', async () => {
       if (st.sending) return;
-      if (action.photo === 'required' && !st.photo) return showErr(`${photoTitle}: obrigatória para concluir o registro.`);
+      if (action.photo === 'required' && !st.photos.length) return showErr(`${photoTitle}: obrigatória para concluir o registro.`);
       st.sending = true; $('#sh-go', bg).disabled = true;
       if (action.gps === 'capturar' && !st.gps) st.gps = await getGps();
       const gps = st.gps && !(st.gps.erro && action.gps === 'opcional') ? st.gps : undefined;
       try {
-        await sendEvent(opId, { type: action.type, occurredAt, gps, photo: st.photo || undefined, note: $('#sh-note', bg).value.trim() || undefined, refEventId: action.refEventId });
+        await sendEvent(opId, { type: action.type, occurredAt, gps, photos: st.photos.length ? st.photos : undefined, note: $('#sh-note', bg).value.trim() || undefined, refEventId: action.refEventId });
         bg.remove(); refresh();
       } catch (e) { st.sending = false; $('#sh-go', bg).disabled = false; showErr(e.message); }
     });
@@ -230,7 +235,7 @@
 
   async function render() {
     clearInterval(liveT); clearInterval(monitorT);
-    if (!S.token) return renderLogin();
+    if (!S.token) return route().name === 'cadastro' ? renderCadastro(route().id) : renderLogin();
     connectSSE();
     if (!S.config) { try { S.config = await api('GET', '/api/config'); const me = await api('GET', '/api/me'); S.user = me; store.set('estadia.user', JSON.stringify(me)); } catch (e) { if (e.status === 401) return; } }
     await refreshFila();
@@ -242,7 +247,10 @@
       if (r.name === 'op' && r.id) await (tac ? viewOpMotorista(r.id) : viewOp(r.id));
       else if (r.name === 'det' && r.id) await viewOp(r.id);
       else if (r.name === 'amelia' && tac) await viewAmelia(r.id);
+      else if (r.name === 'caminhao' && tac) await (r.id === 'novo' ? viewCaminhaoNovo() : viewCaminhoes());
+      else if (r.name === 'viagem' && tac) await viewViagemNova();
       else if (tac) await homeMotorista();
+      else if (r.name === 'cadastros' && ['transportadora', 'admin'].includes(S.user.role)) await viewCadastros();
       else if (r.name === 'dossie' && r.id) await viewDossie(r.id);
       else if (r.name === 'relatorios' && can('relatorios')) await viewRelatorios();
       else if (r.name === 'admin' && S.user.role === 'admin') await viewAdmin();
@@ -277,7 +285,7 @@
       return;
     }
     bar.innerHTML = `<a class="brand" href="#/"><span class="mark"></span><b>Estadia BR</b></a>
-      <nav class="nav">${nav('#/', 'Operações')}${can('relatorios') ? nav('#/relatorios', 'Relatórios') : ''}${S.user.role === 'admin' ? nav('#/admin', 'Administração') : ''}</nav>
+      <nav class="nav">${nav('#/', 'Operações')}${['transportadora', 'admin'].includes(S.user.role) ? nav('#/cadastros', 'Frota e cadastros') : ''}${can('relatorios') ? nav('#/relatorios', 'Relatórios') : ''}${S.user.role === 'admin' ? nav('#/admin', 'Administração') : ''}</nav>
       <span class="net ${online() ? '' : 'off'}"><i></i>${online() ? 'Online' : 'Sem sinal'}${pend ? ` · ${pend} a enviar` : ''}</span>
       <span class="who">${esc(S.user.nome)}<small>${esc(ROLE[S.user.role])} · ${esc(S.user.orgNome || '')}</small></span>
       <button id="logout">Sair</button>`;
@@ -296,7 +304,7 @@
   function renderLogin() {
     const aba = store.get('estadia.aba') || 'motorista';
     $('#app').innerHTML = `<div class="login">
-      <section class="hero"><div class="mark"></div><h1>Estadia BR</h1>
+      <section class="hero"><img class="logo" src="/logo.jpg" alt="Estadia BR · Seu tempo. Seu direito. Sua prova." width="260" height="260">
         <p>Registre cada etapa da carga e descarga com um toque. A confirmação chega pelo WhatsApp e o tempo de estadia é calculado sozinho.</p></section>
       <section class="card login-card">
         <div class="tabs" role="tablist"><button role="tab" data-aba="motorista" aria-selected="${aba === 'motorista'}">Sou motorista</button><button role="tab" data-aba="empresa" aria-selected="${aba === 'empresa'}">Sou da empresa</button></div>
@@ -306,6 +314,7 @@
           <p class="err" id="lm-err" hidden></p>
           <button class="drv-big" type="submit">ENTRAR</button>
           <p class="small muted">Você continua conectado neste celular. Não precisa entrar de novo toda vez.</p>
+          <a class="drv-big alt" href="#/cadastro/motorista">PRIMEIRA VEZ? CRIAR MINHA CONTA</a>
           <div class="demo-users"><span class="label">Demonstração</span>
             <button type="button" data-tel="11988880001"><b>João Batista Ferreira</b><span class="muted small">(11) 98888-0001 · código 1234 · RTB-4F27</span></button>
             <button type="button" data-tel="11988880002"><b>Ana Lúcia Prado</b><span class="muted small">(11) 98888-0002 · código 1234 · QPE-2H91</span></button></div>
@@ -314,6 +323,7 @@
           <div class="field"><label class="label" for="lf-e">E-mail</label><input id="lf-e" type="email" autocomplete="username" required></div>
           <div class="field"><label class="label" for="lf-s">Senha</label><input id="lf-s" type="password" autocomplete="current-password" required></div>
           <p class="err" id="lf-err" hidden></p><button class="btn primary" type="submit">Entrar</button>
+          <a class="btn" href="#/cadastro/empresa">Cadastrar minha empresa</a>
           <div class="demo-users"><span class="label">Contas de demonstração · senha estadia123</span>
             ${DEMO.map(([e, n, r]) => `<button type="button" data-e="${e}"><b>${esc(n)}</b><span class="muted small">${esc(r)}</span></button>`).join('')}</div>
         </form>
@@ -331,6 +341,290 @@
     $$('[data-tel]').forEach((b) => (b.onclick = () => entrar({ telefone: b.dataset.tel, pin: '1234' }, '#lm-err')));
     $('#lf').onsubmit = (e) => { e.preventDefault(); entrar({ email: $('#lf-e').value, senha: $('#lf-s').value }, '#lf-err'); };
     $$('[data-e]').forEach((b) => (b.onclick = () => entrar({ email: b.dataset.e, senha: 'estadia123' }, '#lf-err')));
+  }
+
+  // ---------------- autocadastro (motorista e empresa) ----------------
+  function entrarCom(r, destino = '#/') {
+    S.token = r.token; S.user = r.user; S.config = null;
+    store.set('estadia.token', r.token); store.set('estadia.user', JSON.stringify(r.user));
+    location.hash = destino; render();
+  }
+  function renderCadastro(tipo) {
+    const empresa = tipo === 'empresa';
+    $('#app').innerHTML = `<div class="login"><section class="hero"><img class="logo" src="/logo.jpg" alt="Estadia BR · Seu tempo. Seu direito. Sua prova." width="260" height="260">
+        <p>${empresa ? 'Cadastre sua empresa para acompanhar as operações, confirmar marcos e receber o Dossiê de cada estadia.' : 'Crie sua conta em 1 minuto. Depois cadastramos o seu caminhão juntos, passo a passo.'}</p></section>
+      <section class="card login-card">${empresa ? `<h2>Cadastrar empresa</h2>
+        <form id="ce" class="form" style="grid-template-columns:1fr">
+          <div class="field"><span class="label">A empresa é</span><div class="chips" role="radiogroup">
+            <label class="chip"><input type="radio" name="ce-tipo" value="transportadora" checked><span>Transportadora</span></label>
+            <label class="chip"><input type="radio" name="ce-tipo" value="destino"><span>Embarcador ou destinatário</span></label></div></div>
+          <div class="field"><label class="label" for="ce-emp">Nome da empresa</label><input id="ce-emp" required autocomplete="organization"></div>
+          <div class="field"><label class="label" for="ce-cnpj">CNPJ</label><input id="ce-cnpj" required inputmode="numeric" placeholder="00.000.000/0000-00"></div>
+          <div class="field"><label class="label" for="ce-nome">Seu nome</label><input id="ce-nome" required autocomplete="name"></div>
+          <div class="field"><label class="label" for="ce-email">Seu e-mail</label><input id="ce-email" type="email" required autocomplete="email"></div>
+          <div class="field"><label class="label" for="ce-tel">Seu celular (WhatsApp)</label><input id="ce-tel" type="tel" inputmode="tel" placeholder="(11) 99999-9999"></div>
+          <div class="field"><label class="label" for="ce-senha">Senha (mínimo 8 caracteres)</label><input id="ce-senha" type="password" minlength="8" required autocomplete="new-password"></div>
+          <label class="chk"><input type="checkbox" id="ce-ok"> Li e aceito o uso dos dados para registrar e comprovar as operações (LGPD).</label>
+          <p class="err" id="ce-err" hidden></p><button class="btn primary" type="submit">Criar conta da empresa</button>
+          <a class="btn" href="#/">Já tenho conta · entrar</a></form>`
+      : `<h2>Criar minha conta</h2>
+        <form id="cm" class="login-m">
+          <label for="cm-nome">Seu nome</label><input id="cm-nome" autocomplete="name" placeholder="Nome e sobrenome" required>
+          <label for="cm-tel">Seu celular (WhatsApp)</label><input id="cm-tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required>
+          <label for="cm-pin">Crie um código de 4 números</label><input id="cm-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="••••" required>
+          <label for="cm-pin2">Repita o código</label><input id="cm-pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="••••" required>
+          <details><summary class="small">CPF (opcional)</summary><input id="cm-cpf" inputmode="numeric" placeholder="000.000.000-00" aria-label="CPF"></details>
+          <label class="chk big-chk"><input type="checkbox" id="cm-ok"> Aceito que o Estadia BR guarde meus registros, fotos e localização das viagens para comprovar a estadia.</label>
+          <p class="err" id="cm-err" hidden></p>
+          <button class="drv-big" type="submit">CRIAR CONTA</button>
+          <a class="drv-link" href="#/">Já tenho conta · entrar</a>
+          <p class="small muted">Use este celular para entrar. O código substitui senha.</p></form>`}</section></div>`;
+    const erro = (sel, msg) => { const el = $(sel); el.textContent = msg; el.hidden = false; };
+    if (empresa) {
+      $('#ce').onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          entrarCom(await api('POST', '/api/cadastro/empresa', { tipo: $('input[name="ce-tipo"]:checked').value, empresa: $('#ce-emp').value, cnpj: $('#ce-cnpj').value, nome: $('#ce-nome').value,
+            email: $('#ce-email').value, telefone: $('#ce-tel').value, senha: $('#ce-senha').value, aceite: $('#ce-ok').checked }), '#/');
+          toast('Empresa cadastrada. Bem-vindo ao Estadia BR!');
+        } catch (err) { erro('#ce-err', err.message); }
+      };
+      return;
+    }
+    $('#cm').onsubmit = async (e) => {
+      e.preventDefault();
+      if ($('#cm-pin').value !== $('#cm-pin2').value) return erro('#cm-err', 'Os dois códigos estão diferentes. Digite de novo.');
+      try {
+        entrarCom(await api('POST', '/api/cadastro/motorista', { nome: $('#cm-nome').value, telefone: $('#cm-tel').value, pin: $('#cm-pin').value, cpf: $('#cm-cpf').value, aceite: $('#cm-ok').checked }), '#/caminhao/novo');
+        toast('Conta criada! Agora vamos cadastrar o seu caminhão.');
+      } catch (err) { erro('#cm-err', err.message); }
+    };
+  }
+
+  // ---------------- frota: desenho do conjunto ----------------
+  // Pictograma simples do tipo de composição: cabine, carroceria do caminhão e implementos.
+  function compSvg(c) {
+    if (!c) return '';
+    const n = c.implementos, rig = c.veiculo === 'rigido';
+    const cab = 16, body = rig ? 30 : 0, trl = 34, gap = 3;
+    const w = cab + body + n * (trl + gap) + 4;
+    let x = w - 2, out = '';
+    const roda = (cx) => `<circle cx="${cx}" cy="31" r="3.4"/>`;
+    out += `<path d="M${x - cab} 30V14h${cab - 6}l6 7v9z"/>${roda(x - 4)}${roda(x - cab + 4)}`; x -= cab;
+    if (rig) { out += `<rect x="${x - body}" y="9" width="${body - 1}" height="21" rx="1.5"/>${roda(x - 6)}${c.id === 'BITRUCK' || c.id === 'TRUCK' ? roda(x - 13) : ''}`; x -= body; }
+    for (let i = 0; i < n; i++) { x -= gap; out += `<rect x="${x - trl}" y="9" width="${trl}" height="21" rx="1.5"/>${roda(x - 6)}${roda(x - 13)}${c.tipoImplemento === 'reboque' ? roda(x - trl + 6) : ''}`; x -= trl; }
+    return `<svg class="comp-svg" viewBox="0 0 ${w} 36" aria-hidden="true">${out}</svg>`;
+  }
+  const cat = () => (S.config && S.config.catalogos) || { composicoes: [], carrocerias: [], tiposCarga: [], tiposVeiculo: {} };
+  const compDe = (id) => cat().composicoes.find((c) => c.id === id) || null;
+  const placasConj = (c) => [c.placa, ...(c.placasImplementos || [])].map(placaFmt).join(' + ');
+
+  // ---------------- motorista: cadastro guiado do caminhão ----------------
+  async function viewCaminhaoNovo() {
+    const main = $('#main');
+    const st = { passo: 0, comp: null, placa: '', imps: [], categoria: '', carroceria: '', cap: '', marca: '', modelo: '', ano: '', apelido: '' };
+    const passos = ['Tipo', 'Placas', 'Carroceria', 'Toneladas', 'Conferir'];
+    const desenhar = () => {
+      const c = st.comp;
+      const topo = `<a class="drv-back" href="#/caminhao">← Voltar</a><div class="drv"><span class="drv-step">Seu caminhão · passo ${st.passo + 1} de ${passos.length}</span>
+        <div class="dots">${passos.map((_, i) => `<i class="${i <= st.passo ? 'on' : ''}"></i>`).join('')}</div>`;
+      let corpo = '';
+      if (st.passo === 0) {
+        corpo = `<h1 class="drv-hello">Qual é o seu caminhão?</h1><p class="drv-muted">Toque no desenho parecido com o seu conjunto.</p>
+          <div class="comp-grid">${cat().composicoes.map((x) => `<button class="comp-card ${c && c.id === x.id ? 'sel' : ''}" data-comp="${x.id}">${compSvg(x)}<b>${esc(x.nome)}</b><span>${esc(x.descricao)}</span></button>`).join('')}</div>`;
+      } else if (st.passo === 1) {
+        const nomeImp = (i) => (c.tipoImplemento === 'reboque' ? `${i + 1}º reboque` : c.implementos > 1 ? `${i + 1}ª carreta` : 'carreta (semirreboque)');
+        corpo = `<h1 class="drv-hello">Placas</h1><div class="comp-sel">${compSvg(c)}<b>${esc(c.nome)}</b></div>
+          <form id="cv-f" class="login-m">
+            <label for="cv-p">Placa ${c.veiculo === 'trator' ? 'do cavalo' : 'do caminhão'}</label><input id="cv-p" class="placa-in" autocapitalize="characters" maxlength="8" placeholder="ABC1D23" value="${esc(st.placa)}" required>
+            ${Array.from({ length: c.implementos }, (_, i) => `<label for="cv-i${i}">Placa da ${nomeImp(i)}</label><input id="cv-i${i}" class="placa-in" autocapitalize="characters" maxlength="8" placeholder="ABC1D23" value="${esc(st.imps[i] || '')}" required>`).join('')}
+            ${c.veiculo === 'trator' ? `<span class="label">Tração do cavalo (opcional)</span><div class="chips">${(cat().tiposVeiculo.trator || []).map((t) => `<label class="chip"><input type="radio" name="cv-cat" value="${t.id}" ${st.categoria === t.id ? 'checked' : ''}><span>${esc(t.nome)}</span></label>`).join('')}</div>` : ''}
+            <button class="drv-big" type="submit">CONTINUAR</button></form>`;
+      } else if (st.passo === 2) {
+        corpo = `<h1 class="drv-hello">Qual a carroceria?</h1><p class="drv-muted">${c.implementos ? 'O tipo das carretas.' : 'O tipo da caixa de carga do caminhão.'}</p>
+          <div class="chips grande">${cat().carrocerias.map((x) => `<button class="chip-btn ${st.carroceria === x.id ? 'sel' : ''}" data-carr="${x.id}">${esc(x.nome)}</button>`).join('')}</div>`;
+      } else if (st.passo === 3) {
+        corpo = `<h1 class="drv-hello">Quantas toneladas ${c.implementos ? 'o conjunto leva' : 'o caminhão leva'}?</h1>
+          <p class="drv-muted">Está no documento (CRLV) como <b>capacidade de carga</b>.${c.implementos > 1 ? ' Some todas as carretas.' : ''} É esse número que entra no cálculo da estadia.</p>
+          <form id="cv-t" class="login-m"><div class="drv-money"><input id="cv-cap" inputmode="decimal" placeholder="0" value="${esc(st.cap)}" aria-label="Toneladas" required><span>toneladas</span></div>
+          <button class="drv-big" type="submit">CONTINUAR</button></form>`;
+      } else {
+        corpo = `<h1 class="drv-hello">Está certo?</h1>
+          <div class="drv-card"><div class="comp-sel">${compSvg(c)}<b>${esc(c.nome)}</b></div>
+            <dl class="drv-dados"><div><dt>Placas</dt><dd class="mono">${esc([st.placa, ...st.imps].map(placaFmt).join(' + '))}</dd></div>
+            <div><dt>Carroceria</dt><dd>${esc((cat().carrocerias.find((x) => x.id === st.carroceria) || {}).nome || '')}</dd></div>
+            <div><dt>Leva</dt><dd>${esc(st.cap)} toneladas</dd></div></dl></div>
+          <details class="drv-card"><summary><b>Mais detalhes</b> <span class="drv-muted">(opcional)</span></summary><div class="login-m">
+            <label for="cv-ma">Marca</label><input id="cv-ma" value="${esc(st.marca)}" placeholder="Ex.: Scania">
+            <label for="cv-mo">Modelo</label><input id="cv-mo" value="${esc(st.modelo)}" placeholder="Ex.: R 450">
+            <label for="cv-an">Ano</label><input id="cv-an" inputmode="numeric" maxlength="4" value="${esc(st.ano)}">
+            <label for="cv-ap">Apelido</label><input id="cv-ap" value="${esc(st.apelido)}" placeholder="Ex.: Carreta do sider"></div></details>
+          <p class="err" id="cv-err" hidden></p>
+          <button class="drv-big ok" id="cv-save">ESTÁ CERTO · SALVAR</button>`;
+      }
+      main.innerHTML = topo + corpo + (st.passo ? '<button class="drv-link" id="cv-back">Voltar um passo</button>' : '') + '</div>';
+      const back = $('#cv-back'); if (back) back.onclick = () => { st.passo--; desenhar(); };
+      $$('[data-comp]').forEach((b) => (b.onclick = () => { const novo = compDe(b.dataset.comp); if (!st.comp || st.comp.id !== novo.id) st.imps = []; st.comp = novo; st.passo = 1; desenhar(); }));
+      $$('.placa-in').forEach((i) => (i.oninput = () => { const p = i.selectionStart; i.value = i.value.toUpperCase(); try { i.setSelectionRange(p, p); } catch { /* ok */ } }));
+      const f = $('#cv-f');
+      if (f) { $('#cv-p').focus(); f.onsubmit = (e) => {
+        e.preventDefault();
+        const norm = (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const ok = (v) => /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(v);
+        st.placa = norm($('#cv-p').value); st.imps = Array.from({ length: c.implementos }, (_, i) => norm($(`#cv-i${i}`).value));
+        const ruim = [st.placa, ...st.imps].find((v) => !ok(v));
+        if (ruim !== undefined) return toast(`Placa "${ruim || '(vazia)'}" inválida. Use ABC1D23 ou ABC1234.`, true);
+        const r = $('input[name="cv-cat"]:checked'); st.categoria = r ? r.value : '';
+        st.passo = 2; desenhar();
+      }; }
+      $$('[data-carr]').forEach((b) => (b.onclick = () => { st.carroceria = b.dataset.carr; st.passo = 3; desenhar(); }));
+      const t = $('#cv-t');
+      if (t) { $('#cv-cap').focus(); t.onsubmit = (e) => { e.preventDefault(); const v = Number($('#cv-cap').value.replace(',', '.')); if (!(v > 0 && v < 100)) return toast('Digite as toneladas, por exemplo 30.', true); st.cap = String(v).replace('.', ','); st.passo = 4; desenhar(); }; }
+      const save = $('#cv-save');
+      if (save) save.onclick = async () => {
+        save.disabled = true;
+        st.marca = $('#cv-ma').value; st.modelo = $('#cv-mo').value; st.ano = $('#cv-an').value; st.apelido = $('#cv-ap').value;
+        try {
+          const r = await api('POST', '/api/frota/conjuntos', { composicao: c.id, placaVeiculo: st.placa, placasImplementos: st.imps, carroceria: st.carroceria, capacidadeToneladas: st.cap,
+            categoriaVeiculo: st.categoria || undefined, marca: st.marca, modelo: st.modelo, ano: st.ano || undefined, apelido: st.apelido, padrao: true });
+          S.user = { ...S.user, ...r.me }; store.set('estadia.user', JSON.stringify(S.user));
+          toast('Caminhão cadastrado. É ele que vamos usar nas suas viagens.'); location.hash = '#/';
+        } catch (err) { save.disabled = false; const el = $('#cv-err'); el.textContent = err.message; el.hidden = false; }
+      };
+    };
+    desenhar();
+  }
+
+  async function viewCaminhoes() {
+    const f = await api('GET', '/api/frota');
+    const main = $('#main');
+    main.innerHTML = `<a class="drv-back" href="#/">← Início</a><div class="drv"><h1 class="drv-hello">Meus caminhões</h1>
+      ${f.conjuntos.map((c) => `<div class="drv-card ${c.padrao ? 'now' : ''}">${c.padrao ? '<span class="drv-tag">EM USO</span>' : ''}<div class="comp-sel">${compSvg(compDe(c.composicao))}<b>${esc(c.apelido || c.composicaoNome)}</b></div>
+        <p class="mono">${esc(placasConj(c))}</p><p class="drv-muted">${esc(c.descricao)} · ${num(c.capacidadeToneladas)} toneladas</p>
+        ${c.padrao ? '' : `<button class="drv-big" data-usar="${c.id}">USAR ESTE</button>`}<button class="drv-link" data-tirar="${c.id}">Remover</button></div>`).join('') || '<p class="drv-muted">Nenhum caminhão cadastrado ainda.</p>'}
+      <a class="drv-big alt" href="#/caminhao/novo">+ CADASTRAR ${f.conjuntos.length ? 'OUTRO ' : ''}CAMINHÃO</a></div>`;
+    const atualizar = (r) => { S.user = { ...S.user, ...r.me }; store.set('estadia.user', JSON.stringify(S.user)); refresh(); };
+    $$('[data-usar]').forEach((b) => (b.onclick = async () => { try { atualizar(await api('POST', `/api/frota/conjuntos/${b.dataset.usar}/padrao`)); toast('Pronto. Este é o caminhão em uso.'); } catch (e) { toast(e.message, true); } }));
+    $$('[data-tirar]').forEach((b) => (b.onclick = async () => {
+      if (b.dataset.certeza !== '1') { b.dataset.certeza = '1'; b.textContent = 'Toque de novo para remover'; return; }
+      try { atualizar(await api('POST', `/api/frota/conjuntos/${b.dataset.tirar}/desativar`)); toast('Caminhão removido. O histórico das viagens continua guardado.'); } catch (e) { toast(e.message, true); }
+    }));
+  }
+
+  // ---------------- motorista: nova viagem guiada ----------------
+  async function viewViagemNova() {
+    const v = await api('GET', '/api/tac/viagens');
+    const main = $('#main');
+    if (!v.conjunto) { location.hash = '#/caminhao/novo'; toast('Antes, cadastre o seu caminhão.'); return; }
+    const st = { passo: 0, tipo: '', destinoOrgId: '', destinoNome: '', localNome: '', tipoCarga: '', mercadoria: '', peso: '', nfe: '', rNome: '', rTel: '', cid: uuid() };
+    const destinos = (S.config && S.config.destinos) || [];
+    const total = 4;
+    const desenhar = () => {
+      const topo = `<a class="drv-back" href="#/">← Início</a><div class="drv"><span class="drv-step">Nova viagem · passo ${st.passo + 1} de ${total}</span><div class="dots">${Array.from({ length: total }, (_, i) => `<i class="${i <= st.passo ? 'on' : ''}"></i>`).join('')}</div>`;
+      let corpo = '';
+      if (st.passo === 0) {
+        corpo = `<h1 class="drv-hello">Você vai carregar ou descarregar?</h1>
+          <button class="drv-giant" data-tipo="CARGA">${ICON.truck}<span>VOU CARREGAR</span></button>
+          <button class="drv-giant alt2" data-tipo="DESCARGA">${ICON.doc}<span>VOU DESCARREGAR</span></button>`;
+      } else if (st.passo === 1) {
+        corpo = `<h1 class="drv-hello">Em qual empresa?</h1>
+          ${destinos.length ? `<div class="chips grande">${destinos.map((d) => `<button class="chip-btn ${st.destinoOrgId === d.id ? 'sel' : ''}" data-dest="${d.id}">${esc(d.nome)}</button>`).join('')}</div><p class="drv-muted">Ou escreva o nome:</p>` : ''}
+          <form id="vn-d" class="login-m"><label for="vn-dn">Empresa</label><input id="vn-dn" value="${esc(st.destinoOrgId ? '' : st.destinoNome)}" placeholder="Ex.: Cooperativa Vale Verde">
+            <label for="vn-l">Local ou doca (opcional)</label><input id="vn-l" value="${esc(st.localNome)}" placeholder="Ex.: Armazém 2 · Doca 5">
+            <button class="drv-big" type="submit">CONTINUAR</button></form>`;
+      } else if (st.passo === 2) {
+        corpo = `<h1 class="drv-hello">O que você ${st.tipo === 'CARGA' ? 'vai levar' : 'está levando'}?</h1>
+          <div class="chips grande">${cat().tiposCarga.map((x) => `<button class="chip-btn ${st.tipoCarga === x.id ? 'sel' : ''}" data-carga="${x.id}" title="${esc(x.exemplo)}">${esc(x.nome)}<small>${esc(x.exemplo)}</small></button>`).join('')}</div>
+          <form id="vn-c" class="login-m"><label for="vn-m">Qual produto? (opcional)</label><input id="vn-m" value="${esc(st.mercadoria)}" placeholder="Ex.: soja, açúcar, bebidas">
+            <label for="vn-p">Peso em toneladas (opcional)</label><input id="vn-p" inputmode="decimal" value="${esc(st.peso)}" placeholder="Ex.: 28">
+            <button class="drv-big" type="submit">CONTINUAR</button></form>`;
+      } else {
+        corpo = `<h1 class="drv-hello">Quase pronto</h1>
+          <form id="vn-f" class="login-m"><label for="vn-n">Nota fiscal (opcional)</label><input id="vn-n" inputmode="numeric" value="${esc(st.nfe)}" placeholder="Número ou chave da NF-e">
+            <label for="vn-rt">WhatsApp da portaria (opcional)</label><input id="vn-rt" type="tel" inputmode="tel" value="${esc(st.rTel)}" placeholder="(11) 99999-9999">
+            <label for="vn-rn">Nome de quem atende (opcional)</label><input id="vn-rn" value="${esc(st.rNome)}" placeholder="Ex.: Portaria, Sr. Carlos">
+            <div class="drv-card"><span class="drv-label">Caminhão</span><div class="comp-sel">${compSvg(compDe(v.conjunto.composicao))}<b class="mono">${esc(placasConj(v.conjunto))}</b></div>
+              <span class="drv-muted">${esc(v.conjunto.descricao)} · ${num(v.conjunto.capacidadeToneladas)} t</span><a class="drv-link left" href="#/caminhao">Trocar caminhão</a></div>
+            <p class="err" id="vn-err" hidden></p>
+            <button class="drv-big ok" type="submit">CRIAR VIAGEM</button></form>`;
+      }
+      main.innerHTML = topo + corpo + (st.passo ? '<button class="drv-link" id="vn-back">Voltar um passo</button>' : '') + '</div>';
+      const back = $('#vn-back'); if (back) back.onclick = () => { st.passo--; desenhar(); };
+      $$('[data-tipo]').forEach((b) => (b.onclick = () => { st.tipo = b.dataset.tipo; st.passo = 1; desenhar(); }));
+      $$('[data-dest]').forEach((b) => (b.onclick = () => { st.destinoOrgId = b.dataset.dest; st.destinoNome = (destinos.find((d) => d.id === b.dataset.dest) || {}).nome || ''; st.localNome = $('#vn-l').value; st.passo = 2; desenhar(); }));
+      const fd = $('#vn-d');
+      if (fd) fd.onsubmit = (e) => { e.preventDefault(); const n = $('#vn-dn').value.trim(); st.localNome = $('#vn-l').value.trim(); if (n) { st.destinoOrgId = ''; st.destinoNome = n; } if (!st.destinoNome) return toast('Escolha ou escreva a empresa.', true); st.passo = 2; desenhar(); };
+      $$('[data-carga]').forEach((b) => (b.onclick = () => { $$('[data-carga]').forEach((x) => x.classList.toggle('sel', x === b)); st.tipoCarga = b.dataset.carga; }));
+      const fc = $('#vn-c');
+      if (fc) fc.onsubmit = (e) => { e.preventDefault(); if (!st.tipoCarga) return toast('Toque no tipo de carga.', true); st.mercadoria = $('#vn-m').value.trim(); st.peso = $('#vn-p').value.trim(); st.passo = 3; desenhar(); };
+      const ff = $('#vn-f');
+      if (ff) ff.onsubmit = async (e) => {
+        e.preventDefault();
+        st.nfe = $('#vn-n').value.trim(); st.rTel = $('#vn-rt').value.trim(); st.rNome = $('#vn-rn').value.trim();
+        const btn = ff.querySelector('button[type="submit"]'); btn.disabled = true;
+        try {
+          const d = await api('POST', '/api/tac/viagens', { tipo: st.tipo, destinoOrgId: st.destinoOrgId || undefined, destinoNome: st.destinoNome, localNome: st.localNome, tipoCarga: st.tipoCarga,
+            mercadoria: st.mercadoria, pesoToneladas: st.peso, nfe: st.nfe, responsavelNome: st.rNome, responsavelTelefone: st.rTel, conjuntoId: v.conjunto.id, clientEventId: st.cid });
+          sessionStorage.removeItem('estadia.naoAbrirAtiva'); toast(`Viagem ${d.op.codigo} criada.`); location.hash = `#/op/${d.op.id}`;
+        } catch (err) { btn.disabled = false; const el = $('#vn-err'); el.textContent = err.message; el.hidden = false; }
+      };
+    };
+    desenhar();
+  }
+
+  // ---------------- portal: frota e cadastros ----------------
+  async function viewCadastros() {
+    const f = await api('GET', '/api/frota');
+    const c = cat();
+    const main = $('#main');
+    const nomeCat = (id) => { for (const l of Object.values(c.tiposVeiculo || {})) { const x = l.find((y) => y.id === id); if (x) return x.nome; } return id || '—'; };
+    main.innerHTML = `<h1>Frota e cadastros</h1>
+      <div class="card"><div class="card-h"><h2>Conjuntos (composições)</h2><span class="pill">${f.conjuntos.length}</span></div>
+        <div class="tablewrap"><table><thead><tr><th>Composição</th><th>Placas</th><th>Carroceria</th><th>Capacidade</th><th>Apelido</th><th></th></tr></thead><tbody>
+        ${f.conjuntos.map((x) => `<tr><td><span class="row">${compSvg(compDe(x.composicao))}${esc(x.composicaoNome)}</span></td><td class="mono">${esc(placasConj(x))}</td><td>${esc(x.carroceriaNome || '')}</td><td class="mono">${num(x.capacidadeToneladas)} t</td><td>${esc(x.apelido || '')}</td><td><button class="btn small" data-desativar="${x.id}">Desativar</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">Nenhum conjunto cadastrado.</td></tr>'}</tbody></table></div>
+        <details ${f.conjuntos.length ? '' : 'open'}><summary style="cursor:pointer"><b>Novo conjunto</b> <span class="small muted">cadastra o veículo e os implementos de uma vez</span></summary>
+        <form id="cj" class="form" style="margin-top:10px">
+          <div class="field"><label class="label" for="cj-comp">Tipo de composição</label><select id="cj-comp">${c.composicoes.map((x) => `<option value="${x.id}">${esc(x.nome)} · ${esc(x.descricao)}</option>`).join('')}</select></div>
+          <div class="field"><label class="label" for="cj-placa" id="cj-placa-l">Placa do veículo</label><input id="cj-placa" required autocapitalize="characters" placeholder="ABC1D23"></div>
+          <div class="field" id="cj-imps"></div>
+          <div class="field" id="cj-cat-f"><label class="label" for="cj-cat">Tração (cavalo)</label><select id="cj-cat"><option value="">—</option>${(c.tiposVeiculo.trator || []).map((t) => `<option value="${t.id}">${esc(t.nome)}</option>`).join('')}</select></div>
+          <div class="field"><label class="label" for="cj-carr">Carroceria</label><select id="cj-carr">${c.carrocerias.map((x) => `<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></div>
+          <div class="field"><label class="label" for="cj-cap">Capacidade de carga do conjunto (t)</label><input id="cj-cap" type="number" step="0.1" min="0.1" required></div>
+          <div class="field"><label class="label" for="cj-ma">Marca</label><input id="cj-ma"></div>
+          <div class="field"><label class="label" for="cj-mo">Modelo</label><input id="cj-mo"></div>
+          <div class="field"><label class="label" for="cj-an">Ano</label><input id="cj-an" inputmode="numeric" maxlength="4"></div>
+          <div class="field"><label class="label" for="cj-rn">RNTRC</label><input id="cj-rn"></div>
+          <div class="field"><label class="label" for="cj-ap">Apelido</label><input id="cj-ap" placeholder="Ex.: Bitrem 02"></div>
+          <div class="field full"><button class="btn primary" type="submit">Cadastrar conjunto</button></div><p class="err field full" id="cj-err" hidden></p></form></details></div>
+      <div class="grid2"><div class="col">
+        <div class="card"><div class="card-h"><h2>Veículos</h2><span class="pill">${f.veiculos.length}</span></div><div class="tablewrap"><table><thead><tr><th>Placa</th><th>Tipo</th><th>Marca/modelo</th><th>Ano</th></tr></thead><tbody>
+          ${f.veiculos.map((x) => `<tr><td class="mono">${esc(placaFmt(x.placa))}</td><td>${x.tipo === 'trator' ? 'Cavalo' : 'Caminhão'} · ${esc(nomeCat(x.categoria))}</td><td>${esc([x.marca, x.modelo].filter(Boolean).join(' ') || '—')}</td><td class="mono">${x.ano || '—'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">—</td></tr>'}</tbody></table></div></div>
+        <div class="card"><div class="card-h"><h2>Implementos</h2><span class="pill">${f.implementos.length}</span></div><div class="tablewrap"><table><thead><tr><th>Placa</th><th>Categoria</th><th>Carroceria</th></tr></thead><tbody>
+          ${f.implementos.map((x) => `<tr><td class="mono">${esc(placaFmt(x.placa))}</td><td>${esc(x.categoria === 'reboque' ? 'Reboque' : 'Semirreboque')}</td><td>${esc((c.carrocerias.find((y) => y.id === x.carroceria) || {}).nome || '—')}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">—</td></tr>'}</tbody></table></div></div>
+      </div><div class="col">
+        <div class="card"><h2>Tipos de composição</h2><div class="tablewrap"><table><thead><tr><th></th><th>Composição</th><th>Veículo</th><th>Implementos</th></tr></thead><tbody>
+          ${c.composicoes.map((x) => `<tr><td>${compSvg(x)}</td><td><b>${esc(x.nome)}</b><br><span class="small muted">${esc(x.descricao)}</span></td><td>${x.veiculo === 'trator' ? 'Cavalo mecânico' : 'Caminhão'}</td><td>${x.implementos ? `${x.implementos} ${x.tipoImplemento}${x.implementos > 1 ? 's' : ''}` : '—'}</td></tr>`).join('')}</tbody></table></div></div>
+        <div class="card"><h2>Tipos de carga</h2><div class="tablewrap"><table><thead><tr><th>Tipo</th><th>Exemplos</th></tr></thead><tbody>
+          ${c.tiposCarga.map((x) => `<tr><td>${esc(x.nome)}</td><td class="small muted">${esc(x.exemplo)}</td></tr>`).join('')}</tbody></table></div></div>
+      </div></div>`;
+    const ajustar = () => {
+      const comp = compDe($('#cj-comp').value);
+      $('#cj-placa-l').textContent = comp.veiculo === 'trator' ? 'Placa do cavalo' : 'Placa do caminhão';
+      $('#cj-cat-f').hidden = comp.veiculo !== 'trator';
+      const box = $('#cj-imps');
+      const atuais = $$('input', box).map((i) => i.value);
+      box.innerHTML = comp.implementos ? `<span class="label">Placas ${comp.tipoImplemento === 'reboque' ? 'dos reboques' : 'dos semirreboques'}</span><div class="row">${Array.from({ length: comp.implementos }, (_, i) => `<input aria-label="Placa do implemento ${i + 1}" placeholder="${i + 1}º · ABC1D23" value="${esc(atuais[i] || '')}" required autocapitalize="characters">`).join('')}</div>` : '<span class="small muted">Sem implementos nesta composição.</span>';
+    };
+    $('#cj-comp').onchange = ajustar; ajustar();
+    $('#cj').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api('POST', '/api/frota/conjuntos', { composicao: $('#cj-comp').value, placaVeiculo: $('#cj-placa').value, placasImplementos: $$('#cj-imps input').map((i) => i.value), categoriaVeiculo: $('#cj-cat').value || undefined,
+          carroceria: $('#cj-carr').value, capacidadeToneladas: $('#cj-cap').value, marca: $('#cj-ma').value, modelo: $('#cj-mo').value, ano: $('#cj-an').value || undefined, rntrc: $('#cj-rn').value, apelido: $('#cj-ap').value });
+        toast('Conjunto cadastrado.'); refresh();
+      } catch (err) { const el = $('#cj-err'); el.textContent = err.message; el.hidden = false; }
+    };
+    $$('[data-desativar]').forEach((b) => (b.onclick = async () => { try { await api('POST', `/api/frota/conjuntos/${b.dataset.desativar}/desativar`); toast('Conjunto desativado. Operações antigas não mudam.'); refresh(); } catch (err) { toast(err.message, true); } }));
   }
 
   // ---------------- pills e rótulos ----------------
@@ -351,6 +645,7 @@
     catch (e) { if (e.code !== 'REDE') throw e; ops = JSON.parse(store.get('estadia.cache.ops.' + S.user.id) || '[]'); }
     if (S.user.role === 'tac') return homeTac(main, ops);
     if (S.user.role === 'advocacia') return homeAdv(main, ops);
+    if (can('criar')) { try { S.frota = await api('GET', '/api/frota'); } catch { S.frota = null; } }
     return homePortal(main, ops);
   }
 
@@ -482,12 +777,15 @@
 
   function newOpForm() {
     const dest = (S.config && S.config.destinos) || [];
+    const conjs = S.frota ? S.frota.conjuntos : [];
     return `<details class="card" id="newop"><summary style="cursor:pointer"><b>Nova operação</b> <span class="muted small">carga e descarga são operações independentes</span></summary>
       <form id="nf" class="form" style="margin-top:12px">
         <div class="field"><label class="label" for="nf-tipo">Tipo</label><select id="nf-tipo"><option value="DESCARGA">Descarga</option><option value="CARGA">Carga</option></select></div>
         <div class="field"><label class="label" for="nf-dest">Embarcador / destinatário</label><select id="nf-dest">${dest.map((d) => `<option value="${d.id}">${esc(d.nome)}</option>`).join('')}</select></div>
+        <div class="field"><label class="label" for="nf-conj">Veículo da frota</label><select id="nf-conj"><option value="">Outro (digitar placa)</option>${conjs.map((c) => `<option value="${c.id}">${esc(placasConj(c))} · ${esc(c.descricao)}</option>`).join('')}</select></div>
         <div class="field"><label class="label" for="nf-placa">Placa</label><input id="nf-placa" required placeholder="ABC1D23" autocapitalize="characters"></div>
         <div class="field"><label class="label" for="nf-imp">Implemento</label><input id="nf-imp" placeholder="carreta sider"></div>
+        <div class="field"><label class="label" for="nf-tc">Tipo de carga</label><select id="nf-tc"><option value="">—</option>${cat().tiposCarga.map((x) => `<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></div>
         <div class="field"><label class="label" for="nf-cap">Capacidade do veículo (t)</label><input id="nf-cap" type="number" step="0.1" min="0.1" required value="30"></div>
         <div class="field"><label class="label" for="nf-peso">Peso (t)</label><input id="nf-peso" type="number" step="0.1"></div>
         <div class="field"><label class="label" for="nf-merc">Carga</label><input id="nf-merc" placeholder="açúcar cristal"></div>
@@ -509,12 +807,17 @@
   }
   function bindNewOp() {
     const nf = $('#nf'); if (!nf) return;
+    $('#nf-conj').onchange = () => {
+      const c = (S.frota ? S.frota.conjuntos : []).find((x) => x.id === $('#nf-conj').value);
+      $('#nf-placa').disabled = !!c;
+      if (c) { $('#nf-placa').value = placaFmt(c.placa); $('#nf-imp').value = c.descricao; $('#nf-cap').value = c.capacidadeToneladas; }
+    };
     $('#nf-here').onclick = async () => { const g = await getGps(); if (g.erro) return toast(g.erro, true); $('#nf-lat').value = g.lat; $('#nf-lng').value = g.lng; toast(`Local definido (±${g.acc} m). Limite de deslocamento: 300 m.`); };
     nf.onsubmit = async (e) => {
       e.preventDefault();
       const v = (id) => $(id).value;
       try {
-        const d = await api('POST', '/api/operations', { tipo: v('#nf-tipo'), destinoOrgId: v('#nf-dest'), placa: v('#nf-placa'), implemento: v('#nf-imp'), capacidadeToneladas: v('#nf-cap'),
+        const d = await api('POST', '/api/operations', { tipo: v('#nf-tipo'), destinoOrgId: v('#nf-dest'), conjuntoId: v('#nf-conj') || undefined, tipoCarga: v('#nf-tc') || undefined, placa: v('#nf-placa'), implemento: v('#nf-imp'), capacidadeToneladas: v('#nf-cap'),
           pesoToneladas: v('#nf-peso'), mercadoria: v('#nf-merc'), volume: v('#nf-vol'), nfe: v('#nf-nfe'), cte: v('#nf-cte'), mdfe: v('#nf-mdfe'), origem: v('#nf-orig'),
           localNome: v('#nf-local'), dataPrevista: v('#nf-prev') || undefined, responsavelNome: v('#nf-rn'), responsavelTelefone: v('#nf-rt'), lat: v('#nf-lat'), lng: v('#nf-lng'), observacoes: v('#nf-obs') });
         toast(`Operação ${d.op.codigo} criada. Informe o código ao motorista.`);
@@ -576,27 +879,30 @@
     const viagem = (o) => `<div class="drv-card trip"><span class="drv-tag">${o.tipo === 'CARGA' ? 'CARGA' : 'DESCARGA'}</span>
       <h2>${esc(o.localNome)}</h2><p class="drv-muted">${esc(o.destinoNome)}</p>
       <p>${[o.mercadoria, o.pesoToneladas != null ? `${num(o.pesoToneladas)} toneladas` : null, o.dataPrevista ? `previsto ${diaHora(o.dataPrevista)}` : null].filter(Boolean).map(esc).join(' · ')}</p>
-      <button class="drv-big" data-comecar="${esc(o.codigo)}">É ESSA · COMEÇAR</button></div>`;
+      <button class="drv-big" data-comecar="${esc(o.codigo)}" data-placa="${esc(o.placa)}">É ESSA · COMEÇAR</button></div>`;
     main.innerHTML = `<div class="drv">
       <h1 class="drv-hello">Olá, ${esc(primeiro(S.user.nome))}</h1>
-      <p class="drv-muted">Caminhão <b class="mono">${esc(placaFmt(S.user.placa))}</b></p>
+      ${v.conjunto ? `<a class="drv-truck" href="#/caminhao">${compSvg(compDe(v.conjunto.composicao))}<span><b class="mono">${esc(placasConj(v.conjunto))}</b><br><span class="drv-muted">${esc(v.conjunto.descricao)} · trocar</span></span></a>`
+        : `<div class="drv-card now"><h2>Cadastre o seu caminhão</h2><p class="drv-muted">Leva 1 minuto. Assim as viagens já saem com a placa e as toneladas certas.</p><a class="drv-big" href="#/caminhao/novo">CADASTRAR MEU CAMINHÃO</a></div>`}
       ${ativa ? `<a class="drv-card drv-cont" href="#/op/${ativa.id}"><b>Continuar viagem em andamento</b><span>${esc(ativa.localNome)}</span></a>` : ''}
       ${v.disponiveis.length ? `<h2 class="drv-h">${v.disponiveis.length > 1 ? 'Viagens para você' : 'Sua próxima viagem'}</h2>${v.disponiveis.map(viagem).join('')}`
-        : !ativa ? `<div class="drv-card"><h2>Nenhuma viagem cadastrada para ${esc(placaFmt(S.user.placa))}</h2><p class="drv-muted">Peça para a transportadora cadastrar, ou informe você mesmo:</p>
-          <a class="drv-big alt" href="#/amelia">FALAR COM A AMÉLIA</a><a class="drv-link" href="#/amelia">Digitar o código da viagem</a></div>` : ''}
-      ${v.disponiveis.length ? '<a class="drv-link" href="#/amelia">Não é nenhuma dessas? Fale com a Amélia</a>' : ''}
+        : !ativa && v.conjunto ? `<div class="drv-card"><h2>Nenhuma viagem da transportadora para ${esc(placaFmt(v.conjunto.placa))}</h2><p class="drv-muted">Cadastre você mesmo, é rápido:</p>
+          <a class="drv-big" href="#/viagem/nova">+ NOVA VIAGEM</a><a class="drv-big alt" href="#/amelia">FALAR COM A AMÉLIA</a><a class="drv-link" href="#/amelia">Digitar o código da viagem</a></div>` : ''}
+      ${v.disponiveis.length ? '<a class="drv-link" href="#/viagem/nova">Não é nenhuma dessas? Cadastrar nova viagem</a><a class="drv-link" href="#/amelia">Ou fale com a Amélia</a>' : ''}
+      ${ativa && v.conjunto ? '<a class="drv-link" href="#/viagem/nova">+ Cadastrar outra viagem</a>' : ''}
       ${v.minhas.length ? `<h2 class="drv-h">Viagens anteriores</h2>${v.minhas.filter((o) => o !== ativa).slice(0, 6).map((o) => `<a class="drv-row" href="#/op/${o.id}"><span><b>${esc(o.localNome)}</b><br><span class="drv-muted">${esc(o.status)}</span></span><span class="mono">${o.financeiro.devido != null ? brl(o.financeiro.devido) : ''}</span></a>`).join('')}` : ''}
       ${ajudaHtml(null)}${demoToolsHtml(null)}
     </div>`;
     $$('[data-comecar]').forEach((b) => (b.onclick = async () => {
       b.disabled = true; b.textContent = 'ABRINDO…';
-      try { const d = await api('POST', '/api/operations/identify', { codigo: b.dataset.comecar, placa: S.user.placa, clientEventId: uuid(), occurredAt: new Date().toISOString() }); sessionStorage.removeItem('estadia.naoAbrirAtiva'); location.hash = `#/op/${d.op.id}`; }
+      try { const d = await api('POST', '/api/operations/identify', { codigo: b.dataset.comecar, placa: b.dataset.placa || S.user.placa, clientEventId: uuid(), occurredAt: new Date().toISOString() }); sessionStorage.removeItem('estadia.naoAbrirAtiva'); location.hash = `#/op/${d.op.id}`; }
       catch (e) { toast(e.message, true); b.disabled = false; b.textContent = 'É ESSA · COMEÇAR'; }
     }));
     bindDemoTools(null);
   }
 
   function ajudaHtml(d) {
+    if (d && d.op.criadaPor === 'tac' && !d.op.transportadoraContatoTelefone) return '';
     const tel = d && d.contatos && d.contatos.transportadora && d.contatos.transportadora.telefone;
     const msg = encodeURIComponent(`Olá, aqui é ${S.user.nome} (placa ${placaFmt(S.user.placa)}). Preciso de ajuda${d ? ` na viagem ${d.op.codigo}` : ''}.`);
     return `<a class="drv-help" href="https://wa.me/${tel || ''}?text=${msg}" target="_blank" rel="noopener">${ICON.zap}<span>Precisa de ajuda? <b>Falar com a transportadora</b></span></a>`;
@@ -743,7 +1049,8 @@
       const c = conf(ev), dv = div(ev);
       const msgs = msgsDe(ev).filter((m) => m.finalidade === 'CONFIRMAR');
       return `<li class="${ev ? 'done' : i === idx ? 'now' : ''}"><span class="drv-dot">${ev ? ICON.check : i + 1}</span><div><b>${esc(p.titulo)}</b>
-        ${ev ? `<span class="drv-muted">${hhmm(ev.occurredAt)}${ev.pendente ? ' · guardado no celular, envia quando tiver sinal' : ''}</span>` : ''}
+        ${ev ? `<span class="drv-muted">${hhmm(ev.occurredAt)}${ev.pendente ? ' · guardado no celular, envia quando tiver sinal' : ''}${!ev.pendente && fotosDe(d, ev).length ? ` · ${fotosDe(d, ev).length} foto${fotosDe(d, ev).length > 1 ? 's' : ''}` : ''}</span>
+          ${!ev.pendente && op.tacUserId === S.user.id && !d.timeline.some((x) => x.type === 'OPERACAO_ENCERRADA') ? `<button type="button" class="drv-link left" data-maisfoto="${ev.id}">${ICON.cam} Adicionar fotos</button>` : ''}` : ''}
         ${c ? `<span class="drv-ok">${ICON.check} Confirmado por ${esc(primeiro(c.actor.name))} às ${hhmm(c.occurredAt)}</span>` : dv ? `<span class="drv-bad">Não confirmado: ${esc(dv.payload.note)}</span>` : ''}
         ${!c && !dv ? msgs.map((m) => linhaZap(m, ev)).join('') : ''}</div></li>`;
     }).join('');
@@ -756,7 +1063,7 @@
       const lib = reg.LIBERACAO;
       agora = `<div class="drv-card now"><span class="drv-step">A portaria informou</span><h2>Você foi liberado às ${hhmm(lib.occurredAt)}?</h2>
         <button class="drv-big ok" data-conflib="1">SIM, FUI LIBERADO</button><button class="drv-big alt" data-naolib="1">NÃO</button></div>`;
-    } else if (!d.timeline.some((e) => e.type === 'DADOS_INFORMADOS') && !reg.CHEGADA && !sessionStorage.getItem('estadia.pularDados.' + id)) {
+    } else if (op.criadaPor !== 'tac' && !d.timeline.some((e) => e.type === 'DADOS_INFORMADOS') && !reg.CHEGADA && !sessionStorage.getItem('estadia.pularDados.' + id)) {
       const linha = (k, v) => (v ? `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>` : '');
       agora = `<div class="drv-card now"><span class="drv-step">Antes de começar</span><h2>Confira sua carga</h2>
         <dl class="drv-dados">${linha('Placa', placaFmt(op.placa))}${linha('Carga', op.mercadoria)}${linha('Peso', op.pesoToneladas != null ? `${num(op.pesoToneladas)} toneladas` : null)}${linha('Nota fiscal', op.nfe)}${linha('Destino', op.localNome)}</dl>
@@ -813,6 +1120,7 @@
     }));
     const rec = $('#recebi');
     if (rec) rec.onclick = () => recebiSheet(id, d);
+    $$('[data-maisfoto]').forEach((b) => (b.onclick = () => fotosSheet(id, d.timeline.find((e) => e.id === b.dataset.maisfoto))));
     bindDemoTools(d, id);
 
     // Tempo ao vivo e monitoramento de deslocamento (silencioso)
@@ -827,12 +1135,14 @@
   function executarPasso(d, p, reg) {
     const occurredAt = new Date().toISOString();
     const gpsP = p.gps ? getGps() : Promise.resolve(null);
-    const enviar = async (photo, bg) => {
+    const fotos = [];
+    const MAXF = (S.config && S.config.maxFotos) || 6;
+    const enviar = async (bg) => {
       const go = $('#ps-go', bg); if (go) { go.disabled = true; go.textContent = 'ENVIANDO…'; }
       let gps = await gpsP;
       if (gps && gps.erro && p.gps === 'opcional') gps = undefined;
       try {
-        const r = await sendEvent(d.op.id, { type: p.k, occurredAt, gps: gps || undefined, photo: photo || undefined });
+        const r = await sendEvent(d.op.id, { type: p.k, occurredAt, gps: gps || undefined, photos: fotos.length ? fotos.slice() : undefined });
         vibrar(80);
         const pendente = !r.offline && r.detalhe && r.detalhe.mensagens.find((m) => m.refEventId === r.evento.id && m.status === 'aguardando_envio');
         if (pendente) {
@@ -848,27 +1158,75 @@
         setTimeout(() => { bg.remove(); refresh(); }, 2200);
       } catch (e) { if (go) { go.disabled = false; go.textContent = 'ENVIAR'; } toast(e.message, true); }
     };
-    const confirmar = (photo) => {
+    // Folha de confirmação: mostra as fotos já tiradas e deixa adicionar mais (até o limite) ou tirar uma.
+    const confirmar = () => {
       const bg = sheet(`<div class="drv-sheet"><h2>${esc(p.pergunta)}</h2><p class="drv-muted">Horário: <b>${hhmm(occurredAt)}</b></p>
-        ${photo ? `<img class="drv-prev" src="${photo}" alt="Foto tirada">` : ''}
+        ${fotos.length ? `<div class="fotos-grid">${fotos.map((f, i) => `<figure><img src="${f}" alt="Foto ${i + 1}"><button type="button" class="foto-x" data-tirar="${i}" aria-label="Tirar a foto ${i + 1}">×</button></figure>`).join('')}</div>
+          <p class="drv-muted center">${fotos.length} foto${fotos.length > 1 ? 's' : ''}${fotos.length < MAXF ? ` · pode juntar até ${MAXF}` : ''}</p>` : ''}
         <button class="drv-big ok" id="ps-go">SIM, ENVIAR</button>
-        ${photo ? '<button class="drv-big alt" id="ps-again">TIRAR OUTRA FOTO</button>' : ''}
-        ${p.foto === 'optional' && !photo ? '<button class="drv-big alt" id="ps-foto">TIRAR FOTO ANTES</button>' : ''}
+        ${fotos.length && fotos.length < MAXF ? `<button class="drv-big alt" id="ps-mais">${ICON.cam} TIRAR MAIS UMA FOTO</button>` : ''}
+        ${p.foto === 'optional' && !fotos.length ? `<button class="drv-big alt" id="ps-mais">${ICON.cam} TIRAR FOTO ANTES</button>` : ''}
+        ${fotos.length < MAXF ? '<button class="drv-link" id="ps-gal">Escolher fotos da galeria</button>' : ''}
         <button class="drv-link" data-x>Voltar</button></div>`);
-      $('#ps-go', bg).onclick = () => enviar(photo, bg);
-      const again = $('#ps-again', bg); if (again) again.onclick = () => { bg.remove(); abrirCamera(); };
-      const foto = $('#ps-foto', bg); if (foto) foto.onclick = () => { bg.remove(); abrirCamera(); };
+      $('#ps-go', bg).onclick = () => {
+        if (p.foto === 'required' && !fotos.length) { toast('Tire a foto para registrar.', true); bg.remove(); abrirCamera(); return; }
+        enviar(bg);
+      };
+      const mais = $('#ps-mais', bg); if (mais) mais.onclick = () => { bg.remove(); abrirCamera(); };
+      const gal = $('#ps-gal', bg); if (gal) gal.onclick = () => { bg.remove(); abrirCamera(true); };
+      $$('[data-tirar]', bg).forEach((b) => (b.onclick = () => { fotos.splice(Number(b.dataset.tirar), 1); bg.remove(); confirmar(); }));
     };
-    const abrirCamera = () => {
+    const abrirCamera = (galeria = false) => {
       const inp = document.createElement('input');
-      inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.hidden = true;
+      inp.type = 'file'; inp.accept = 'image/*'; inp.hidden = true;
+      if (galeria) inp.multiple = true; else inp.capture = 'environment';
       document.body.appendChild(inp);
-      inp.onchange = async () => { const f = inp.files[0]; inp.remove(); if (!f) return; try { confirmar(await compressImage(f)); } catch (e) { toast(e.message, true); } };
+      inp.onchange = async () => {
+        const lista = [...inp.files].slice(0, MAXF - fotos.length); inp.remove();
+        try { for (const f of lista) fotos.push(await compressImage(f)); } catch (e) { toast(e.message, true); }
+        if (inp.files.length > lista.length) toast(`Cabem ${MAXF} fotos por registro. Depois você pode adicionar mais.`);
+        confirmar();
+      };
+      inp.addEventListener('cancel', () => { inp.remove(); if (fotos.length || p.foto !== 'required') confirmar(); });
       inp.click();
     };
     if (p.foto === 'required') abrirCamera(); // abre a câmera no mesmo toque
-    else confirmar(null);
+    else confirmar();
   }
+
+  // Adicionar fotos a um registro já feito: vira um evento próprio, sem alterar o registro original.
+  function fotosSheet(opId, ev) {
+    const fotos = [];
+    const MAXF = (S.config && S.config.maxFotos) || 6;
+    const bg = sheet(`<div class="drv-sheet"><h2>Mais fotos: ${esc(ev.label)}</h2><p class="drv-muted">Registro de ${hhmm(ev.occurredAt)}. As novas fotos ficam com o horário de agora, sem mudar o registro.</p>
+      <div class="fotos-grid" id="fs-g"></div>
+      <label class="drv-big alt" for="fs-cam">${ICON.cam} TIRAR FOTO</label><input type="file" id="fs-cam" accept="image/*" capture="environment" hidden>
+      <label class="drv-link" for="fs-gal">Escolher da galeria</label><input type="file" id="fs-gal" accept="image/*" multiple hidden>
+      <input id="fs-note" class="drv-input" placeholder="O que mostram as fotos? (opcional)" maxlength="300">
+      <button class="drv-big ok" id="fs-go" disabled>ENVIAR FOTOS</button><button class="drv-link" data-x>Voltar</button></div>`);
+    const desenhar = () => {
+      $('#fs-g', bg).innerHTML = fotos.map((f, i) => `<figure><img src="${f}" alt="Foto ${i + 1}"><button type="button" class="foto-x" data-tirar="${i}" aria-label="Tirar a foto ${i + 1}">×</button></figure>`).join('');
+      $$('[data-tirar]', bg).forEach((b) => (b.onclick = () => { fotos.splice(Number(b.dataset.tirar), 1); desenhar(); }));
+      $('#fs-go', bg).disabled = !fotos.length;
+      $('#fs-go', bg).textContent = fotos.length > 1 ? `ENVIAR ${fotos.length} FOTOS` : 'ENVIAR FOTO';
+    };
+    const ler = async (inp) => { const lista = [...inp.files].slice(0, MAXF - fotos.length); try { for (const f of lista) fotos.push(await compressImage(f)); } catch (e) { toast(e.message, true); } inp.value = ''; desenhar(); };
+    $('#fs-cam', bg).onchange = (e) => ler(e.target);
+    $('#fs-gal', bg).onchange = (e) => ler(e.target);
+    $('#fs-go', bg).onclick = async () => {
+      $('#fs-go', bg).disabled = true;
+      try { await sendEvent(opId, { type: 'EVIDENCIA_ADICIONADA', occurredAt: new Date().toISOString(), refEventId: ev.id, photos: fotos, note: $('#fs-note', bg).value.trim() || undefined }); bg.remove(); refresh(); }
+      catch (e) { toast(e.message, true); $('#fs-go', bg).disabled = false; }
+    };
+  }
+
+  // Todas as fotos de um registro: as do momento e as adicionadas depois.
+  const fotosDe = (d, ev) => {
+    const p = ev.payload || {};
+    const proprias = p.photos || (p.photo ? [p.photo] : []);
+    const extras = d.timeline.filter((x) => x.type === 'EVIDENCIA_ADICIONADA' && x.refEventId === ev.id).flatMap((x) => x.payload.photos || []);
+    return proprias.concat(extras);
+  };
 
   function printSheet(opId, m) {
     let photo = null;
@@ -928,6 +1286,8 @@
     const myPending = fila.filter((x) => x.opId === id);
     const evById = Object.fromEntries(d.timeline.map((e) => [e.id, e]));
     const o = d.op, r = d.resumo, ap = d.apuracao;
+    d.podeFotos = r.statusCode !== 'ENCERRADA' && (role === 'admin' || (role === 'tac' && o.tacUserId === S.user.id) || (role === 'destino' && o.destinoOrgId === S.user.orgId));
+    const cg = cat();
 
     let acoes = d.acoes.slice();
     if (role === 'tac' && (myPending.length || !online())) {
@@ -945,9 +1305,10 @@
     main.innerHTML = `<a href="#/" class="small">← Voltar</a>
       <div class="card"><div class="card-h"><div><span class="row"><span class="label">${esc(o.codigo)}</span>${tipoPill(o.tipo)}</span><h1>${esc(o.localNome || o.destinoNome)}</h1></div>${statusPill(r)}</div>
         <dl class="kvgrid">${[
-          ['Embarcador/destinatário', o.destinoNome], ['Transportadora', o.transportadoraNome], ['TAC', o.tacNome || 'não identificado'], ['Placa', placaFmt(o.placa)],
-          ['Implemento', o.implemento], ['Capacidade', o.capacidadeToneladas != null ? `${num(o.capacidadeToneladas)} t` : null], ['Peso', o.pesoToneladas != null ? `${num(o.pesoToneladas)} t` : null],
-          ['Carga', o.mercadoria], ['Volume', o.volume], ['NF-e', o.nfe], ['CT-e', o.cte], ['MDF-e', o.mdfe], ['Origem', o.origem], ['Data prevista', o.dataPrevista ? dataHora(o.dataPrevista) : null],
+          ['Embarcador/destinatário', o.destinoNome], ['Transportadora', o.transportadoraNome || (o.criadaPor === 'tac' ? 'Viagem cadastrada pelo motorista' : null)], ['TAC', o.tacNome || 'não identificado'],
+          ['Placas', [o.placa, ...(o.placasImplementos || [])].map(placaFmt).join(' + ')],
+          ['Composição', o.composicao ? (compDe(o.composicao) || {}).nome : null], ['Implemento', o.implemento], ['Capacidade', o.capacidadeToneladas != null ? `${num(o.capacidadeToneladas)} t` : null], ['Peso', o.pesoToneladas != null ? `${num(o.pesoToneladas)} t` : null],
+          ['Tipo de carga', o.tipoCarga ? (cg.tiposCarga.find((x) => x.id === o.tipoCarga) || {}).nome : null], ['Carga', o.mercadoria], ['Volume', o.volume], ['NF-e', o.nfe], ['CT-e', o.cte], ['MDF-e', o.mdfe], ['Origem', o.origem], ['Data prevista', o.dataPrevista ? dataHora(o.dataPrevista) : null],
           ['Responsável no destino', o.responsavelNome ? `${o.responsavelNome}${o.responsavelTelefone ? ' · ' + o.responsavelTelefone : ''}` : null], ['Observações', o.observacoes],
         ].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
         ${limiteHtml(ap)}</div>
@@ -955,7 +1316,7 @@
         ${myPending.length ? `<div class="card" style="border-color:var(--warn)"><div class="card-h"><h3>Salvos no aparelho</h3><span class="pill warn">${myPending.length} a enviar</span></div>
           ${myPending.map((p) => `<div class="row between small"><span>${esc(p.body.type)} · <span class="mono">${hhmm(p.body.occurredAt)}</span></span>${p.erro ? `<span class="err">${esc(p.erro)}</span> <button class="btn small danger" data-discard="${p.clientEventId}">Descartar</button>` : '<span class="muted">aguardando sinal</span>'}</div>`).join('')}
           ${online() ? '<button class="btn small" id="sync">Enviar agora</button>' : ''}</div>` : ''}
-        ${confs.map((a) => pendingBox(a, evById[a.refEventId], acoes)).join('')}
+        ${confs.map((a) => pendingBox(a, evById[a.refEventId], acoes, d)).join('')}
         ${registros.filter((a) => role === 'tac' || a.type === 'LIBERACAO').map((a) => `<button class="big" data-act="${a.type}">${esc(a.label)}<small>${a.photo === 'required' ? (a.type === 'SAIDA' ? 'Foto do comprovante · GPS não obrigatório' : 'Captura horário, GPS e foto') : a.gps ? 'Captura horário e GPS' : 'Registra o horário deste momento'}</small></button>`).join('')}
         ${role !== 'tac' && registros.some((a) => a.type !== 'LIBERACAO') ? `<div class="card"><span class="label">Registrar pelo operador do destino</span><div class="row">${registros.filter((a) => a.type !== 'LIBERACAO').map((a) => `<button class="btn" data-act="${a.type}">${esc(a.label)}</button>`).join('')}</div></div>` : ''}
         ${mensagensHtml(d)}
@@ -976,6 +1337,7 @@
       </div></div>`;
 
     $$('[data-act]', main).forEach((b) => (b.onclick = () => captureSheet(id, acoes.find((a) => a.type === b.dataset.act))));
+    $$('[data-maisfoto]', main).forEach((b) => (b.onclick = () => fotosSheet(id, evById[b.dataset.maisfoto])));
     $$('[data-confirm]', main).forEach((b) => (b.onclick = async () => {
       const a = acoes.find((x) => x.type === b.dataset.confirm); b.disabled = true;
       try { await sendEvent(id, { type: a.type, occurredAt: new Date().toISOString(), refEventId: a.refEventId }); refresh(); } catch (e) { toast(e.message, true); b.disabled = false; }
@@ -1058,13 +1420,14 @@
       <div class="meter"><div class="fill ${ap.excedeu ? 'over' : ''}" style="width:${w}%"></div><div class="tick" style="left:${lp}%"><span>5h</span></div></div><div class="scale">${ticks}</div></div>`;
   }
 
-  function pendingBox(a, ref, acoes) {
+  function pendingBox(a, ref, acoes, d) {
     if (!ref) return '';
     const contest = acoes.find((x) => x.kind === 'divergencia' && x.refEventId === ref.id);
     const p = ref.payload || {};
+    const fs = fotosDe(d, ref);
     const title = { CHEGADA_CONFIRMADA: 'Confirmar chegada do veículo', INICIO_CONFIRMADO: 'Confirmar início da operação', TERMINO_CONFIRMADO: 'Confirmar término da operação', LIBERACAO_CONFIRMADA: 'Você foi liberado para viagem' }[a.type] || a.label;
     return `<div class="pending"><div class="card-h"><h3>${esc(title)}</h3><span class="pill acc">pendente</span></div>
-      <div class="evid">${p.photo ? `<img src="${fileUrl(p.photo)}" alt="Foto: ${esc(ref.label)}" loading="lazy">` : `<div class="kpi"><span class="label">Sem foto</span></div>`}
+      <div class="evid">${fs.length ? `<div class="fotos-col">${fs.map((f, i) => `<a href="${fileUrl(f)}" target="_blank" rel="noopener"><img src="${fileUrl(f)}" alt="Foto ${i + 1}: ${esc(ref.label)}" loading="lazy"></a>`).join('')}</div>` : `<div class="kpi"><span class="label">Sem foto</span></div>`}
         <dl class="kv"><dt>Registro</dt><dd>${esc(ref.label)}</dd><dt>Por</dt><dd>${esc(ref.actor.name)}</dd><dt>Ocorrido</dt><dd class="mono">${dataHora(ref.occurredAt)}</dd>
         ${p.gps ? `<dt>Local</dt><dd class="mono">${esc(gpsTxt(p.gps))} ${mapLink(p.gps) ? `<a href="${mapLink(p.gps)}" target="_blank" rel="noopener">mapa</a>` : ''}</dd>` : ''}
         ${p.note ? `<dt>Obs.</dt><dd>${esc(p.note)}</dd>` : ''}</dl></div>
@@ -1103,12 +1466,12 @@
   }
 
   const KIND = { registro: ['Registro', ''], confirmacao: ['Confirmação', 'ok'], divergencia: ['Divergência', 'crit'], ocorrencia: ['Ocorrência', 'crit'], apuracao: ['Apuração', 'acc'], financeiro: ['Financeiro', 'ok'],
-    dossie: ['Dossiê', 'sys'], juridico: ['Jurídico', 'sys'], cadastro: ['Cadastro', ''], tratamento: ['Tratamento', 'sys'], notificacao: ['Notificação', 'sys'] };
+    dossie: ['Dossiê', 'sys'], juridico: ['Jurídico', 'sys'], cadastro: ['Cadastro', ''], tratamento: ['Tratamento', 'sys'], notificacao: ['Notificação', 'sys'], evidencia: ['Fotos', ''] };
   function timelineHtml(d, myPending) {
     const subs = {}, main = [];
     for (const e of d.timeline) {
       if (e.type.startsWith('WHATSAPP_')) continue; // mensagens ficam no quadro "Mensagens de WhatsApp"
-      if (e.refEventId && ['confirmacao', 'divergencia', 'tratamento'].includes(e.kind)) (subs[e.refEventId] = subs[e.refEventId] || []).push(e);
+      if (e.refEventId && ['confirmacao', 'divergencia', 'tratamento', 'evidencia'].includes(e.kind)) (subs[e.refEventId] = subs[e.refEventId] || []).push(e);
       else main.push(e);
     }
     const subHtml = (e) => (subs[e.id] || []).map((x) => {
@@ -1116,6 +1479,7 @@
       const extra = x.kind === 'divergencia'
         ? `<span>${esc(x.payload.note)}</span>${x.payload.alegadoEm ? `<span class="meta">horário reconhecido pela parte: ${hhmm(x.payload.alegadoEm)}</span>` : ''}<span class="meta">registro original de ${hhmm(e.occurredAt)} preservado</span>`
         : x.kind === 'tratamento' ? `<span>${esc(x.payload.resolucao)}: ${esc(x.payload.note)}</span>`
+        : x.kind === 'evidencia' ? `${x.payload.note ? `<span>${esc(x.payload.note)}</span>` : ''}<span class="thumbs">${(x.payload.photos || []).map((f) => `<a href="${fileUrl(f)}" target="_blank" rel="noopener"><img class="thumb" src="${fileUrl(f)}" alt="Foto adicionada" loading="lazy"></a>`).join('')}</span><span class="meta">o registro original de ${hhmm(e.occurredAt)} não muda</span>`
           : `${x.payload && x.payload.note ? `<span>${esc(x.payload.note)}</span>` : ''}<span class="meta">não altera o horário do registro (${hhmm(e.occurredAt)}) · via ${esc(ORIGEM[x.origem] || x.origem)}</span>`;
       return `<div class="sub ${cls}"><div class="row between"><b>${esc(x.label)}</b><span class="mono">${diaHora(x.occurredAt)}</span></div><span>${esc(x.actor.name)}</span>${extra}${subHtml(x)}</div>`;
     }).join('');
@@ -1124,7 +1488,9 @@
       let body = `<span class="small muted">${esc(e.actor.name)} · ${esc(ROLE[e.actor.role] || e.actor.role)} · via ${esc(ORIGEM[e.origem] || e.origem)}</span>`;
       if (e.kind === 'registro') {
         if (p.gps) body += `<div class="meta"><span>${esc(gpsTxt(p.gps))}</span>${mapLink(p.gps) ? `<a href="${mapLink(p.gps)}" target="_blank" rel="noopener">ver no mapa</a>` : ''}</div>`;
-        if (p.photo) body += `<a href="${fileUrl(p.photo)}" target="_blank" rel="noopener"><img class="thumb" src="${fileUrl(p.photo)}" alt="Foto: ${esc(e.label)}" loading="lazy"></a>`;
+        const fs = p.photos || (p.photo ? [p.photo] : []);
+        if (fs.length) body += `<span class="thumbs">${fs.map((f, i) => `<a href="${fileUrl(f)}" target="_blank" rel="noopener"><img class="thumb" src="${fileUrl(f)}" alt="Foto ${i + 1}: ${esc(e.label)}" loading="lazy"></a>`).join('')}</span>`;
+        if (e.type !== 'OPERACAO_IDENTIFICADA' && d.podeFotos) body += `<button class="btn small" data-maisfoto="${e.id}">Adicionar fotos</button>`;
         if (p.note) body += `<span class="small">${esc(p.note)}</span>`;
         if ((Date.parse(e.receivedAt) - Date.parse(e.occurredAt)) / 60000 >= 2) body += `<div class="meta"><span>ocorrido ${hhmm(e.occurredAt)} · sincronizado ${hhmm(e.receivedAt)}</span></div>`;
       } else if (e.kind === 'ocorrencia') {
@@ -1239,14 +1605,14 @@
           <div style="text-align:right"><span class="label">Gerado em</span><div class="mono">${dataHora(c.geradoEm)}</div><span class="small muted">${esc(c.geradoPor.nome)} · situação: ${esc(c.status.descricao)}</span></div></div>
         <div class="kpis"><div class="kpi"><span class="label">Tempo efetivo</span><b>${ap && !ap.pendente ? dur(ap.tempoMin) : '—'}</b></div><div class="kpi"><span class="label">Valor devido</span><b>${brl(f.devido)}</b></div>
           <div class="kpi"><span class="label">Valor pago</span><b>${brl(f.pago)}</b></div><div class="kpi"><span class="label">Saldo</span><b>${brl(f.saldo)}</b></div></div>
-        <section><span class="label">Dados da operação</span><dl class="kvgrid">${linha('Transportadora', o.transportadoraNome)}${linha('Embarcador/destinatário', o.destinoNome)}${linha('TAC', o.tacNome)}${linha('Veículo', `${placaFmt(o.placa)}${o.implemento ? ' · ' + o.implemento : ''}`)}
+        <section><span class="label">Dados da operação</span><dl class="kvgrid">${linha('Transportadora', o.transportadoraNome)}${linha('Embarcador/destinatário', o.destinoNome)}${linha('TAC', o.tacNome)}${linha('Veículo', `${[o.placa, ...(o.placasImplementos || [])].map(placaFmt).join(' + ')}${o.implemento ? ' · ' + o.implemento : ''}`)}${linha('Composição', o.composicaoNome)}${linha('Tipo de carga', o.tipoCargaNome)}
           ${linha('Capacidade', o.capacidadeToneladas && `${num(o.capacidadeToneladas)} t`)}${linha('Peso', o.pesoToneladas && `${num(o.pesoToneladas)} t`)}${linha('Carga', o.mercadoria)}${linha('Volume', o.volume)}${linha('NF-e', o.nfe)}${linha('CT-e', o.cte)}${linha('MDF-e', o.mdfe)}${linha('Local', o.localNome)}</dl></section>
         ${c.dadosInformados ? `<section><span class="label">Dados informados pelo TAC (Amélia · ${esc(c.dadosInformados.canal)})</span><p class="small">“${esc(c.dadosInformados.texto)}” · ${dataHora(c.dadosInformados.em)}</p></section>` : ''}
         <section><span class="label">Marcos e confirmações</span><div class="tablewrap"><table><thead><tr><th>Marco</th><th>Ocorrido</th><th>Registrado por</th><th>Local</th><th>Confirmação</th></tr></thead><tbody>
           ${c.marcos.map((m) => `<tr><td>${esc(m.marco)}${m.divergencias.length ? ' <span class="pill crit">divergência</span>' : ''}</td><td class="mono">${dataHora(m.em)}${Date.parse(m.recebidoEm) - Date.parse(m.em) > 120000 ? `<br><span class="muted small">recebido ${hhmm(m.recebidoEm)}</span>` : ''}</td>
             <td>${esc(m.por)}<br><span class="small muted">via ${esc(ORIGEM[m.origem] || m.origem)}</span></td><td class="mono small">${m.gps ? esc(gpsTxt(m.gps)) : '—'}</td><td>${m.confirmacao ? `${esc(m.confirmacao.por)}<br><span class="mono small">${dataHora(m.confirmacao.em)} · ${esc(ORIGEM[m.confirmacao.origem] || m.confirmacao.origem)}</span>` : '—'}</td></tr>`).join('')}
         </tbody></table></div></section>
-        ${c.marcos.some((m) => m.foto) ? `<section><span class="label">Evidências fotográficas</span><div class="photos">${c.marcos.filter((m) => m.foto).map((m) => `<figure><img src="${fileUrl(m.foto)}" alt="${esc(m.marco)}"><figcaption>${esc(m.marco)} · ${dataHora(m.em)}<br><span class="mono">sha256 ${m.foto.sha256.slice(0, 16)}…</span></figcaption></figure>`).join('')}</div></section>` : ''}
+        ${c.marcos.some((m) => (m.fotos || []).length || m.foto) ? `<section><span class="label">Evidências fotográficas</span><div class="photos">${c.marcos.flatMap((m) => (m.fotos || (m.foto ? [{ ...m.foto, em: m.em, por: m.por }] : [])).map((f, i, arr) => `<figure><img src="${fileUrl(f)}" alt="${esc(m.marco)} · foto ${i + 1}"><figcaption>${esc(m.marco)}${arr.length > 1 ? ` · ${i + 1}/${arr.length}` : ''} · ${dataHora(f.em || m.em)}${f.adicionada ? `<br>adicionada por ${esc(f.por)}${f.note ? ': ' + esc(f.note) : ''}` : ''}<br><span class="mono">sha256 ${f.sha256.slice(0, 16)}…</span></figcaption></figure>`)).join('')}</div></section>` : ''}
         ${c.ocorrencias.length || c.marcos.some((m) => m.divergencias.length) ? `<section><span class="label">Ocorrências e divergências</span>
           ${c.ocorrencias.map((x) => `<p class="small" style="margin:4px 0"><span class="mono">${esc(x.codigo)}</span> · ${dataHora(x.em)} · ${x.codigo === 'DESLOCAMENTO_FORA_DO_LIMITE' ? `${x.dados.distanciaM} m do local (limite ${x.dados.limiteM} m)${x.dados.simulado ? ' · simulado' : ''}` : esc(x.dados.motivo || '')}</p>`).join('')}
           ${c.marcos.flatMap((m) => m.divergencias.map((dv) => `<p class="small" style="margin:4px 0"><b>${esc(m.marco)}</b> · ${esc(dv.por)} em ${dataHora(dv.em)}: ${esc(dv.descricao)}${dv.alegadoEm ? ` (horário reconhecido: ${hhmm(dv.alegadoEm)})` : ''} · ${dv.tratamento ? `tratada: ${esc(dv.tratamento.resolucao)}, ${esc(dv.tratamento.descricao)}` : '<b>em aberto</b>'}</p>`)).join('')}</section>` : ''}

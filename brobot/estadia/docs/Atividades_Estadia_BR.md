@@ -59,6 +59,9 @@ Dentro dos **RF**, cada item tem uma etiqueta de fase:
 | 26 | Ambiente de demonstração e treinamento | MVP |
 | 27 | Segurança, LGPD e qualidade transversal | MVP |
 | 28 | Relação entre carga e descarga e integrações externas | COMPLETO (estrutura no MVP) |
+| 29 | Frota: veículos, implementos, composições e tipos de carga | MVP |
+| 30 | Autocadastro de motorista e de empresa | MVP |
+| 31 | Várias fotos por registro | MVP |
 
 ---
 
@@ -390,7 +393,7 @@ Produzir o primeiro marco comprovável da operação: **foto + localização + d
 
 ## ✅ Requisitos Funcionais (RF)
 1. **[MVP]** O sistema deve permitir registrar a chegada com o botão **CHEGUEI**.
-2. **[MVP]** O sistema deve exigir uma fotografia no momento da chegada.
+2. **[MVP]** O sistema deve exigir ao menos uma fotografia no momento da chegada (até 6 no mesmo registro, ver Atividade 31).
 3. **[MVP]** O sistema deve capturar a localização GPS disponível.
 4. **[MVP]** O sistema deve gravar data/hora do aparelho, data/hora do servidor, usuário, aparelho, IP e origem.
 5. **[MVP]** O sistema deve associar foto, localização, data, hora, usuário e operação ao evento de chegada.
@@ -1607,6 +1610,173 @@ Preparar o produto para crescer: relacionar carga e descarga para análise e int
 
 ---
 
+# 🆕 Nova Atividade – 29 · Frota: veículos, implementos, composições e tipos de carga
+
+## 🎯 Objetivo
+Ter tabelas de **veículos**, **implementos**, **tipos de composição** e **tipos de carga** para que cada operação saia com as placas certas, o tipo de conjunto e a **capacidade correta**, que é a base do cálculo da estadia.
+
+---
+
+## 👤 User Story
+**Como** transportadora ou motorista autônomo
+**Quero** cadastrar meus caminhões e carretas uma única vez
+**Para** que as viagens já saiam com placas, composição e toneladas sem digitar de novo
+
+---
+
+## ✅ Requisitos Funcionais (RF)
+1. **[MVP]** O sistema deve manter a tabela de **tipos de composição**: VUC/3/4, Toco, Truck, Bitruck, Carreta, Vanderleia, Bitrem, Rodotrem, Tritrem, Romeu e Julieta e Treminhão, indicando se o veículo é caminhão ou cavalo mecânico e quantos implementos exige.
+2. **[MVP]** O sistema deve manter a tabela de **veículos**: placa, tipo (caminhão ou cavalo), categoria/tração, marca, modelo, ano e RNTRC.
+3. **[MVP]** O sistema deve manter a tabela de **implementos**: placa, categoria (semirreboque ou reboque) e carroceria.
+4. **[MVP]** O sistema deve manter a tabela de **carrocerias** (baú, baú frigorífico, sider, graneleiro, grade baixa, caçamba, tanque, silo, porta-contêiner, prancha, cegonha, boiadeiro, florestal, outra).
+5. **[MVP]** O sistema deve manter a tabela de **tipos de carga** (granel sólido, granel líquido, frigorificada, conteinerizada, carga geral, neogranel, perigosas e granel pressurizada).
+6. **[MVP]** O sistema deve permitir cadastrar um **conjunto** de uma vez: tipo de composição, placa do veículo, placas dos implementos, carroceria e capacidade de carga em toneladas.
+7. **[MVP]** O sistema deve preencher a operação a partir do conjunto escolhido: placa, placas dos implementos, composição, carroceria e capacidade.
+8. **[MVP]** O sistema deve permitir ao motorista escolher qual conjunto está **em uso**.
+9. **[MVP]** O sistema deve permitir desativar um conjunto sem apagar o histórico.
+10. **[MVP]** O sistema deve exibir um desenho de cada tipo de composição para o motorista reconhecer o seu.
+11. **[COMPLETO]** O sistema deve consultar placa e RNTRC em bases oficiais e ler a capacidade do CRLV digital.
+
+---
+
+## 📜 Regras de Negócio (RN)
+1. A composição define quantas placas de implemento são obrigatórias (ex.: Bitrem = cavalo + 2 semirreboques). Placas a mais ou a menos impedem o cadastro.
+2. Placas seguem o padrão antigo (ABC1234) ou Mercosul (ABC1D23) e não podem se repetir no mesmo conjunto.
+3. A **capacidade de carga do conjunto** (toneladas) é obrigatória e entre 0 e 100 t. É o valor usado na apuração.
+4. Mudar o conjunto depois não altera operações já criadas. Correção em operação existente é feita por retificação (Atividade 21).
+5. Cada dono vê só a própria frota: o motorista, os conjuntos dele; a transportadora, os da empresa.
+6. Todo cadastro e desativação gera registro de auditoria.
+
+---
+
+## ⚙️ Requisitos Não Funcionais (RNF)
+1. O cadastro do conjunto pelo motorista deve caber em **até 5 telas**, com uma decisão por tela.
+2. As tabelas de referência devem ser parametrizáveis sem mudar o sistema.
+
+---
+
+## 🧪 Critérios de Aceite (QA)
+- **Dado** a composição Bitrem, **quando** o usuário informar só uma placa de semirreboque, **então** o sistema deve pedir as 2 placas.
+- **Dado** um conjunto Bitrem de 37 t na frota, **quando** a transportadora criar a operação escolhendo esse conjunto, **então** a operação deve sair com as 3 placas, a composição e 37 t.
+- **Dado** que o motorista tem dois caminhões, **quando** escolher "usar este", **então** as próximas viagens devem usar as placas desse conjunto.
+- **Dado** a frota de uma transportadora, **quando** outra empresa listar a frota, **então** não deve ver esses veículos.
+
+---
+
+## 🎨 Protótipo Visual
+[Link do Figma — "Seu caminhão" (motorista) e "Frota e cadastros" (portal)]
+
+---
+
+---
+
+# 🆕 Nova Atividade – 30 · Autocadastro de motorista e de empresa
+
+## 🎯 Objetivo
+Permitir que motoristas e empresas entrem no Estadia BR **sozinhos**, sem depender da administração, para acelerar a adoção.
+
+---
+
+## 👤 User Story
+**Como** motorista autônomo ou responsável por uma empresa
+**Quero** criar minha conta pelo próprio app
+**Para** começar a registrar e comprovar minhas estadias no mesmo dia
+
+---
+
+## ✅ Requisitos Funcionais (RF)
+1. **[MVP]** O sistema deve oferecer, na tela de entrada, **"Primeira vez? Criar minha conta"** para o motorista: nome, celular, código de 4 números (digitado duas vezes), CPF opcional e aceite de uso dos dados.
+2. **[MVP]** O sistema deve entrar automaticamente após o cadastro e levar o motorista ao cadastro guiado do caminhão.
+3. **[MVP]** O sistema deve oferecer **"Cadastrar minha empresa"**: tipo (transportadora ou embarcador/destinatário), nome, CNPJ, nome do responsável, e-mail, celular e senha.
+4. **[MVP]** O sistema deve permitir ao motorista **cadastrar a própria viagem** em 4 telas: carregar ou descarregar, empresa, tipo de carga e, opcionalmente, nota fiscal e WhatsApp da portaria.
+5. **[ESTRUTURA]** O sistema deve ter um parâmetro para ligar ou desligar o autocadastro por ambiente.
+6. **[COMPLETO]** O sistema deve confirmar o celular por código enviado por WhatsApp/SMS e permitir recuperar o código esquecido.
+7. **[COMPLETO]** O sistema deve permitir que o responsável da empresa convide outros usuários da mesma empresa.
+
+---
+
+## 📜 Regras de Negócio (RN)
+1. Cada celular tem **uma única** conta de motorista.
+2. O código não pode ter 4 números iguais.
+3. CPF e CNPJ, quando informados, precisam ter dígitos verificadores válidos.
+4. Cada CNPJ tem **uma única** empresa cadastrada. Quem chegar depois pede acesso ao responsável.
+5. Sem o aceite de uso dos dados (LGPD), o cadastro não é concluído.
+6. A viagem cadastrada pelo motorista já nasce vinculada a ele, com o caminhão em uso. Sem caminhão cadastrado, a viagem não é criada.
+7. Viagem cadastrada pelo motorista para uma empresa já cadastrada fica visível para essa empresa.
+
+---
+
+## ⚙️ Requisitos Não Funcionais (RNF)
+1. Limite de cadastros por conexão para evitar abuso (no MVP: 20 por hora por IP).
+2. O cadastro do motorista deve ser concluído em **até 1 minuto**.
+
+---
+
+## 🧪 Critérios de Aceite (QA)
+- **Dado** um celular novo, **quando** o motorista criar a conta, **então** deve entrar direto no cadastro do caminhão.
+- **Dado** um celular já cadastrado, **quando** tentar criar outra conta, **então** deve ver "Este celular já tem conta".
+- **Dado** um CNPJ com dígito errado, **quando** cadastrar a empresa, **então** o sistema deve recusar.
+- **Dado** o motorista com caminhão cadastrado, **quando** criar uma viagem, **então** a viagem deve sair com as placas e a capacidade do caminhão em uso.
+
+---
+
+## 🎨 Protótipo Visual
+[Link do Figma — Criar conta (motorista), Cadastrar empresa, Nova viagem]
+
+---
+
+---
+
+# 🆕 Nova Atividade – 31 · Várias fotos por registro
+
+## 🎯 Objetivo
+Permitir mais de uma foto por registro (caminhão, placa, lacre, documento) e adicionar fotos depois, sem enfraquecer a prova.
+
+---
+
+## 👤 User Story
+**Como** motorista
+**Quero** tirar várias fotos no mesmo passo e adicionar outras depois
+**Para** guardar todas as evidências que comprovam a situação
+
+---
+
+## ✅ Requisitos Funcionais (RF)
+1. **[MVP]** O sistema deve aceitar até **6 fotos** no momento do registro, pela câmera ou pela galeria.
+2. **[MVP]** O sistema deve mostrar as fotos antes de enviar e permitir tirar uma delas.
+3. **[MVP]** O sistema deve permitir **adicionar fotos** a um registro já feito, com observação opcional.
+4. **[MVP]** O sistema deve exibir todas as fotos na linha do tempo, na página de confirmação do link e no Dossiê, com o resumo criptográfico de cada uma.
+
+---
+
+## 📜 Regras de Negócio (RN)
+1. Fotos adicionadas depois são um **evento próprio**, com horário próprio. O registro original não muda.
+2. A mesma foto enviada duas vezes no mesmo registro é guardada uma vez só.
+3. Cada registro aceita no máximo 10 envios de fotos adicionais.
+4. Só as partes da operação (motorista da viagem, destino e administração) adicionam fotos. Operação encerrada não recebe fotos.
+
+---
+
+## ⚙️ Requisitos Não Funcionais (RNF)
+1. Cada foto é comprimida no celular (lado maior de até 1600 px) antes do envio.
+2. As fotos ficam na fila offline junto com o registro.
+
+---
+
+## 🧪 Critérios de Aceite (QA)
+- **Dado** o passo CHEGUEI, **quando** o motorista tirar 2 fotos e enviar, **então** o registro deve ter as 2 fotos.
+- **Dado** 7 fotos, **quando** enviar, **então** o sistema deve recusar e pedir no máximo 6.
+- **Dado** um registro já enviado, **quando** o motorista adicionar uma foto, **então** ela deve aparecer abaixo do registro, com o horário da adição, e o registro original deve continuar igual.
+
+---
+
+## 🎨 Protótipo Visual
+[Link do Figma — Folha de confirmação com miniaturas e "Tirar mais uma foto"]
+
+---
+
+---
+
 # 📌 Anexo A — Matriz dos marcos (decisão consolidada)
 
 | Marco | Quem registra | Quem confirma | Evidência | GPS |
@@ -1636,6 +1806,11 @@ Preparar o produto para crescer: relacionar carga e descarga para análise e int
 | D-10 | Amélia com extração por regras e transcrição do aparelho no MVP. | Custo zero e previsível na fase inicial. | IA generativa + transcrição no servidor. |
 | D-11 | Validade do link de 24 h, com "Pedir novo link". | Segurança sem travar quem confirma depois. | Parâmetro por organização. |
 | D-12 | Ambiente de demonstração com "Reiniciar demonstração". | Vender e treinar repetidas vezes. | Inexistente em produção. |
+| D-13 | Tabelas de veículos, implementos, composições e tipos de carga; a operação usa o conjunto. | Reunião de 13/10/2026: capacidade e placas corretas sem redigitar. | Integração com bases oficiais e CRLV digital. |
+| D-14 | Até 6 fotos por registro e fotos adicionais como evento próprio. | Reunião de 13/10/2026: mais evidências por passo. | Mantém-se. |
+| D-15 | Autocadastro de motorista (celular + código) e de empresa (CNPJ). | Reunião de 13/10/2026: adoção sem depender da administração. | Confirmação do celular por código e convites. |
+| D-16 | Motorista cadastra caminhão e viagem por assistentes de uma decisão por tela. | Reunião de 13/10/2026: cadastro intuitivo para quem dirige. | Mantém-se. |
+| D-17 | Marca visual: logo Estadia BR e verde da marca nas telas. | Logo aprovada na reunião de 13/10/2026. | White-label configurável por cliente. |
 
 ---
 
