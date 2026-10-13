@@ -987,8 +987,10 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
 
     if ((m = /^\/api\/(?:photos|evidencias)\/([a-f0-9]{64}\.(?:jpg|png|webp|webm|ogg|m4a|mp3))$/.exec(p))) {
-      const owner = store.events.find((e) => e.payload && ((e.payload.photo && e.payload.photo.file === m[1]) || (e.payload.audio && e.payload.audio.file === m[1]) || (Array.isArray(e.payload.photos) && e.payload.photos.some((f) => f.file === m[1]))));
-      if (!owner || !canSee(user, stateOf(owner.opId))) return fail(res, 404, 'NAO_ENCONTRADA', 'Evidência não encontrada.');
+      // A mesma foto (mesmo hash) pode estar em mais de uma operação: basta o usuário ver uma delas.
+      const usa = (e) => e.opId && e.payload && ((e.payload.photo && e.payload.photo.file === m[1]) || (e.payload.audio && e.payload.audio.file === m[1]) || (Array.isArray(e.payload.photos) && e.payload.photos.some((f) => f.file === m[1])));
+      const ops = new Set(store.events.filter(usa).map((e) => e.opId));
+      if (![...ops].some((id) => canSee(user, stateOf(id)))) return fail(res, 404, 'NAO_ENCONTRADA', 'Evidência não encontrada.');
       return serveFile(res, store.photoPath(m[1]));
     }
 

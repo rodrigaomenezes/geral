@@ -437,3 +437,20 @@ test('Autocadastro de empresa com CNPJ válido e operação a partir do conjunto
     assert.deepEqual(op.placasImplementos, bitrem.placasImplementos);
   } finally { await t.close(); }
 });
+
+test('A mesma foto em duas operações continua visível para quem vê qualquer uma delas', async () => {
+  const t = await boot();
+  try {
+    const joao = (await t.call('POST', '/api/login', { telefone: '11988880001', pin: '1234' })).body.token;
+    const op = (await t.call('GET', '/api/tac/viagens', null, joao)).body.disponiveis[0];
+    await t.call('POST', '/api/operations/identify', { codigo: op.codigo, placa: op.placa }, joao);
+    // Mesma imagem usada no histórico de demonstração (outra operação, de outro motorista)
+    const igual = 'data:image/png;base64,' + demoPhotoPng().toString('base64');
+    const ch = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photos: [igual] }, joao);
+    const file = ch.body.evento.payload.photos[0].file;
+    const base = `http://127.0.0.1:${t.app.server.address().port}`;
+    assert.equal((await fetch(`${base}/api/evidencias/${file}?token=${joao}`)).status, 200);
+    const horizonte = await t.login('cd@horizonte.demo');
+    assert.equal((await fetch(`${base}/api/evidencias/${file}?token=${horizonte}`)).status, 404);
+  } finally { await t.close(); }
+});
