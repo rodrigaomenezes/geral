@@ -113,6 +113,17 @@ Para iniciar conversas fora da janela de 24h, a Meta exige *templates* aprovados
 
 A transportadora escolhe o conjunto da frota ao criar a operação: placa, implementos, composição e capacidade são preenchidos sozinhos.
 
+### Painéis por perfil
+
+Menu **Painel** (portal) e **Meu painel** (motorista). Cada perfil vê só as próprias viagens:
+
+- **Indicadores:** viagens, tempo médio de estadia, acima de 5h, espera até começar, valor devido, recebido e saldo pendente.
+- **Gráficos:** viagens por dia (dentro do limite × acima de 5h), distribuição do tempo de estadia, destinos/locais, origens, tipos de carga, produtos, composições, motoristas, transportadoras e situação. A métrica dos rankings pode ser viagens, tempo médio, % acima de 5h ou valor devido.
+- **Filtros:** período (7, 30, 90 dias, tudo ou datas), tipo, destino/local, origem, transportadora, motorista, composição, tipo de carga e situação. Tocar numa barra, num dia ou num indicador também filtra; tocar de novo tira o filtro.
+- **Lista:** as viagens filtradas, ordenáveis, abrem a operação e podem ser baixadas em planilha (CSV).
+
+A demonstração traz um histórico fictício de viagens (desde 01/10/2026, início da regra vigente) para os painéis terem dados.
+
 ## O que mudou na versão 2.0
 
 | Item do documento | Implementação |

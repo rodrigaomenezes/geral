@@ -320,7 +320,9 @@ test('cadeia de hash detecta adulteração e o reinício da demonstração recri
     assert.equal((await t.call('POST', '/api/admin/reset-demo', {}, admin)).status, 200);
     assert.equal(t.app.store.verify().ok, true);
     const admin2 = await t.login('admin@estadiabr.demo');
-    assert.equal((await t.call('GET', '/api/operations', null, admin2)).body.length, 4);
+    const ops = (await t.call('GET', '/api/operations', null, admin2)).body;
+    for (const c of ['OP-2026-0001', 'OP-2026-0002', 'OP-2026-0003', 'OP-2026-0004']) assert.ok(ops.some((o) => o.codigo === c), c);
+    assert.ok(ops.length > 20, 'histórico de demonstração para os painéis');
   } finally {
     await t.close();
   }
@@ -421,6 +423,27 @@ test('Autocadastro do motorista, cadastro guiado do caminhão, viagem própria e
   } finally { await t.close(); }
 });
 
+test('Painel: cada perfil vê só as próprias viagens, com tempos, origens, destinos e cargas', async () => {
+  const t = await boot();
+  try {
+    const carla = await t.login('operacao@rodoviasul.demo');
+    const pc = (await t.call('GET', '/api/painel', null, carla)).body;
+    assert.ok(pc.linhas.length > 10);
+    assert.ok(pc.linhas.every((r) => r.transportadora === 'Rodovia Sul Transportes'));
+    const r = pc.linhas.find((x) => x.tempoMin != null && x.concluida);
+    for (const k of ['dia', 'destino', 'origem', 'motorista', 'composicao', 'tipoCarga', 'devido', 'status']) assert.ok(k in r, k);
+    const paulo = await t.login('cd@horizonte.demo');
+    assert.ok((await t.call('GET', '/api/painel', null, paulo)).body.linhas.every((x) => x.destinoOrgId === 'horizonte'));
+    const joao = (await t.call('POST', '/api/login', { telefone: '11988880001', pin: '1234' })).body.token;
+    const pj = (await t.call('GET', '/api/painel', null, joao)).body;
+    assert.ok(pj.linhas.length > 0 && pj.linhas.every((x) => x.motorista === 'João Batista Ferreira'));
+    // João continua com a viagem da demonstração ao vivo disponível (nenhuma viagem dele em andamento)
+    const v = (await t.call('GET', '/api/tac/viagens', null, joao)).body;
+    assert.ok(v.disponiveis.some((o) => o.codigo === 'OP-2026-0001'));
+    assert.ok(v.minhas.every((o) => !['AGUARDANDO_CHEGADA', 'AGUARDANDO_CONFIRMACAO_CHEGADA', 'CHEGADA_CONFIRMADA', 'OPERACAO_INICIADA', 'INICIO_CONFIRMADO', 'OPERACAO_FINALIZADA', 'TERMINO_CONFIRMADO', 'LIBERADA', 'LIBERACAO_CONFIRMADA'].includes(o.statusCode)));
+  } finally { await t.close(); }
+});
+
 test('Autocadastro de empresa com CNPJ válido e operação a partir do conjunto da frota', async () => {
   const t = await boot();
   try {
@@ -450,7 +473,8 @@ test('A mesma foto em duas operações continua visível para quem vê qualquer 
     const file = ch.body.evento.payload.photos[0].file;
     const base = `http://127.0.0.1:${t.app.server.address().port}`;
     assert.equal((await fetch(`${base}/api/evidencias/${file}?token=${joao}`)).status, 200);
-    const horizonte = await t.login('cd@horizonte.demo');
-    assert.equal((await fetch(`${base}/api/evidencias/${file}?token=${horizonte}`)).status, 404);
+    // Empresa sem nenhuma operação com essa foto não acessa
+    const nova = await t.call('POST', '/api/cadastro/empresa', { tipo: 'destino', empresa: 'Destino Sem Viagens', cnpj: '11.222.333/0001-81', nome: 'Rita', email: 'rita@t.com', senha: 'segredo123', aceite: true });
+    assert.equal((await fetch(`${base}/api/evidencias/${file}?token=${nova.body.token}`)).status, 404);
   } finally { await t.close(); }
 });

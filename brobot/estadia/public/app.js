@@ -249,6 +249,7 @@
       else if (r.name === 'amelia' && tac) await viewAmelia(r.id);
       else if (r.name === 'caminhao' && tac) await (r.id === 'novo' ? viewCaminhaoNovo() : viewCaminhoes());
       else if (r.name === 'viagem' && tac) await viewViagemNova();
+      else if (r.name === 'painel') await viewPainel();
       else if (tac) await homeMotorista();
       else if (r.name === 'cadastros' && ['transportadora', 'admin'].includes(S.user.role)) await viewCadastros();
       else if (r.name === 'dossie' && r.id) await viewDossie(r.id);
@@ -285,7 +286,7 @@
       return;
     }
     bar.innerHTML = `<a class="brand" href="#/"><span class="mark"></span><b>Estadia BR</b></a>
-      <nav class="nav">${nav('#/', 'Operações')}${['transportadora', 'admin'].includes(S.user.role) ? nav('#/cadastros', 'Frota e cadastros') : ''}${can('relatorios') ? nav('#/relatorios', 'Relatórios') : ''}${S.user.role === 'admin' ? nav('#/admin', 'Administração') : ''}</nav>
+      <nav class="nav">${nav('#/painel', 'Painel')}${nav('#/', 'Operações')}${['transportadora', 'admin'].includes(S.user.role) ? nav('#/cadastros', 'Frota e cadastros') : ''}${can('relatorios') ? nav('#/relatorios', 'Relatórios') : ''}${S.user.role === 'admin' ? nav('#/admin', 'Administração') : ''}</nav>
       <span class="net ${online() ? '' : 'off'}"><i></i>${online() ? 'Online' : 'Sem sinal'}${pend ? ` · ${pend} a enviar` : ''}</span>
       <span class="who">${esc(S.user.nome)}<small>${esc(ROLE[S.user.role])} · ${esc(S.user.orgNome || '')}</small></span>
       <button id="logout">Sair</button>`;
@@ -891,6 +892,7 @@
       ${v.disponiveis.length ? '<a class="drv-link" href="#/viagem/nova">Não é nenhuma dessas? Cadastrar nova viagem</a><a class="drv-link" href="#/amelia">Ou fale com a Amélia</a>' : ''}
       ${ativa && v.conjunto ? '<a class="drv-link" href="#/viagem/nova">+ Cadastrar outra viagem</a>' : ''}
       ${v.minhas.length ? `<h2 class="drv-h">Viagens anteriores</h2>${v.minhas.filter((o) => o !== ativa).slice(0, 6).map((o) => `<a class="drv-row" href="#/op/${o.id}"><span><b>${esc(o.localNome)}</b><br><span class="drv-muted">${esc(o.status)}</span></span><span class="mono">${o.financeiro.devido != null ? brl(o.financeiro.devido) : ''}</span></a>`).join('')}` : ''}
+      <a class="drv-row" href="#/painel"><span><b>Meu painel</b><br><span class="drv-muted">Tempo de espera, valores e viagens</span></span><span>›</span></a>
       ${ajudaHtml(null)}${demoToolsHtml(null)}
     </div>`;
     $$('[data-comecar]').forEach((b) => (b.onclick = async () => {
@@ -1651,6 +1653,200 @@
         el.innerHTML = h === hash ? '<span class="pill ok">Conteúdo íntegro</span> O hash recalculado no seu navegador confere com o registrado.' : '<span class="pill crit">Divergente</span> O conteúdo não confere com o hash registrado.';
       } catch (e) { el.textContent = 'Não foi possível verificar: ' + e.message; }
     };
+  }
+
+  // ---------------- painel (dashboard por perfil) ----------------
+  // Dados: uma linha por operação visível (/api/painel). Filtros, gráficos e lista são calculados no navegador.
+  const FAIXAS = [['0–2h', 0, 120], ['2–5h', 120, 300], ['5–8h', 300, 480], ['8–12h', 480, 720], ['12h ou mais', 720, Infinity]];
+  const faixaDe = (r) => (r.tempoMin == null ? 'Sem apuração' : (FAIXAS.find(([, a, b]) => r.tempoMin >= a && r.tempoMin < b) || FAIXAS[0])[0]);
+  const DIMS = {
+    tipo: { label: 'Tipo', val: (r) => (r.tipo === 'CARGA' ? 'Carga' : 'Descarga') },
+    destino: { label: 'Destino / embarcador', val: (r) => r.destino },
+    local: { label: 'Local', val: (r) => r.local },
+    origem: { label: 'Origem', val: (r) => r.origem },
+    transportadora: { label: 'Transportadora', val: (r) => r.transportadora },
+    motorista: { label: 'Motorista', val: (r) => r.motorista },
+    composicao: { label: 'Composição', val: (r) => r.composicao },
+    tipoCarga: { label: 'Tipo de carga', val: (r) => r.tipoCarga },
+    mercadoria: { label: 'Produto', val: (r) => r.mercadoria },
+    status: { label: 'Situação', val: (r) => r.status },
+    faixa: { label: 'Tempo de estadia', val: faixaDe },
+    dia: { label: 'Dia', val: (r) => r.dia },
+  };
+  const DIMS_PERFIL = {
+    transportadora: ['tipo', 'destino', 'origem', 'motorista', 'composicao', 'tipoCarga', 'status'],
+    destino: ['tipo', 'local', 'origem', 'transportadora', 'motorista', 'tipoCarga', 'status'],
+    tac: ['tipo', 'destino', 'tipoCarga', 'status'],
+    advocacia: ['destino', 'transportadora', 'status'],
+    admin: ['tipo', 'destino', 'origem', 'transportadora', 'motorista', 'composicao', 'tipoCarga', 'status'],
+  };
+  const RANKINGS = {
+    transportadora: [['destino', 'Destinos e embarcadores'], ['origem', 'Origens'], ['tipoCarga', 'Tipos de carga'], ['composicao', 'Composições'], ['motorista', 'Motoristas'], ['mercadoria', 'Produtos']],
+    destino: [['local', 'Locais e docas'], ['origem', 'Origens'], ['transportadora', 'Transportadoras'], ['tipoCarga', 'Tipos de carga'], ['composicao', 'Composições'], ['motorista', 'Motoristas']],
+    tac: [['destino', 'Onde você mais espera'], ['tipoCarga', 'Tipos de carga'], ['origem', 'Origens']],
+    advocacia: [['destino', 'Destinos'], ['transportadora', 'Transportadoras']],
+    admin: [['destino', 'Destinos e embarcadores'], ['transportadora', 'Transportadoras'], ['origem', 'Origens'], ['tipoCarga', 'Tipos de carga'], ['composicao', 'Composições'], ['motorista', 'Motoristas']],
+  };
+  const METRICAS = { viagens: 'Viagens', tempo: 'Tempo médio de estadia', acima: '% acima de 5h', devido: 'Valor devido' };
+  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  const soma = (a) => a.reduce((x, y) => x + (y || 0), 0);
+  const fmtMetrica = (m, v) => (v == null ? '—' : m === 'tempo' ? dur(v) : m === 'devido' ? brl(v) : m === 'acima' ? `${num(v, 0)}%` : num(v, 0));
+  const medir = (m, rows) => {
+    if (m === 'viagens') return rows.length;
+    if (m === 'tempo') return avg(rows.filter((r) => r.tempoMin != null && !r.emCurso).map((r) => r.tempoMin));
+    if (m === 'acima') { const ap = rows.filter((r) => r.tempoMin != null && !r.emCurso); return ap.length ? (ap.filter((r) => r.excedeu).length / ap.length) * 100 : null; }
+    return soma(rows.map((r) => r.devido));
+  };
+
+  let tipT;
+  function tooltip(root) {
+    let tip = $('#viz-tip');
+    if (!tip) { tip = document.createElement('div'); tip.id = 'viz-tip'; tip.className = 'viz-tip'; tip.hidden = true; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
+    const mostrar = (el, x, y) => { tip.innerHTML = el.dataset.tip; tip.hidden = false; const w = tip.offsetWidth, h = tip.offsetHeight; tip.style.left = `${Math.min(window.innerWidth - w - 8, Math.max(8, x - w / 2))}px`; tip.style.top = `${Math.max(8, y - h - 14)}px`; };
+    root.addEventListener('pointermove', (e) => { const el = e.target.closest('[data-tip]'); if (!el || e.pointerType === 'touch') { tip.hidden = true; return; } clearTimeout(tipT); mostrar(el, e.clientX, e.clientY); });
+    root.addEventListener('pointerleave', () => { tipT = setTimeout(() => (tip.hidden = true), 80); });
+    root.addEventListener('focusin', (e) => { const el = e.target.closest('[data-tip]'); if (el) { const r = el.getBoundingClientRect(); mostrar(el, r.left + r.width / 2, r.top); } });
+    root.addEventListener('focusout', () => (tip.hidden = true));
+  }
+
+  async function viewPainel() {
+    const data = await api('GET', '/api/painel');
+    const role = S.user.role;
+    const chave = 'estadia.painel.' + S.user.id;
+    let F; try { F = JSON.parse(store.get(chave) || 'null'); } catch { F = null; }
+    F = F || { periodo: '30', de: '', ate: '', filtros: {}, metrica: 'viagens', acima: false, saldo: false, ordem: 'dia', desc: true };
+    const salvar = () => store.set(chave, JSON.stringify(F));
+    const dims = DIMS_PERFIL[role] || DIMS_PERFIL.admin;
+    const hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const menosDias = (n) => new Date(Date.now() - 3 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+    const main = $('#main');
+
+    const filtrar = (ignorar) => data.linhas.filter((r) => {
+      if (F.periodo !== 'tudo') {
+        const de = F.periodo === 'custom' ? F.de : menosDias(Number(F.periodo) - 1), ate = F.periodo === 'custom' ? F.ate : hoje;
+        if ((de && r.dia < de) || (ate && r.dia > ate)) return false;
+      }
+      if (F.acima && !r.excedeu) return false;
+      if (F.saldo && !(r.saldo > 0)) return false;
+      for (const [k, v] of Object.entries(F.filtros)) if (k !== ignorar && DIMS[k] && DIMS[k].val(r) !== v) return false;
+      return true;
+    });
+
+    const desenhar = () => {
+      const rows = filtrar();
+      const apuradas = rows.filter((r) => r.tempoMin != null && !r.emCurso);
+      const acima = apuradas.filter((r) => r.excedeu);
+      const opcoes = (k) => [...new Set(filtrar(k).map(DIMS[k].val))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      const ativos = Object.entries(F.filtros);
+      const kpi = (label, valor, sub, acao, on) => `<button class="kpi kpi-btn ${on ? 'on' : ''}" ${acao ? `data-kpi="${acao}"` : 'disabled'} type="button"><span class="label">${label}</span><b>${valor}</b>${sub ? `<span class="small muted">${sub}</span>` : ''}</button>`;
+      const pct = (a, b) => (b ? `${num((a / b) * 100, 0)}%` : '—');
+
+      // Viagens por dia (colunas empilhadas: dentro do limite x acima de 5h)
+      const dias = [...new Set(rows.map((r) => r.dia))].sort();
+      let colunas = '';
+      if (dias.length) {
+        const de = F.periodo === 'tudo' ? dias[0] : F.periodo === 'custom' ? (F.de || dias[0]) : menosDias(Number(F.periodo) - 1);
+        const ate = F.periodo === 'custom' && F.ate ? F.ate : (F.periodo === 'tudo' ? dias[dias.length - 1] : hoje);
+        const todos = []; for (let d = new Date(de + 'T12:00:00Z'); d.toISOString().slice(0, 10) <= ate && todos.length < 120; d.setUTCDate(d.getUTCDate() + 1)) todos.push(d.toISOString().slice(0, 10));
+        const porDia = Object.fromEntries(todos.map((d) => [d, { ok: 0, acima: 0, total: 0 }]));
+        for (const r of rows) if (porDia[r.dia]) { porDia[r.dia].total++; porDia[r.dia][r.excedeu ? 'acima' : 'ok']++; }
+        const max = Math.max(1, ...Object.values(porDia).map((x) => x.total));
+        const passo = Math.ceil(todos.length / 8);
+        const dm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+        colunas = `<div class="cols" role="img" aria-label="Viagens por dia">${todos.map((d, i) => { const x = porDia[d]; return `<button type="button" class="col ${F.filtros.dia === d ? 'sel' : ''}" data-dim="dia" data-val="${d}" data-tip="<b>${dm(d)}</b><br>${x.total} viage${x.total === 1 ? 'm' : 'ns'}<br>${x.ok} dentro do limite · ${x.acima} acima de 5h" aria-label="${dm(d)}: ${x.total} viagens">
+            <span class="col-bar"><i class="seg acima" style="height:${(x.acima / max) * 100}%"></i><i class="seg ok" style="height:${(x.ok / max) * 100}%"></i></span><span class="col-x">${i % passo === 0 ? dm(d) : ''}</span></button>`; }).join('')}</div>
+          <div class="legend"><span><i class="sw ok"></i>Dentro do limite</span><span><i class="sw acima"></i>Acima de 5h</span><span class="muted small">Máximo no dia: ${max}</span></div>`;
+      }
+
+      // Distribuição do tempo de estadia
+      const fx = FAIXAS.map(([n]) => [n, apuradas.filter((r) => faixaDe(r) === n).length]);
+      const fxMax = Math.max(1, ...fx.map(([, v]) => v));
+      const hist = `<div class="cols hist">${fx.map(([n, v], i) => `<button type="button" class="col ${F.filtros.faixa === n ? 'sel' : ''}" data-dim="faixa" data-val="${n}" data-tip="<b>${n}</b><br>${v} viage${v === 1 ? 'm' : 'ns'} · ${pct(v, apuradas.length)}" aria-label="${n}: ${v} viagens">
+          <span class="col-v">${v}</span><span class="col-bar"><i class="seg ${i >= 2 ? 'acima' : 'ok'}" style="height:${(v / fxMax) * 100}%"></i></span><span class="col-x">${n}</span></button>`).join('')}</div>
+        <p class="small muted">Da chegada confirmada à liberação. A partir de 5h o valor é calculado sobre o tempo total.</p>`;
+
+      // Rankings (métrica escolhida)
+      const ranking = ([k, titulo]) => {
+        const grupos = {};
+        for (const r of filtrar(k)) (grupos[DIMS[k].val(r)] = grupos[DIMS[k].val(r)] || []).push(r);
+        let itens = Object.entries(grupos).map(([nome, rs]) => ({ nome, rs, v: medir(F.metrica, rs) })).filter((x) => x.v != null).sort((a, b) => b.v - a.v);
+        const extra = itens.slice(8); itens = itens.slice(0, 8);
+        const max = Math.max(...itens.map((x) => x.v), 0) || 1;
+        return `<div class="card viz"><div class="card-h"><h3>${esc(titulo)}</h3><span class="small muted">${esc(METRICAS[F.metrica])}</span></div>
+          ${itens.map((x) => `<button type="button" class="hbar ${F.filtros[k] === x.nome ? 'sel' : ''}" data-dim="${k}" data-val="${esc(x.nome)}"
+            data-tip="<b>${esc(x.nome)}</b><br>${x.rs.length} viage${x.rs.length === 1 ? 'm' : 'ns'} · tempo médio ${esc(fmtMetrica('tempo', medir('tempo', x.rs)))}<br>${esc(fmtMetrica('acima', medir('acima', x.rs)))} acima de 5h · devido ${esc(brl(medir('devido', x.rs)))}">
+            <span class="hb-l">${esc(x.nome)}</span><span class="hb-t"><i style="width:${Math.max(2, (x.v / max) * 100)}%"></i></span><span class="hb-v">${esc(fmtMetrica(F.metrica, x.v))}</span></button>`).join('') || '<p class="small muted">Sem dados no filtro.</p>'}
+          ${extra.length ? `<p class="small muted">+ ${extra.length} outros</p>` : ''}</div>`;
+      };
+
+      // Situação
+      const st = {}; for (const r of filtrar('status')) st[r.status] = (st[r.status] || 0) + 1;
+      const stMax = Math.max(1, ...Object.values(st));
+      const situacao = `<div class="card viz"><div class="card-h"><h3>Situação das viagens</h3><span class="small muted">Viagens</span></div>
+        ${Object.entries(st).sort((a, b) => b[1] - a[1]).map(([n, v]) => `<button type="button" class="hbar ${F.filtros.status === n ? 'sel' : ''}" data-dim="status" data-val="${esc(n)}" data-tip="<b>${esc(n)}</b><br>${v} viage${v === 1 ? 'm' : 'ns'}"><span class="hb-l">${esc(n)}</span><span class="hb-t"><i style="width:${Math.max(2, (v / stMax) * 100)}%"></i></span><span class="hb-v">${v}</span></button>`).join('')}</div>`;
+
+      // Lista
+      const COLS = [['codigo', 'Código'], ['dia', 'Chegada'], ['tipo', 'Tipo'], [role === 'destino' ? 'local' : 'destino', role === 'destino' ? 'Local' : 'Destino'], ['origem', 'Origem'], ['motorista', 'Motorista'], ['tipoCarga', 'Carga'], ['tempoMin', 'Estadia'], ['devido', 'Devido'], ['saldo', 'Saldo'], ['status', 'Situação']];
+      const ord = [...rows].sort((a, b) => { const x = a[F.ordem], y = b[F.ordem]; const c = x == null ? -1 : y == null ? 1 : typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR'); return F.desc ? -c : c; });
+      const tabela = `<div class="card"><div class="card-h"><h2>Viagens <span class="pill">${rows.length}</span></h2><button class="btn small" id="pn-csv" type="button">Baixar planilha (CSV)</button></div>
+        <div class="tablewrap"><table class="pn-tab"><thead><tr>${COLS.map(([k, l]) => `<th><button type="button" class="th-sort" data-ord="${k}">${l}${F.ordem === k ? (F.desc ? ' ↓' : ' ↑') : ''}</button></th>`).join('')}</tr></thead><tbody>
+        ${ord.slice(0, 200).map((r) => `<tr class="click" data-op="${r.id}"><td class="mono">${esc(r.codigo)}</td><td class="mono">${r.chegadaEm ? diaHora(r.chegadaEm) : '—'}</td><td>${tipoPill(r.tipo)}</td><td>${esc(role === 'destino' ? r.local : r.destino)}</td><td>${esc(r.origem)}</td><td>${esc(r.motorista)}</td><td>${esc(r.tipoCarga)}</td>
+          <td class="mono" ${r.excedeu ? 'style="color:var(--crit);font-weight:600"' : ''}>${r.tempoMin != null ? dur(r.tempoMin) + (r.emCurso ? ' …' : '') : '—'}</td><td class="mono">${brl(r.devido)}</td><td class="mono">${brl(r.saldo)}</td><td>${statusPill(r)}</td></tr>`).join('') || `<tr><td colspan="${COLS.length}" class="muted">Nenhuma viagem com estes filtros.</td></tr>`}
+        </tbody></table></div>${rows.length > 200 ? '<p class="small muted">Mostrando as 200 primeiras. Use os filtros ou baixe a planilha.</p>' : ''}</div>`;
+
+      const titulo = { transportadora: 'Painel da transportadora', destino: 'Painel do local', tac: 'Meu painel', advocacia: 'Painel do jurídico', admin: 'Painel geral' }[role] || 'Painel';
+      main.innerHTML = `<div class="painel">
+        ${role === 'tac' ? '<a class="drv-back" href="#/">← Início</a>' : ''}
+        <div class="row between"><h1>${titulo}</h1><span class="small muted">${data.linhas.length} viagens no total · toque nos gráficos para filtrar</span></div>
+        <div class="filtros card">
+          <div class="chips" role="group" aria-label="Período">${[['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['tudo', 'Tudo'], ['custom', 'Escolher datas']].map(([v, l]) => `<button type="button" class="chip-btn ${F.periodo === v ? 'sel' : ''}" data-per="${v}">${l}</button>`).join('')}</div>
+          ${F.periodo === 'custom' ? `<div class="row"><label class="small">De <input type="date" id="pn-de" value="${esc(F.de)}"></label><label class="small">Até <input type="date" id="pn-ate" value="${esc(F.ate)}"></label></div>` : ''}
+          <details class="pn-mais" ${(F.abrir ?? window.innerWidth > 700) ? 'open' : ''}><summary>Mais filtros${ativos.length ? ` <span class="pill acc">${ativos.length} ativo${ativos.length > 1 ? 's' : ''}</span>` : ''}</summary>
+          <div class="fgrid">${dims.map((k) => `<label class="field"><span class="label">${esc(DIMS[k].label)}</span><select data-fil="${k}"><option value="">Todos</option>${opcoes(k).map((o) => `<option ${F.filtros[k] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`).join('')}</div></details>
+          ${ativos.length || F.acima || F.saldo ? `<div class="chips ativos">${ativos.map(([k, v]) => `<button type="button" class="chip-on" data-tirar-fil="${k}">${esc(DIMS[k].label)}: ${esc(k === 'dia' ? v.split('-').reverse().join('/') : v)} ✕</button>`).join('')}${F.acima ? '<button type="button" class="chip-on" data-kpi="acima">Só acima de 5h ✕</button>' : ''}${F.saldo ? '<button type="button" class="chip-on" data-kpi="saldo">Só com saldo ✕</button>' : ''}<button type="button" class="drv-link" id="pn-limpar">Limpar filtros</button></div>` : ''}
+        </div>
+        <div class="kpis kpis-6">
+          ${kpi('Viagens', rows.length, `${rows.filter((r) => r.concluida).length} concluídas · ${rows.filter((r) => !r.concluida).length} em andamento`)}
+          ${kpi('Tempo médio de estadia', dur(avg(apuradas.map((r) => r.tempoMin))), `${apuradas.length} apuradas`)}
+          ${kpi('Acima de 5h', acima.length, `${pct(acima.length, apuradas.length)} das apuradas · toque para filtrar`, 'acima', F.acima)}
+          ${kpi('Espera até começar', dur(avg(rows.map((r) => r.esperaMin).filter((v) => v != null))), 'da chegada confirmada ao início')}
+          ${kpi('Valor devido', brl(soma(rows.map((r) => r.devido))), `recebido ${brl(soma(rows.map((r) => r.pago)))}`)}
+          ${kpi('Saldo pendente', brl(soma(rows.map((r) => (r.saldo > 0 ? r.saldo : 0)))), `${rows.filter((r) => r.saldo > 0).length} viagens · toque para filtrar`, 'saldo', F.saldo)}
+        </div>
+        <div class="grid2 pn-grid">
+          <div class="card viz"><div class="card-h"><h3>Viagens por dia</h3><span class="small muted">pela data de chegada</span></div>${colunas || '<p class="small muted">Sem viagens no período.</p>'}</div>
+          <div class="card viz"><div class="card-h"><h3>Tempo de estadia</h3><span class="small muted">viagens por faixa</span></div>${hist}</div>
+        </div>
+        <div class="row between pn-met"><h2>Comparar por</h2><div class="chips" role="group" aria-label="Métrica dos gráficos">${Object.entries(METRICAS).map(([k, l]) => `<button type="button" class="chip-btn ${F.metrica === k ? 'sel' : ''}" data-met="${k}">${l}</button>`).join('')}</div></div>
+        <div class="grid2 pn-grid">${(RANKINGS[role] || RANKINGS.admin).map(ranking).join('')}${situacao}</div>
+        ${tabela}
+      </div>`;
+
+      // Interações: tocar numa barra filtra; tocar de novo tira o filtro.
+      $$('[data-dim]', main).forEach((b) => (b.onclick = () => { const k = b.dataset.dim, v = b.dataset.val; if (F.filtros[k] === v) delete F.filtros[k]; else F.filtros[k] = v; salvar(); desenhar(); }));
+      $$('[data-fil]', main).forEach((s) => (s.onchange = () => { if (s.value) F.filtros[s.dataset.fil] = s.value; else delete F.filtros[s.dataset.fil]; salvar(); desenhar(); }));
+      $$('[data-tirar-fil]', main).forEach((b) => (b.onclick = () => { delete F.filtros[b.dataset.tirarFil]; salvar(); desenhar(); }));
+      $$('[data-kpi]', main).forEach((b) => (b.onclick = () => { F[b.dataset.kpi] = !F[b.dataset.kpi]; salvar(); desenhar(); }));
+      $$('[data-per]', main).forEach((b) => (b.onclick = () => { F.periodo = b.dataset.per; if (F.periodo === 'custom' && !F.de) { F.de = menosDias(29); F.ate = hoje; } delete F.filtros.dia; salvar(); desenhar(); }));
+      $$('[data-met]', main).forEach((b) => (b.onclick = () => { F.metrica = b.dataset.met; salvar(); desenhar(); }));
+      $$('[data-ord]', main).forEach((b) => (b.onclick = () => { if (F.ordem === b.dataset.ord) F.desc = !F.desc; else { F.ordem = b.dataset.ord; F.desc = true; } salvar(); desenhar(); }));
+      $$('tr[data-op]', main).forEach((tr) => (tr.onclick = () => (location.hash = `#/op/${tr.dataset.op}`)));
+      const mais = $('.pn-mais', main); if (mais) mais.ontoggle = () => { F.abrir = mais.open; salvar(); };
+      const de = $('#pn-de'), ate = $('#pn-ate');
+      if (de) de.onchange = () => { F.de = de.value; salvar(); desenhar(); };
+      if (ate) ate.onchange = () => { F.ate = ate.value; salvar(); desenhar(); };
+      const limpar = $('#pn-limpar'); if (limpar) limpar.onclick = () => { F.filtros = {}; F.acima = false; F.saldo = false; salvar(); desenhar(); };
+      $('#pn-csv').onclick = () => {
+        const cab = ['Código', 'Chegada', 'Tipo', 'Destino', 'Local', 'Origem', 'Transportadora', 'Motorista', 'Placa', 'Composição', 'Tipo de carga', 'Produto', 'Peso (t)', 'Estadia (min)', 'Acima de 5h', 'Devido', 'Pago', 'Saldo', 'Situação'];
+        const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+        const linhas = ord.map((r) => [r.codigo, r.chegadaEm || '', r.tipo, r.destino, r.local, r.origem, r.transportadora, r.motorista, r.placa, r.composicao, r.tipoCarga, r.mercadoria, r.pesoToneladas, r.tempoMin, r.excedeu ? 'sim' : 'não', r.devido, r.pago, r.saldo, r.status].map(q).join(';'));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(['﻿' + [cab.map(q).join(';'), ...linhas].join('\n')], { type: 'text/csv;charset=utf-8' }));
+        a.download = `estadia-painel-${hoje}.csv`; a.click();
+      };
+    };
+    desenhar();
+    tooltip(main);
   }
 
   // ---------------- relatórios ----------------

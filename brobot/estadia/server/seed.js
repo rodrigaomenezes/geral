@@ -167,8 +167,113 @@ function seed(dir, store, { quiet = false } = {}) {
   const s3 = e3('SAIDA', u.ana, [-1, 17, 41], { payload: { photo: doc } });
   zap(carlaZap, [-1, 17, 42], 'INFORMAR', s3, null, 'saiu do local às 17:41. Tempo de estadia 11h12, valor devido R$ 840,00', 'ok', [-1, 18, 2]);
 
+  const historico = gerarHistorico({ dir, store, o, u, actor, photo, doc, sistema });
+
   if (!quiet) console.log('Dados de demonstração criados. Senha de todos os usuários:', SENHA_DEMO);
-  return { orgs: o, users: u, ops: { op3, op4 }, at };
+  return { orgs: o, users: u, ops: { op3, op4 }, at, historico };
+}
+
+// ---------- Histórico de demonstração para os painéis ----------
+// Viagens fictícias, determinísticas (gerador com semente fixa), desde a vigência da regra atual.
+function gerarHistorico({ dir, store, o, u, actor, photo, doc, sistema }) {
+  let semente = 20261001;
+  const rnd = () => { semente = (semente * 1664525 + 1013904223) >>> 0; return semente / 4294967296; };
+  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+  const entre = (a, b) => a + rnd() * (b - a);
+  const novos = {
+    porto: dir.addOrg({ id: 'porto-santos', nome: 'Terminal Porto Seco · Santos', tipo: 'destino' }),
+    coop: dir.addOrg({ id: 'coop-vale-verde', nome: 'Cooperativa Vale Verde · Rio Verde', tipo: 'destino' }),
+  };
+  dir.addUser({ email: 'gate@portoseco.demo', senha: SENHA_DEMO, nome: 'Lucas Martins', role: 'destino', orgId: novos.porto.id });
+  dir.addUser({ email: 'expedicao@valeverde.demo', senha: SENHA_DEMO, nome: 'Fernanda Rocha', role: 'destino', orgId: novos.coop.id });
+  const locais = [
+    { org: o.serra, tipo: 'DESCARGA', local: 'CD Jundiaí · Doca 4', cidade: 'Jundiaí/SP', lat: -23.18571, lng: -46.89784 },
+    { org: o.horizonte, tipo: 'DESCARGA', local: 'CD Campinas · Doca 2', cidade: 'Campinas/SP', lat: -22.90556, lng: -47.06083 },
+    { org: novos.porto, tipo: 'DESCARGA', local: 'Porto Seco · Gate 3', cidade: 'Santos/SP', lat: -23.95, lng: -46.333 },
+    { org: o.usina, tipo: 'CARGA', local: 'Usina Boa Vista · Expedição', cidade: 'Uberlândia/MG', lat: -18.91861, lng: -48.27722 },
+    { org: novos.coop, tipo: 'CARGA', local: 'Cooperativa Vale Verde · Silo 1', cidade: 'Rio Verde/GO', lat: -17.7923, lng: -50.9192 },
+  ];
+  const origens = ['Ribeirão Preto/SP', 'Uberlândia/MG', 'Rio Verde/GO', 'Sorocaba/SP', 'Maringá/PR', 'Cuiabá/MT', 'Londrina/PR', 'Goiânia/GO'];
+  const cargas = {
+    GRANELEIRO: [['GRANEL_SOLIDO', 'soja'], ['GRANEL_SOLIDO', 'milho'], ['GRANEL_SOLIDO', 'açúcar VHP']],
+    SIDER: [['CARGA_GERAL', 'açúcar cristal'], ['CARGA_GERAL', 'bebidas']],
+    BAU: [['CARGA_GERAL', 'eletrodomésticos'], ['CARGA_GERAL', 'alimentos']],
+    BAU_FRIGORIFICO: [['FRIGORIFICADA', 'carne bovina'], ['FRIGORIFICADA', 'frango congelado']],
+    TANQUE: [['GRANEL_LIQUIDO', 'etanol']],
+  };
+  // Motoristas extras, cada um com o seu conjunto
+  const extra = [
+    ['Carlos Eduardo Souza', '11988880003', 'carlos', { composicao: 'BITREM', placaVeiculo: 'RCS3A10', placasImplementos: ['RCS3A11', 'RCS3A12'], carroceria: 'GRANELEIRO', capacidadeToneladas: 37 }],
+    ['Márcio Alves', '11988880004', 'marcio', { composicao: 'RODOTREM', placaVeiculo: 'RMA5B20', placasImplementos: ['RMA5B21', 'RMA5B22'], carroceria: 'GRANELEIRO', capacidadeToneladas: 48 }],
+    ['Patrícia Gomes', '11988880005', 'patricia', { composicao: 'TRUCK', placaVeiculo: 'RPG7C30', placasImplementos: [], carroceria: 'BAU_FRIGORIFICO', capacidadeToneladas: 14 }],
+    ['Roberto Lima', '11988880006', 'roberto', { composicao: 'VANDERLEIA', placaVeiculo: 'RRL9D40', placasImplementos: ['RRL9D41'], carroceria: 'TANQUE', capacidadeToneladas: 33 }],
+  ];
+  const motoristas = [
+    { user: u.joao, conj: dir.frotaDe(u.joao).conjuntos[0], demo: true },
+    { user: u.ana, conj: dir.frotaDe(u.ana).conjuntos[0], demo: true },
+  ];
+  for (const [nome, tel, id, c] of extra) {
+    const user = dir.addUser({ email: `${id}@tac.demo`, senha: SENHA_DEMO, nome, role: 'tac', orgId: o.tac.id, telefone: tel, pin: '1234' });
+    motoristas.push({ user, conj: dir.salvarConjunto(C.validarConjunto(c), { orgId: o.tac.id, userId: user.id }), demo: false });
+  }
+  const portarias = { 'serra-azul': 'Portaria Serra Azul', horizonte: 'Portaria Horizonte', 'porto-santos': 'Gate Porto Seco', 'usina-boa-vista': 'Expedição Usina', 'coop-vale-verde': 'Balança Vale Verde' };
+  const agora = Date.now();
+  const inicio = Math.max(Date.parse('2026-10-01T09:00:00Z'), agora - 45 * 86400000);
+  const dias = Math.max(1, Math.floor((agora - inicio) / 86400000));
+  const total = Math.min(90, Math.max(24, dias * 5));
+  const iso = (ms) => new Date(ms).toISOString();
+  const lista = [];
+  for (let i = 0; i < total; i++) {
+    const emCurso = i >= total - 4; // as últimas ficam em andamento (motoristas que não são da demonstração ao vivo)
+    const m = emCurso ? pick(motoristas.filter((x) => !x.demo)) : pick(motoristas);
+    const carroceria = m.conj.carroceria;
+    const [tipoCarga, mercadoria] = pick(cargas[carroceria] || cargas.SIDER);
+    const loc = pick(locais.filter((l) => (carroceria === 'TANQUE' || carroceria === 'GRANELEIRO' ? true : l.org !== novos.coop)));
+    const autonomo = rnd() < 0.2;
+    let chegada = emCurso ? agora - entre(1, 8) * 3600000 : inicio + rnd() * (agora - inicio - 14 * 3600000);
+    const d = new Date(chegada); const h = d.getUTCHours(); if (!emCurso && (h < 8 || h > 20)) chegada += (12 - h) * 3600000; // horário comercial (UTC-3)
+    const lento = rnd() < 0.34;
+    const esperaIni = lento ? entre(150, 420) : entre(15, 110);
+    const duracao = entre(50, lento ? 260 : 150);
+    const conf = chegada + entre(3, 28) * 60000;
+    const ini = conf + esperaIni * 60000;
+    const ter = ini + duracao * 60000;
+    const lib = ter + entre(8, 70) * 60000;
+    const sai = lib + entre(4, 25) * 60000;
+    const opId = require('node:crypto').randomUUID();
+    const codigo = `OP-2026-${String(1001 + i)}`;
+    const criada = chegada - entre(4, 30) * 3600000;
+    const peso = Math.round(m.conj.capacidadeToneladas * entre(0.85, 1) * 10) / 10;
+    store.append({ opId, type: 'OPERACAO_CRIADA', actor: autonomo ? actor(m.user) : actor(u.carla), origem: autonomo ? 'app' : 'portal', occurredAt: iso(criada), receivedAt: iso(criada),
+      payload: { codigo, tipo: loc.tipo, ...(autonomo ? { criadaPor: 'tac', transportadoraOrgId: null, transportadoraNome: null }
+        : { transportadoraOrgId: o.rodovia.id, transportadoraNome: o.rodovia.nome, transportadoraContatoNome: 'Carla Mendes', transportadoraContatoTelefone: '+55 11 90000-0010' }),
+      destinoOrgId: loc.org.id, destinoNome: loc.org.nome, placa: m.conj.placa, placasImplementos: m.conj.placasImplementos, composicao: m.conj.composicao, carroceria, conjuntoId: m.conj.id,
+      implemento: C.descreverConjunto(m.conj), capacidadeToneladas: m.conj.capacidadeToneladas, pesoToneladas: peso, tipoCarga, mercadoria,
+      nfe: String(35261000300000 + i * 7919), origem: loc.tipo === 'CARGA' ? loc.cidade : pick(origens.filter((c) => c !== loc.cidade)), localNome: loc.local, lat: loc.lat, lng: loc.lng,
+      responsavelNome: portarias[loc.org.id], responsavelTelefone: '+55 11 90000-0001' } });
+    const ev = (type, ms, by, extra = {}) => store.append({ opId, type, actor: by, origem: extra.origem || (by.role === 'tac' ? 'app' : 'link_whatsapp'), occurredAt: iso(ms), receivedAt: iso(ms), refEventId: extra.ref, payload: extra.payload || {} }).event;
+    const tac = actor(m.user);
+    const portaria = { userId: `link:${opId}`, name: `${portarias[loc.org.id]} (via link)`, role: 'destino', orgId: loc.org.id };
+    const near = (k = 0.0003) => ({ lat: +(loc.lat + (rnd() - 0.5) * k).toFixed(6), lng: +(loc.lng + (rnd() - 0.5) * k).toFixed(6), acc: Math.round(entre(5, 20)) });
+    ev('OPERACAO_IDENTIFICADA', chegada - 30 * 60000, tac, { payload: { placa: m.conj.placa, via: autonomo ? 'cadastro_tac' : 'codigo' } });
+    const c = ev('CHEGADA', chegada, tac, { payload: { gps: near(), photo, photos: [photo] } });
+    if (!emCurso || rnd() < 0.75) ev('CHEGADA_CONFIRMADA', conf, portaria, { ref: c.id }); else { lista.push({ opId, emCurso: true }); continue; }
+    if (rnd() < 0.07) ev('DESLOCAMENTO_FORA_DO_LIMITE', ini - 30 * 60000, sistema, { origem: 'sistema', payload: { distanciaM: Math.round(entre(320, 900)), limiteM: 300, posicao: near(0.01), referencia: { lat: loc.lat, lng: loc.lng, fonte: 'local cadastrado' } } });
+    if (emCurso && ini > agora) { lista.push({ opId, emCurso: true }); continue; }
+    const iv = ev('INICIO', ini, tac, { payload: { gps: near() } });
+    if (rnd() < 0.08) ev('DIVERGENCIA', ini + 9 * 60000, portaria, { ref: iv.id, payload: { note: 'Não confere (pelo link): início efetivo foi depois.' } });
+    else ev('INICIO_CONFIRMADO', ini + entre(2, 15) * 60000, portaria, { ref: iv.id });
+    if (emCurso && ter > agora) { lista.push({ opId, emCurso: true }); continue; }
+    const tv = ev('TERMINO', ter, tac, { payload: { gps: near() } });
+    ev('TERMINO_CONFIRMADO', ter + entre(2, 15) * 60000, portaria, { ref: tv.id });
+    if (emCurso) { lista.push({ opId, emCurso: true }); continue; }
+    const lv = ev('LIBERACAO', lib, tac, { payload: { photo: doc, photos: [doc] } });
+    ev('LIBERACAO_CONFIRMADA', lib + entre(2, 10) * 60000, portaria, { ref: lv.id });
+    ev('SAIDA', sai, tac, { payload: { photo: doc, photos: [doc] } });
+    const sorte = rnd();
+    lista.push({ opId, saidaEm: iso(sai + 60000), pagamento: sorte < 0.45 ? 'total' : sorte < 0.7 ? 'parcial' : 'nenhum', juridico: rnd() < 0.5, encerrar: rnd() < 0.6, autonomo, motorista: m.user });
+  }
+  return lista;
 }
 
 module.exports = { seed, SENHA_DEMO, PIN_DEMO, demoPhotoPng, demoDocPng };

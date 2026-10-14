@@ -62,6 +62,15 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
   }
 
+  /** Próximo código livre do ano (OP-AAAA-NNNN), sem colidir com códigos existentes. */
+  function proximoCodigo() {
+    const ano = new Date().getFullYear();
+    const usados = new Set(allStates().map((st) => st.op.codigo));
+    let n = store.opIds().length + 1;
+    while (usados.has(`OP-${ano}-${String(n).padStart(4, '0')}`)) n++;
+    return `OP-${ano}-${String(n).padStart(4, '0')}`;
+  }
+
   // ---------- apuração, dossiê e links ----------
   function recordApuracao(st, by = SYS, occurredAt) {
     const ap = D.apurar(st, occurredAt);
@@ -357,6 +366,35 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     };
   }
 
+  // ---------- Painel: uma linha por operação visível ao usuário (filtros e gráficos no navegador) ----------
+  function painel(user) {
+    const dia = (iso) => (iso ? new Date(Date.parse(iso) - 3 * 3600000).toISOString().slice(0, 10) : null); // dia em Brasília
+    const mins = (a, b) => (a && b ? Math.round((Date.parse(b) - Date.parse(a)) / 60000) : null);
+    const linhas = allStates().filter((st) => canSee(user, st)).map((st) => {
+      const ms = st.milestones, conf = (t) => ms[t] && st.confirmations[ms[t].id];
+      const ap = D.apurar(st);
+      const comp = st.op.composicao ? C.composicao(st.op.composicao) : null;
+      return {
+        id: st.op.id, codigo: st.op.codigo, tipo: st.op.tipo, statusCode: st.statusCode, status: st.status,
+        dia: dia(ms.CHEGADA ? ms.CHEGADA.occurredAt : st.op.criadaEm), chegadaEm: ms.CHEGADA ? ms.CHEGADA.occurredAt : null,
+        destino: st.op.destinoNome || '—', destinoOrgId: st.op.destinoOrgId || null, local: st.op.localNome || st.op.destinoNome || '—', origem: st.op.origem || '—',
+        transportadora: st.op.transportadoraNome || 'Motorista autônomo', motorista: st.op.tacNome || 'Não identificado', placa: st.op.placa,
+        composicao: comp ? comp.nome : (st.op.implemento || 'Não informada'), carroceria: C.nomeDe(C.CARROCERIAS, st.op.carroceria) || '—',
+        tipoCarga: C.nomeDe(C.TIPOS_CARGA, st.op.tipoCarga) || 'Não informado', mercadoria: st.op.mercadoria || '—', pesoToneladas: st.op.pesoToneladas ?? null,
+        capacidadeToneladas: st.op.capacidadeToneladas ?? null,
+        tempoMin: ap.pendente ? null : ap.tempoMin, emCurso: !ap.pendente && ap.emCurso, excedeu: !ap.pendente && ap.excedeu,
+        devido: st.financeiro.devido, pago: st.financeiro.pago, saldo: st.financeiro.saldo,
+        confirmacaoMin: mins(ms.CHEGADA && ms.CHEGADA.occurredAt, conf('CHEGADA') && conf('CHEGADA').occurredAt),
+        esperaMin: mins(conf('CHEGADA') && conf('CHEGADA').occurredAt, ms.INICIO && ms.INICIO.occurredAt),
+        operacaoMin: mins(ms.INICIO && ms.INICIO.occurredAt, ms.TERMINO && ms.TERMINO.occurredAt),
+        divergencias: st.divergences.length, deslocamentos: st.ocorrencias.filter((o) => o.type === 'DESLOCAMENTO_FORA_DO_LIMITE').length,
+        semConfirmacao: Object.keys(D.CONFIRMATIONS).some((t) => ms[t] && !st.confirmations[ms[t].id]),
+        juridico: st.statusJuridico, concluida: !!ms.SAIDA,
+      };
+    });
+    return { linhas, perfil: user.role, geradoEm: new Date().toISOString(), limiteMin: D.ruleFor().limiteMin };
+  }
+
   // ---------- SSE ----------
   const streams = new Set();
   store.on('append', (ev) => {
@@ -380,11 +418,33 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     buildDossie(stateOf(ops.op3), SYS, at(-1, 17, 42));
     store.append({ opId: ops.op3, type: 'PAGAMENTO_REGISTRADO', actor: actorOf(carla), origem: 'portal', occurredAt: at(0, 8, 30) < new Date().toISOString() ? at(0, 8, 30) : new Date().toISOString(),
       payload: { valor: 400, origem: 'pagamento_comercial', note: 'Pagamento parcial informado pelo destinatário.' } });
+    // Histórico para os painéis: apuração, dossiê, pagamentos, jurídico e encerramento.
+    const adv = dir.data.orgs.find((o) => o.tipo === 'advocacia');
+    for (const h of info.historico) {
+      if (h.emCurso) continue;
+      const quando = (min) => new Date(Math.min(Date.now(), Date.parse(h.saidaEm) + min * 60000)).toISOString();
+      recordApuracao(stateOf(h.opId), SYS, h.saidaEm);
+      buildDossie(stateOf(h.opId), SYS, h.saidaEm);
+      const st = stateOf(h.opId);
+      const devido = st.financeiro.devido || 0;
+      const quem = h.autonomo ? actorOf(h.motorista) : actorOf(carla);
+      if (devido > 0 && h.pagamento !== 'nenhum') {
+        store.append({ opId: h.opId, type: 'PAGAMENTO_REGISTRADO', actor: quem, origem: h.autonomo ? 'app' : 'portal', occurredAt: quando(2 * 1440),
+          payload: { valor: h.pagamento === 'total' ? devido : D.round2(devido / 2), origem: h.pagamento === 'total' ? 'pagamento_comercial' : 'acordo_direto' } });
+      }
+      const s2 = stateOf(h.opId);
+      if (!h.autonomo && s2.financeiro.saldo > 0 && h.juridico) {
+        store.append({ opId: h.opId, type: 'ENCAMINHADO_JURIDICO', actor: actorOf(carla), origem: 'portal', occurredAt: quando(3 * 1440),
+          payload: { dossieHash: s2.dossies[s2.dossies.length - 1].payload.hash, advocaciaOrgId: adv.id, advocaciaNome: adv.nome, valorEncaminhado: s2.financeiro.saldo } });
+      } else if (!h.autonomo && s2.financeiro.saldo === 0 && h.encerrar) {
+        store.append({ opId: h.opId, type: 'OPERACAO_ENCERRADA', actor: actorOf(carla), origem: 'portal', occurredAt: quando(3 * 1440), payload: { statusAnterior: s2.statusCode, saldo: 0 } });
+      }
+    }
   }
   if (dir.empty && seedIfEmpty) seedAll();
   function resetDemo() { store.reset(); dir.reset(); autoRespostas.length = 0; seedAll(); }
   // Dados de demonstração de versões anteriores (sem transportadora, sem PIN ou sem frota) são recriados no formato atual.
-  if (demo && !dir.empty && (!dir.data.orgs.some((o) => o.tipo === 'transportadora') || dir.data.users.some((u) => u.role === 'tac' && !u.pinHash) || !dir.data.conjuntos.length)) {
+  if (demo && !dir.empty && (!dir.data.orgs.some((o) => o.tipo === 'transportadora') || dir.data.users.some((u) => u.role === 'tac' && !u.pinHash) || !dir.data.conjuntos.length || !dir.data.orgs.some((o) => o.id === 'porto-santos'))) {
     if (!quiet) console.log('Dados de demonstração de versão anterior encontrados: recriando no formato atual.');
     resetDemo();
   }
@@ -652,7 +712,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         destinos: dir.data.orgs.filter((o) => o.tipo === 'destino').map((o) => ({ id: o.id, nome: o.nome })), permissoes: D.PERMISSOES });
     }
 
-    if (p === '/api/operations' && req.method === 'GET') return send(res, 200, allStates().filter((st) => canSee(user, st)).map(summary).reverse());
+    if (p === '/api/operations' && req.method === 'GET') return send(res, 200, allStates().filter((st) => canSee(user, st)).map(summary).sort((a, b) => String(b.chegadaEm || b.criadaEm).localeCompare(String(a.chegadaEm || a.criadaEm))));
 
     if (p === '/api/operations' && req.method === 'POST') {
       if (!D.can(user, 'criar')) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não cadastra operações.');
@@ -667,7 +727,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       if (!(cap > 0 && cap < 100)) return fail(res, 400, 'CAPACIDADE', 'Informe a capacidade do veículo em toneladas.');
       const dest = dir.org(b.destinoOrgId);
       if (!dest || dest.tipo !== 'destino') return fail(res, 400, 'DESTINO', 'Selecione o embarcador/destinatário.');
-      const codigo = b.codigo ? String(b.codigo).trim().toUpperCase().slice(0, 30) : `OP-${new Date().getFullYear()}-${String(store.opIds().length + 1).padStart(4, '0')}`;
+      const codigo = b.codigo ? String(b.codigo).trim().toUpperCase().slice(0, 30) : proximoCodigo();
       if (allStates().some((st) => st.op.codigo === codigo)) return fail(res, 409, 'DUPLICADA', `Já existe a operação ${codigo}.`);
       const transp = user.role === 'transportadora' ? dir.org(user.orgId) : (dir.data.orgs.find((o) => o.tipo === 'transportadora') || dir.org(user.orgId));
       const numOrNull = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return v === '' || v == null || !Number.isFinite(n) ? null : n; };
@@ -783,7 +843,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       const tipoCarga = C.TIPOS_CARGA.some((t) => t.id === b.tipoCarga) ? b.tipoCarga : null;
       const peso = Number(String(b.pesoToneladas ?? '').replace(',', '.'));
       const lat = Number(b.lat), lng = Number(b.lng);
-      const codigo = `OP-${new Date().getFullYear()}-${String(store.opIds().length + 1).padStart(4, '0')}`;
+      const codigo = proximoCodigo();
       const opId = crypto.randomUUID();
       append({ opId, type: 'OPERACAO_CRIADA', clientEventId: b.clientEventId, payload: {
         codigo, tipo: b.tipo, criadaPor: 'tac', transportadoraOrgId: null, transportadoraNome: null, destinoOrgId: destOrg && destOrg.tipo === 'destino' ? destOrg.id : null, destinoNome,
@@ -794,6 +854,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       append({ opId, type: 'OPERACAO_IDENTIFICADA', payload: { placa: conj.placa, via: 'cadastro_tac' } });
       return send(res, 201, detail(stateOf(opId), user, baseUrl));
     }
+
+    if (p === '/api/painel' && req.method === 'GET') return send(res, 200, painel(user));
 
     if (p === '/api/relatorios') {
       if (!D.can(user, 'relatorios')) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não acessa relatórios.');
