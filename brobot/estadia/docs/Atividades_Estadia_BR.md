@@ -3,6 +3,15 @@
 **Produto:** Estadia BR — Plataforma de Gestão e Comprovação de Eventos Logísticos
 **Base:** Documento de Atividades DEV 2.0 (05/10/2026) + decisões tomadas na construção e nos testes do MVP de demonstração
 **Objetivo deste material:** descrever o **sistema ideal** em atividades prontas para o backlog, indicando o que entra no **MVP** e o que deve ficar com a **estrutura pronta** para ser ligado depois, sem refazer o produto.
+**Versão deste documento:** 1.2 · 14/10/2026
+
+### 🗂️ Histórico de versões
+
+| Versão | Data | O que mudou |
+|---|---|---|
+| 1.0 | 08/10/2026 | Primeira versão: atividades 01 a 28 a partir da DEV 2.0 e das decisões do MVP (WhatsApp do próprio motorista, confirmação pelo link, número informado na hora). |
+| 1.1 | 13/10/2026 | Reunião de 13/10: frota (veículos, implementos, composições e tipos de carga), várias fotos por registro, autocadastro de motorista e empresa, cadastro guiado do caminhão e da viagem, nova logo. Atividades 29 a 31. |
+| 1.2 | 14/10/2026 | Painéis por perfil com filtros e acesso às viagens (Atividade 32). Histórico de demonstração para os painéis. Regra de acesso a fotos repetidas entre operações. Códigos de operação sem colisão e lista por chegada mais recente. Decisões D-18 a D-21. |
 
 ---
 
@@ -62,6 +71,7 @@ Dentro dos **RF**, cada item tem uma etiqueta de fase:
 | 29 | Frota: veículos, implementos, composições e tipos de carga | MVP |
 | 30 | Autocadastro de motorista e de empresa | MVP |
 | 31 | Várias fotos por registro | MVP |
+| 32 | Painéis por perfil (dashboards) | MVP |
 
 ---
 
@@ -228,6 +238,7 @@ Garantir que cada operação de **carga** ou **descarga** tenha identidade únic
 3. Carga e descarga são operações **estanques**: uma não depende da outra para avançar.
 4. A **capacidade do veículo** é obrigatória para a apuração. Sem ela, a apuração fica pendente.
 5. A chegada só pode ser registrada **depois** que a operação foi identificada.
+6. O código gerado é sempre o próximo número livre do ano. O sistema nunca repete um código, mesmo com operações importadas ou geradas por outros meios.
 
 ---
 
@@ -341,6 +352,7 @@ Fazer o motorista operar **sozinho**, sem treinamento: o app mostra **um único 
 6. **[MVP]** O sistema deve abrir a câmera direto quando o passo exigir foto.
 7. **[MVP]** O sistema deve mostrar o aviso "Registrado no celular, vai enviar quando tiver sinal" quando estiver sem internet.
 8. **[MVP]** O sistema deve atualizar a tela sozinho quando alguém confirmar pelo link (sem o motorista recarregar).
+8a. **[MVP]** O sistema deve oferecer na tela inicial o atalho **Meu painel**, com tempo de espera, valores e viagens do motorista (Atividade 32).
 9. **[COMPLETO]** O sistema deve ler em voz alta a instrução do passo atual (acessibilidade).
 
 ---
@@ -1289,6 +1301,8 @@ Dar a destino, embarcador e transportadora uma visão **ao vivo** das operaçõe
 4. **[MVP]** O portal deve permitir à transportadora criar operações, registrar pagamentos, gerar dossiê, encaminhar e encerrar.
 5. **[MVP]** O portal deve mostrar o relógio da estadia das operações em andamento.
 6. **[MVP]** O portal deve mostrar o histórico de mensagens de WhatsApp de cada operação com o status honesto de cada uma.
+7. **[MVP]** O portal deve listar as operações pela chegada mais recente (ou pela criação, quando ainda não houve chegada).
+8. **[MVP]** O portal deve ter o menu **Painel** como primeira opção (Atividade 32).
 
 ---
 
@@ -1385,7 +1399,8 @@ Dar visão operacional e financeira consolidada para mostrar quanto tempo se per
 3. **[MVP]** O sistema deve exibir: operações encaminhadas ao jurídico e operações com foto/GPS.
 4. **[MVP]** O sistema deve permitir filtrar por período, local, transportadora e motorista.
 5. **[MVP]** O sistema deve exportar relatórios em CSV.
-6. **[COMPLETO]** O sistema deve oferecer painéis de BI e ranking de locais com maior tempo de espera.
+6. **[MVP]** O sistema deve oferecer painéis com ranking de locais, origens, cargas e motoristas. Ver **Atividade 32**.
+7. **[COMPLETO]** O sistema deve oferecer BI avançado: comparação entre períodos, metas por local e alertas de tendência.
 
 ---
 
@@ -1478,6 +1493,8 @@ Permitir apresentar e testar o produto várias vezes com dados de exemplo, volta
 ## ✅ Requisitos Funcionais (RF)
 1. **[MVP]** O sistema deve oferecer, apenas em ambiente de demonstração, o botão **"Reiniciar demonstração"**.
 2. **[MVP]** O sistema deve recriar organizações, usuários e operações de exemplo (em andamento, isolamento, histórica com pagamento parcial e encerrada sem valor).
+2a. **[MVP]** O sistema deve gerar um **histórico fictício de viagens** para os painéis terem dados: motoristas e locais extras, viagens concluídas com apuração, Dossiê, pagamentos (integral, parcial ou nenhum), encaminhamentos ao jurídico e encerramentos, mais algumas viagens em andamento.
+2b. **[MVP]** O sistema deve recriar a demonstração sozinho quando encontrar dados de demonstração de uma versão anterior.
 3. **[MVP]** O sistema deve exibir ao motorista as "Ferramentas da demonstração" (ex.: simular deslocamento) somente em ambiente de demonstração.
 4. **[ESTRUTURA]** O sistema deve ter um parâmetro que indica se o ambiente é de demonstração ou produção.
 
@@ -1486,6 +1503,9 @@ Permitir apresentar e testar o produto várias vezes com dados de exemplo, volta
 ## 📜 Regras de Negócio (RN)
 1. Em **produção**, o reinício e as ferramentas de demonstração **não existem**.
 2. Eventos simulados ficam marcados como "[simulado em demonstração]".
+3. O histórico fictício começa na data de vigência da regra de cálculo atual, para que todos os valores sigam a mesma regra.
+4. O histórico é sempre o mesmo a cada reinício (gerador com semente fixa), para que as apresentações sejam repetíveis.
+5. As viagens fictícias dos motoristas da demonstração ao vivo ficam todas concluídas, para não atrapalhar o roteiro de apresentação.
 
 ---
 
@@ -1754,6 +1774,7 @@ Permitir mais de uma foto por registro (caminhão, placa, lacre, documento) e ad
 2. A mesma foto enviada duas vezes no mesmo registro é guardada uma vez só.
 3. Cada registro aceita no máximo 10 envios de fotos adicionais.
 4. Só as partes da operação (motorista da viagem, destino e administração) adicionam fotos. Operação encerrada não recebe fotos.
+5. Uma foto idêntica (mesmo resumo criptográfico) pode estar em mais de uma operação. O acesso é liberado se o usuário puder ver **qualquer uma** delas, e negado se não puder ver nenhuma.
 
 ---
 
@@ -1767,11 +1788,95 @@ Permitir mais de uma foto por registro (caminhão, placa, lacre, documento) e ad
 - **Dado** o passo CHEGUEI, **quando** o motorista tirar 2 fotos e enviar, **então** o registro deve ter as 2 fotos.
 - **Dado** 7 fotos, **quando** enviar, **então** o sistema deve recusar e pedir no máximo 6.
 - **Dado** um registro já enviado, **quando** o motorista adicionar uma foto, **então** ela deve aparecer abaixo do registro, com o horário da adição, e o registro original deve continuar igual.
+- **Dado** a mesma foto usada em duas operações de destinos diferentes, **quando** cada destino abrir a sua operação, **então** os dois devem ver a foto; e uma empresa sem nenhuma dessas operações não deve conseguir abri-la.
 
 ---
 
 ## 🎨 Protótipo Visual
 [Link do Figma — Folha de confirmação com miniaturas e "Tirar mais uma foto"]
+
+---
+
+---
+
+# 🆕 Nova Atividade – 32 · Painéis por perfil (dashboards)
+
+## 🎯 Objetivo
+Dar a cada participante uma visão consolidada das **suas** viagens (quantidades, tempos de estadia, origens, destinos, cargas, composições, motoristas e valores), com filtros e acesso direto a cada viagem a partir do próprio painel.
+
+---
+
+## 👤 User Story
+**Como** transportadora, destino, motorista, jurídico ou administração
+**Quero** um painel com os números das minhas viagens que eu possa filtrar e explorar
+**Para** saber onde se perde mais tempo, quanto há a receber e abrir rapidamente a viagem que preciso analisar
+
+---
+
+## ✅ Requisitos Funcionais (RF)
+1. **[MVP]** O sistema deve oferecer o menu **Painel** no portal e o atalho **Meu painel** no app do motorista.
+2. **[MVP]** O sistema deve exibir os indicadores: viagens (concluídas e em andamento), tempo médio de estadia, quantidade e percentual acima de 5 h, espera média da chegada confirmada até o início, valor devido, valor recebido e saldo pendente.
+3. **[MVP]** O sistema deve exibir o gráfico **Viagens por dia**, separando as viagens dentro do limite das acima de 5 h, pela data de chegada.
+4. **[MVP]** O sistema deve exibir a **distribuição do tempo de estadia** por faixas: até 2 h, 2 a 5 h, 5 a 8 h, 8 a 12 h e 12 h ou mais.
+5. **[MVP]** O sistema deve exibir rankings por perfil:
+
+| Perfil | Rankings |
+|---|---|
+| Transportadora | destinos/embarcadores, origens, tipos de carga, composições, motoristas, produtos |
+| Destino / embarcador | locais e docas, origens, transportadoras, tipos de carga, composições, motoristas |
+| Motorista | onde mais espera (destinos), tipos de carga, origens |
+| Jurídico | destinos, transportadoras |
+| Administração | destinos, transportadoras, origens, tipos de carga, composições, motoristas |
+
+6. **[MVP]** O sistema deve permitir escolher a métrica dos rankings: **viagens**, **tempo médio de estadia**, **% acima de 5 h** ou **valor devido**.
+7. **[MVP]** O sistema deve exibir o gráfico **Situação das viagens** (status).
+8. **[MVP]** O sistema deve oferecer filtros de **período** (7, 30, 90 dias, tudo ou datas escolhidas) e por **tipo, destino/local, origem, transportadora, motorista, composição, tipo de carga e situação**, conforme o perfil.
+9. **[MVP]** O sistema deve aplicar o filtro ao tocar numa barra, num dia ou nos indicadores "Acima de 5 h" e "Saldo pendente". Tocar de novo retira o filtro.
+10. **[MVP]** O sistema deve mostrar os filtros ativos como etiquetas removíveis e o botão **Limpar filtros**.
+11. **[MVP]** O sistema deve exibir a **lista de viagens** filtradas, ordenável por qualquer coluna, e abrir a operação ao tocar numa linha.
+12. **[MVP]** O sistema deve permitir **baixar a lista filtrada em planilha (CSV)**.
+13. **[MVP]** O sistema deve mostrar o detalhe de cada barra ao passar o mouse (viagens, tempo médio, % acima de 5 h e valor devido).
+14. **[MVP]** O sistema deve lembrar os filtros escolhidos por usuário naquele aparelho.
+15. **[ESTRUTURA]** O sistema deve entregar ao painel uma linha por operação visível, para que filtros e gráficos possam migrar para agregação no servidor sem mudar a tela.
+16. **[COMPLETO]** O sistema deve agregar os dados no servidor para grandes volumes, comparar períodos, exportar em PDF e enviar resumo periódico por e-mail/WhatsApp.
+
+---
+
+## 📜 Regras de Negócio (RN)
+1. Cada perfil vê **somente** as viagens que pode ver na operação: transportadora as suas, destino as do seu local, motorista as dele, jurídico as encaminhadas e administração todas.
+2. O tempo de estadia é o da apuração: da **chegada confirmada** à **liberação**. Viagens em andamento entram nas contagens, mas não nas médias de tempo final.
+3. "Acima de 5 h" considera só as viagens já apuradas.
+4. O dia de uma viagem é a data da chegada no horário de Brasília. Sem chegada, vale a data de criação.
+5. O saldo pendente soma apenas saldos positivos.
+6. Viagens cadastradas pelo motorista aparecem como "Motorista autônomo" no campo transportadora.
+7. Os rankings mostram os 8 primeiros. O restante aparece como "+ N outros".
+
+---
+
+## ⚙️ Requisitos Não Funcionais (RNF)
+1. O painel deve abrir em **até 2 segundos** com até 5.000 viagens. Acima disso, a agregação passa para o servidor (RF-16).
+2. Os filtros devem responder em **até 300 ms**, sem nova chamada ao servidor.
+3. A tela deve funcionar no celular: período sempre visível, demais filtros recolhidos em "Mais filtros" e barras com rótulo e valor legíveis.
+4. As cores seguem a marca: verde para "dentro do limite" e vermelho para "acima de 5 h", sempre com legenda e rótulo (a cor nunca é a única informação).
+5. A planilha exportada abre corretamente no Excel em português (separador ";" e acentuação preservada).
+
+---
+
+## 🧪 Critérios de Aceite (QA)
+- **Dado** a transportadora Rodovia Sul, **quando** abrir o painel, **então** deve ver só viagens com a sua transportadora.
+- **Dado** o destino Mercado Horizonte, **quando** abrir o painel, **então** deve ver só viagens do seu local.
+- **Dado** o motorista João, **quando** abrir Meu painel, **então** deve ver só as viagens dele.
+- **Dado** o painel aberto, **quando** o usuário tocar na barra "Cooperativa Vale Verde", **então** indicadores, gráficos e lista devem mostrar só essas viagens, e a etiqueta do filtro deve aparecer.
+- **Dado** a métrica "Tempo médio de estadia", **quando** escolhida, **então** os rankings devem ordenar pelo tempo médio e mostrar o valor em horas.
+- **Dado** a lista filtrada, **quando** o usuário tocar numa viagem, **então** a operação deve abrir.
+- **Dado** a lista filtrada, **quando** tocar em "Baixar planilha", **então** o arquivo deve conter só as viagens filtradas.
+
+---
+
+## 🎨 Protótipo Visual
+[Link do Figma — Painel: indicadores, viagens por dia, faixas de estadia, rankings e lista]
+
+> Indicadores em cartões no topo, dois gráficos lado a lado no computador e um abaixo do outro no celular, rankings em barras horizontais com o valor à direita.
 
 ---
 
@@ -1811,10 +1916,15 @@ Permitir mais de uma foto por registro (caminhão, placa, lacre, documento) e ad
 | D-15 | Autocadastro de motorista (celular + código) e de empresa (CNPJ). | Reunião de 13/10/2026: adoção sem depender da administração. | Confirmação do celular por código e convites. |
 | D-16 | Motorista cadastra caminhão e viagem por assistentes de uma decisão por tela. | Reunião de 13/10/2026: cadastro intuitivo para quem dirige. | Mantém-se. |
 | D-17 | Marca visual: logo Estadia BR e verde da marca nas telas. | Logo aprovada na reunião de 13/10/2026. | White-label configurável por cliente. |
+| D-18 | Painel por perfil com filtros calculados no navegador sobre uma linha por operação. | Rápido de entregar e responde na hora para os volumes do MVP. | Agregação no servidor e BI quando o volume crescer. |
+| D-19 | Tocar num gráfico filtra o painel inteiro e a lista abre a operação. | Pedido de 14/10/2026: informações "filtradas, escolhidas e acessadas a partir do dashboard". | Mantém-se. |
+| D-20 | Histórico fictício e repetível na demonstração, a partir da vigência da regra atual. | Painéis com dados para vender e treinar. | Inexistente em produção. |
+| D-21 | Foto repetida em várias operações é liberada para quem vê qualquer uma delas. | Correção de erro encontrado ao gerar o manual. | Mantém-se. |
 
 ---
 
 # 📌 Anexo C — Pontos que ainda dependem de validação
 
 - **Jurídico:** marco legal de início e fim da contagem, tratamento de frações de hora, capacidade considerada, força de prova da confirmação por link, prazos de retenção.
-- **Técnico:** provedor e custos da API do WhatsApp e da IA; app nativo × PWA (monitoramento de GPS em segundo plano exige app nativo); banco relacional e armazenamento de evidências em nuvem; domínio **stadiabr.com.br**.
+- **Negócio:** indicadores e metas que cada cliente quer acompanhar no painel (ex.: meta de tempo médio por local), e se o motorista deve ver valores de todas as viagens ou só das dele.
+- **Técnico:** provedor e custos da API do WhatsApp e da IA; volume esperado de viagens por cliente (define quando o painel passa a agregar no servidor); app nativo × PWA (monitoramento de GPS em segundo plano exige app nativo); banco relacional e armazenamento de evidências em nuvem; domínio **stadiabr.com.br**.
