@@ -3,7 +3,7 @@
 **Produto:** Estadia BR — Plataforma de Gestão e Comprovação de Eventos Logísticos
 **Base:** Documento de Atividades DEV 2.0 (05/10/2026) + decisões tomadas na construção e nos testes do MVP de demonstração
 **Objetivo deste material:** descrever o **sistema ideal** em atividades prontas para o backlog, indicando o que entra no **MVP** e o que deve ficar com a **estrutura pronta** para ser ligado depois, sem refazer o produto.
-**Versão deste documento:** 1.2 · 14/10/2026
+**Versão deste documento:** 1.3 · 15/10/2026
 
 ### 🗂️ Histórico de versões
 
@@ -12,6 +12,7 @@
 | 1.0 | 08/10/2026 | Primeira versão: atividades 01 a 28 a partir da DEV 2.0 e das decisões do MVP (WhatsApp do próprio motorista, confirmação pelo link, número informado na hora). |
 | 1.1 | 13/10/2026 | Reunião de 13/10: frota (veículos, implementos, composições e tipos de carga), várias fotos por registro, autocadastro de motorista e empresa, cadastro guiado do caminhão e da viagem, nova logo. Atividades 29 a 31. |
 | 1.2 | 14/10/2026 | Painéis por perfil com filtros e acesso às viagens (Atividade 32). Histórico de demonstração para os painéis. Regra de acesso a fotos repetidas entre operações. Códigos de operação sem colisão e lista por chegada mais recente. Decisões D-18 a D-21. |
+| 1.3 | 15/10/2026 | Fotos como prova e conferência automática (Atividade 33): câmera ao vivo nos marcos críticos, origem e horário de cada foto, carimbo visível, guia do que fotografar por marco, regras automáticas (galeria, horário, foto repetida) e análise da imagem por IA como apoio, com selo no app, no portal, no link e no Dossiê. Vídeo curto e carimbo do tempo ICP-Brasil ficam como estrutura. Decisões D-22 a D-28. |
 
 ---
 
@@ -72,6 +73,7 @@ Dentro dos **RF**, cada item tem uma etiqueta de fase:
 | 30 | Autocadastro de motorista e de empresa | MVP |
 | 31 | Várias fotos por registro | MVP |
 | 32 | Painéis por perfil (dashboards) | MVP |
+| 33 | Fotos e vídeos como prova, com conferência automática e por IA | MVP (fotos + regras + IA opcional) · Estrutura (vídeo, hash perceptual) |
 
 ---
 
@@ -1882,16 +1884,115 @@ Dar a cada participante uma visão consolidada das **suas** viagens (quantidades
 
 ---
 
+# 🆕 Nova Atividade – 33 · Fotos e vídeos como prova, com conferência automática e por IA
+
+## 🎯 Objetivo
+Aumentar a força de prova das fotos de cada marco: saber **como** e **quando** a foto foi tirada, orientar o motorista sobre **o que** fotografar e conferir automaticamente se a imagem corresponde ao marco, sem nunca travar o registro.
+
+> **Base legal (a validar pelo jurídico):** CPC art. 369 (meios legais e moralmente legítimos) e art. 422 (fotografias digitais fazem prova das imagens; se impugnadas, apresenta-se a autenticação eletrônica ou faz-se perícia); MP 2.200-2/2001, art. 10, §2º, e Lei 14.063/2020 (documentos eletrônicos fora da ICP-Brasil); Lei 11.442/2007, art. 11 (estadia); LGPD art. 7º, VI (exercício regular de direitos). A foto **reforça** a confirmação da outra parte, não a substitui.
+
+---
+
+## 👤 User Story
+**Como** motorista
+**Quero** saber exatamente o que fotografar em cada passo e ser avisado se a foto ficou ruim
+**Para** que a minha prova não seja contestada depois
+
+**Como** transportadora, destino ou jurídico
+**Quero** ver se cada foto foi tirada na hora, no local, e se mostra o que o marco exige
+**Para** confiar no registro ou saber onde ele é fraco antes de cobrar
+
+---
+
+## ✅ Requisitos Funcionais (RF)
+1. **[MVP]** O sistema deve mostrar, em cada passo com foto, o **guia do que fotografar** (tabela abaixo), no botão do passo e na tela de confirmação.
+2. **[MVP]** Nos marcos **Chegada** e **Saída**, o app deve abrir só a **câmera** (sem opção de galeria). Nos demais, a galeria continua disponível.
+3. **[MVP]** O app deve enviar, com cada foto, a **origem** (câmera do app ou galeria) e o **horário do arquivo** no aparelho.
+4. **[MVP]** O app deve aplicar um **carimbo visível** na foto antes do envio: código da operação, marco, data e hora do aparelho, GPS e "da galeria" quando for o caso.
+5. **[MVP]** O sistema deve conferir automaticamente as fotos de cada marco após o registro e após cada foto adicionada, gravando o resultado como evento próprio (**Fotos conferidas**).
+6. **[MVP]** Regras automáticas, sempre ativas:
+   - foto da galeria em Chegada ou Saída → **duvidosa**;
+   - foto tirada mais de 15 min antes ou depois do registro → **duvidosa**;
+   - foto idêntica (mesmo resumo criptográfico) já usada em outro registro, desta ou de outra operação → **não aderente**;
+   - foto pequena demais (menos de 15 KB) → **duvidosa**.
+7. **[MVP]** Quando a IA estiver ativa (chave da API configurada), o sistema deve enviar as fotos do marco a um modelo de visão, que devolve em formato estruturado:
+   - se a cena corresponde ao marco;
+   - cada item do guia atendido ou não, com detalhe;
+   - a placa lida, comparada com a placa do cavalo e dos implementos cadastrados;
+   - se parece foto de tela ou de impressão;
+   - nitidez e um resumo de uma frase.
+8. **[MVP]** O resultado deve aparecer como **selo**: ✓ Foto conferida / ! Foto duvidosa / ! Foto não aderente, com o motivo:
+   - no passo do motorista, com o convite "Se puder, tire outra foto";
+   - na linha do tempo do portal, com checklist, placa lida e alertas;
+   - na caixa de confirmação do destino e na página do link;
+   - no **Dossiê** (seção "Conferência das fotos"), com quem conferiu (regras ou IA e modelo) e quando.
+9. **[MVP]** O relatório deve mostrar a quantidade de operações com **fotos com alerta**.
+10. **[ESTRUTURA]** **Vídeo curto (10 a 20 s)** na chegada, para mostrar a fila e o pátio. Ele segue as mesmas regras de hash, origem e carimbo, fica guardado em armazenamento de objetos (S3/R2) e a IA analisa de 3 a 5 quadros extraídos no servidor.
+11. **[ESTRUTURA]** **Hash perceptual** para achar a mesma imagem recortada, com outro carimbo ou comprimida de novo (o hash exato só acha cópia idêntica).
+12. **[COMPLETO]** **Carimbo do tempo ICP-Brasil** aplicado ao hash de cada evento com foto e ao Dossiê.
+13. **[COMPLETO]** Conferência da placa por **OCR dedicado** e pela base oficial do veículo. Painel de qualidade das provas por motorista e por local.
+14. **[COMPLETO]** Opção "foto não permitida neste local" com justificativa, para áreas restritas de portos e indústrias, aumentando o peso da confirmação de terceiros.
+
+### O que deve aparecer em cada foto
+
+| Marco | Precisa aparecer | Sinal de alerta |
+|---|---|---|
+| Chegada | Frente do caminhão com a **placa legível** + portaria, fachada ou entrada do local | Foto de dentro da cabine, foto de tela, placa de outro veículo |
+| Início | Veículo na doca ou no ponto de operação + **número da doca** | Mesma imagem da chegada |
+| Término | Carroceria ou baú **aberto**: vazio na descarga, carregado na carga | Carroceria fechada |
+| Liberação | Documento de liberação, canhoto ou NF **inteiro**, com assinatura, carimbo ou data | Documento cortado ou ilegível |
+| Saída | Caminhão passando pela portaria de saída ou comprovante de saída | Foto repetida de outro marco |
+
+---
+
+## 📜 Regras de Negócio (RN)
+1. A conferência **nunca bloqueia** o registro nem altera o horário dele. É análise de apoio e a palavra final é humana (confirmação da outra parte, tratamento de divergência ou jurídico).
+2. O resultado é sempre o **pior** entre as regras e a IA: não aderente > duvidosa > aderente.
+3. A conferência de um marco considera **todas** as fotos dele, inclusive as adicionadas depois. Uma nova foto gera nova conferência; vale a mais recente, e as anteriores ficam no histórico.
+4. A foto da galeria é aceita e marcada, nunca descartada.
+5. O horário oficial do marco continua sendo o do servidor. O horário do carimbo e o do arquivo servem só para conferência.
+6. Falha ou recusa da IA não impede nada: o selo fica com as regras automáticas e a falha é registrada.
+7. Com a IA ativa, a conferência roda em segundo plano. O Dossiê automático da saída espera a conferência da foto da saída.
+8. Imagens de pessoas e placas seguem a LGPD: aviso no app, uso só para a comprovação da operação e retenção conforme a política (Atividade 27).
+
+---
+
+## ⚙️ Requisitos Não Funcionais (RNF)
+1. O registro do motorista não pode esperar a IA. A conferência por regras é imediata; a por IA deve concluir em **até 60 s**.
+2. A IA é opcional e ligada por variável de ambiente (`ANTHROPIC_API_KEY`; `ESTADIA_IA=0` desliga; `ESTADIA_IA_MODELO` troca o modelo). Sem ela, o sistema funciona só com as regras.
+3. Resposta da IA em **formato estruturado validado** (JSON Schema), nunca em texto livre interpretado.
+4. Custo previsível: uma chamada por marco com foto, esforço baixo e até 6 imagens por chamada. A meta de custo por viagem deve ser validada com volume real.
+5. Vídeo (quando ligado): até 20 s e 15 MB, comprimido no aparelho e fora do disco do servidor de aplicação.
+
+---
+
+## 🧪 Critérios de Aceite (QA)
+- **Dado** o passo CHEGUEI, **quando** o motorista tocar no botão, **então** o app deve mostrar "Enquadre a frente do caminhão com a placa legível e a portaria" e abrir só a câmera.
+- **Dado** uma foto escolhida da galeria tirada 2 h antes, **quando** registrar a chegada, **então** o registro deve ser aceito e a conferência deve marcar **duvidosa**, com os dois motivos.
+- **Dado** a mesma foto da chegada enviada na saída, **quando** registrar a saída, **então** a conferência da saída deve marcar **não aderente**, citando a operação de origem, e o Dossiê da saída deve trazer esse resultado.
+- **Dado** um marco duvidoso, **quando** o motorista adicionar uma foto nova, **então** deve surgir nova conferência considerando todas as fotos.
+- **Dado** a IA ativa e a placa lida diferente da cadastrada, **quando** a conferência terminar, **então** o selo deve ser **duvidosa** e mostrar a placa lida.
+- **Dado** a IA fora do ar, **quando** o motorista registrar, **então** o registro e a conferência por regras devem funcionar normalmente.
+
+---
+
+## 🎨 Protótipo Visual
+[Link do Figma — Guia do que fotografar no passo, selo no checklist do motorista e evento "Fotos conferidas" no portal]
+
+---
+
+---
+
 # 📌 Anexo A — Matriz dos marcos (decisão consolidada)
 
 | Marco | Quem registra | Quem confirma | Evidência | GPS |
 |---|---|---|---|---|
 | Identificação | TAC (Amélia) | — (confirmação única do TAC) | Texto/áudio | Não |
-| Chegada | TAC | Destino/portaria (link) | **Foto obrigatória** + localização | Sim (falta = ocorrência) |
+| Chegada | TAC | Destino/portaria (link) | **Foto obrigatória pela câmera** + localização + conferência | Sim (falta = ocorrência) |
 | Início | TAC ou destino | A outra parte | Registro | Se disponível |
 | Término | TAC ou destino | A outra parte | Foto/documento opcional | Se disponível |
 | Liberação | Destino **ou TAC (MVP)** | A outra parte (obrigatória se foi o TAC) | Comprovante quando houver | Não obrigatório |
-| Saída | TAC | — | **Foto do comprovante obrigatória** | Não obrigatório |
+| Saída | TAC | — | **Foto obrigatória pela câmera** + conferência | Não obrigatório |
 
 ---
 
@@ -1920,11 +2021,19 @@ Dar a cada participante uma visão consolidada das **suas** viagens (quantidades
 | D-19 | Tocar num gráfico filtra o painel inteiro e a lista abre a operação. | Pedido de 14/10/2026: informações "filtradas, escolhidas e acessadas a partir do dashboard". | Mantém-se. |
 | D-20 | Histórico fictício e repetível na demonstração, a partir da vigência da regra atual. | Painéis com dados para vender e treinar. | Inexistente em produção. |
 | D-21 | Foto repetida em várias operações é liberada para quem vê qualquer uma delas. | Correção de erro encontrado ao gerar o manual. | Mantém-se. |
+| D-22 | Foto e vídeo são aceitos como prova; o sistema reforça a cadeia de custódia (hash, horário do servidor, GPS, autor, origem da captura). | Pergunta de 15/10/2026 sobre validade legal (CPC arts. 369 e 422). A foto reforça a confirmação da outra parte, não a substitui. | Carimbo do tempo ICP-Brasil (Atividade 33, RF-12). |
+| D-23 | Chegada e Saída só com câmera ao vivo. Nos demais marcos a galeria é aceita e marcada. | São os marcos que abrem e fecham a contagem. | Mantém-se. |
+| D-24 | Carimbo visível (operação, marco, hora, GPS) aplicado no aparelho antes do hash. | Quem olha a foto sabe de onde ela é, mesmo fora do sistema. | Mantém-se. |
+| D-25 | Guia do que fotografar por marco, exibido antes e durante a foto. | Foto certa na primeira vez, sem treinamento. | Guias por cliente e por local. |
+| D-26 | Conferência automática por regras sempre ativa; IA de visão opcional por chave de API. | Funciona sem custo no MVP e melhora quando a IA é ligada. | IA ligada por padrão após validação de custo e precisão. |
+| D-27 | A IA **não bloqueia**: gera selo aderente / duvidosa / não aderente, gravado como evento próprio e levado ao Dossiê como análise de apoio. | Erro da IA não pode tirar o direito do motorista. A decisão final é humana. | Mantém-se. |
+| D-28 | Vídeo curto na chegada fica como estrutura (fase seguinte), com armazenamento em nuvem. | Custo de dados do motorista e de armazenamento. Foto resolve o MVP. | Ligar quando houver armazenamento de objetos. |
 
 ---
 
 # 📌 Anexo C — Pontos que ainda dependem de validação
 
-- **Jurídico:** marco legal de início e fim da contagem, tratamento de frações de hora, capacidade considerada, força de prova da confirmação por link, prazos de retenção.
+- **Jurídico:** força de prova das fotos com carimbo e conferência automática, necessidade de carimbo do tempo ICP-Brasil, aviso de LGPD para imagens de pessoas e placas;
+- **Jurídico (regra):** marco legal de início e fim da contagem, tratamento de frações de hora, capacidade considerada, força de prova da confirmação por link, prazos de retenção.
 - **Negócio:** indicadores e metas que cada cliente quer acompanhar no painel (ex.: meta de tempo médio por local), e se o motorista deve ver valores de todas as viagens ou só das dele.
-- **Técnico:** provedor e custos da API do WhatsApp e da IA; volume esperado de viagens por cliente (define quando o painel passa a agregar no servidor); app nativo × PWA (monitoramento de GPS em segundo plano exige app nativo); banco relacional e armazenamento de evidências em nuvem; domínio **stadiabr.com.br**.
+- **Técnico:** provedor e custos da API do WhatsApp e da IA (incluindo o custo por viagem da conferência de fotos e a taxa de acerto da IA em fotos reais de campo); volume esperado de viagens por cliente (define quando o painel passa a agregar no servidor); app nativo × PWA (monitoramento de GPS em segundo plano exige app nativo); banco relacional e armazenamento de evidências em nuvem; domínio **stadiabr.com.br**.

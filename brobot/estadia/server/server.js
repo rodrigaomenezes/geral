@@ -12,6 +12,7 @@ const C = require('./cadastros');
 const D = require('./domain');
 const Amelia = require('./amelia');
 const Z = require('./whatsapp');
+const V = require('./visao');
 const { seed } = require('./seed');
 
 const MAX_BODY = 12 * 1024 * 1024;
@@ -43,6 +44,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   const autoCadastro = process.env.ESTADIA_AUTOCADASTRO !== '0';
   const SYS = { userId: 'sistema', name: 'Estadia BR', role: 'sistema', orgId: 'estadia-br' };
   const zcfg = Z.config(process.env);
+  const ia = V.criarCliente(); // análise de imagem por IA (opcional: precisa de ANTHROPIC_API_KEY)
   const autoRespostas = []; // respostas automáticas do número Estadia BR (exibidas no simulador)
   const cadastros = new Map(); // limite de autocadastros por IP
   const actorOf = (u) => ({ userId: u.id, name: u.nome, role: u.role, orgId: u.orgId });
@@ -94,6 +96,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         const m = st.milestones[t];
         return {
           tipo: t, marco: D.labelOf(t), ...ev(m), gps: m.payload.gps || null, foto: m.payload.photo || null, fotos: D.fotosDo(st, m), observacao: m.payload.note || null,
+          conferenciaFotos: st.analises[m.id] ? { ...ev(st.analises[m.id]), resultado: st.analises[m.id].payload.rotulo, resumo: st.analises[m.id].payload.resumo, achados: st.analises[m.id].payload.achados, checagens: st.analises[m.id].payload.checagens, placaLida: st.analises[m.id].payload.placaLida, placaConfere: st.analises[m.id].payload.placaConfere, motor: st.analises[m.id].payload.motor === 'ia' ? `IA (${st.analises[m.id].payload.modelo})` : 'regras automáticas' } : null,
           confirmacao: st.confirmations[m.id] ? { tipo: D.labelOf(st.confirmations[m.id].type), ...ev(st.confirmations[m.id]) } : null,
           divergencias: st.divergences.filter((d) => d.refEventId === m.id).map((d) => ({ ...ev(d), descricao: d.payload.note, alegadoEm: d.payload.alegadoEm || null,
             tratamento: st.treatments[d.id] ? { ...ev(st.treatments[d.id]), resolucao: st.treatments[d.id].payload.resolucao, descricao: st.treatments[d.id].payload.note } : null })),
@@ -112,7 +115,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       juridico: st.juridico.map((j) => ({ tipo: D.labelOf(j.type), ...ev(j), status: j.payload.status || 'ENVIADO', observacao: j.payload.note || null, resultado: j.payload.resultado || null })),
       trilhaAuditoria: events.map((e) => ({ seq: e.seq, tipo: D.labelOf(e.type), categoria: D.kindOf(e.type), ocorridoEm: e.occurredAt, recebidoEm: e.receivedAt, autor: e.actor.name, perfil: e.actor.role, origem: e.origem, ip: e.ip, dispositivo: e.dispositivo, hash: e.hash })),
       integridade: { cadeiaValida: chain.ok, ultimoHashDaCadeia: store.lastHash, eventosNaOperacao: events.length },
-      ressalva: 'Este dossiê é um conjunto estruturado de evidências e registros para apoiar análise administrativa, negociação ou jurídica. Não constitui conclusão jurídica.',
+      ressalva: 'Este dossiê é um conjunto estruturado de evidências e registros para apoiar análise administrativa, negociação ou jurídica. Não constitui conclusão jurídica. A conferência das fotos (regras automáticas e, quando ativa, IA) é análise de apoio e não substitui a confirmação das partes nem a avaliação humana.',
     };
     const hash = store.saveDossie(content);
     store.append({ opId: st.op.id, type: 'DOSSIE_GERADO', actor: by.userId ? by : actorOf(by), origem: by === SYS ? 'sistema' : 'portal', occurredAt, payload: { hash, eventos: events.length } });
@@ -264,16 +267,56 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       });
   }
 
+  // ---------- validação das fotos (D-22 a D-27) ----------
+  /** Outros registros que usam a mesma foto (mesmo hash): indício de foto reaproveitada. */
+  function usosDaFoto(sha, registro) {
+    const out = [];
+    for (const e of store.events) {
+      if (!e.opId || !e.payload || e.id === registro.id || (e.type === 'EVIDENCIA_ADICIONADA' && e.refEventId === registro.id)) continue;
+      if (!D.MILESTONES[e.type] && e.type !== 'EVIDENCIA_ADICIONADA') continue;
+      const fs_ = e.payload.photos || (e.payload.photo ? [e.payload.photo] : []);
+      if (!fs_.some((f) => f.sha256 === sha)) continue;
+      const st = stateOf(e.opId);
+      const alvo = e.type === 'EVIDENCIA_ADICIONADA' ? Object.values(st.milestones).find((m) => m.id === e.refEventId) : e;
+      const txt = `${st.op.codigo} (${D.labelOf(alvo ? alvo.type : e.type).toLowerCase()})`;
+      if (!out.includes(txt)) out.push(txt);
+    }
+    return out;
+  }
+
+  /** Confere as fotos de um marco e grava o resultado como evento próprio. Nunca lança erro. */
+  async function analisarFotos(opId, registroId) {
+    try {
+      const st = stateOf(opId);
+      const reg = Object.values(st.milestones).find((m) => m.id === registroId);
+      if (!reg || !V.GUIAS[reg.type]) return null;
+      const fotos = D.fotosDo(st, reg).filter((f) => !f.mime || f.mime.startsWith('image/'));
+      if (!fotos.length) return null;
+      const r = await V.analisar({ marco: reg.type, op: st.op, fotos, ocorridoEm: reg.occurredAt, usosDe: (sha) => usosDaFoto(sha, reg),
+        lerArquivo: (file) => fs.readFileSync(store.photoPath(file)) }, ia);
+      return store.append({ opId, type: 'EVIDENCIA_ANALISADA', actor: SYS, origem: 'sistema', refEventId: reg.id, payload: r }).event;
+    } catch (e) {
+      if (!quiet) console.error('Falha ao conferir fotos:', e.message);
+      return null;
+    }
+  }
+
   // Após registros do TAC que dependem do destino: gera link de confirmação (épico 04/21).
   async function aposRegistro(st, ev, baseUrl) {
     if (ev.type === 'CHEGADA' && ev.payload.gps && ev.payload.gps.erro) {
       store.append({ opId: st.op.id, type: 'GPS_INDISPONIVEL', actor: SYS, refEventId: ev.id, payload: { marco: D.labelOf(ev.type), motivo: ev.payload.gps.erro } });
     }
     if (ev.payload.gps) checarDeslocamento(stateOf(st.op.id), ev.payload.gps, ev.occurredAt);
+    // Conferência das fotos: com IA roda em segundo plano (não atrasa o motorista); só com regras é imediata.
+    const alvo = ev.type === 'EVIDENCIA_ADICIONADA' ? ev.refEventId : (D.fotosDo(st, ev).length ? ev.id : null);
+    const conferencia = alvo ? analisarFotos(st.op.id, alvo) : Promise.resolve(null);
+    if (!ia) await conferencia;
     if (ev.type === 'SAIDA') {
       const s2 = stateOf(st.op.id);
       recordApuracao(s2);
-      buildDossie(stateOf(st.op.id), SYS);
+      // O Dossiê da saída espera a conferência das fotos da saída para já sair com o resultado.
+      if (ia) conferencia.finally(() => buildDossie(stateOf(st.op.id), SYS));
+      else buildDossie(stateOf(st.op.id), SYS);
     }
     await notificar(stateOf(st.op.id), ev, baseUrl);
   }
@@ -339,7 +382,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         chegadaConfirmacaoMin: mins(ms.CHEGADA && ms.CHEGADA.occurredAt, conf('CHEGADA') && conf('CHEGADA').occurredAt),
         chegadaInicioMin: mins(ms.CHEGADA && ms.CHEGADA.occurredAt, ms.INICIO && ms.INICIO.occurredAt),
         inicioTerminoMin: mins(ms.INICIO && ms.INICIO.occurredAt, ms.TERMINO && ms.TERMINO.occurredAt),
-        comFoto: !!(ms.CHEGADA && ms.CHEGADA.payload.photo), comGps: !!(ms.CHEGADA && ms.CHEGADA.payload.gps && !ms.CHEGADA.payload.gps.erro),
+        comFoto: !!(ms.CHEGADA && ms.CHEGADA.payload.photo),
+        fotosComAlerta: Object.values(st.analises).filter((a) => a.payload.resultado !== 'aderente').length, comGps: !!(ms.CHEGADA && ms.CHEGADA.payload.gps && !ms.CHEGADA.payload.gps.erro),
         semConfirmacao: Object.keys(D.CONFIRMATIONS).some((t) => ms[t] && !st.confirmations[ms[t].id]),
         encaminhada: !!st.encaminhado, statusJuridico: st.statusJuridico, dossies: st.dossies.length,
       };
@@ -357,7 +401,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         percentualRecuperado: devido ? Math.round((Math.min(pago, devido) / devido) * 1000) / 10 : null,
         comDivergencia: rows.filter((r) => r.divergencias).length, deslocamentos: sum('deslocamentos'),
         tempoMedioConfirmacaoMin: avg(nn('chegadaConfirmacaoMin')), tempoMedioChegadaInicioMin: avg(nn('chegadaInicioMin')), tempoMedioInicioTerminoMin: avg(nn('inicioTerminoMin')),
-        encaminhadas: rows.filter((r) => r.encaminhada).length, comFoto: rows.filter((r) => r.comFoto).length, comGps: rows.filter((r) => r.comGps).length,
+        encaminhadas: rows.filter((r) => r.encaminhada).length, comFoto: rows.filter((r) => r.comFoto).length, fotosComAlerta: rows.filter((r) => r.fotosComAlerta).length, comGps: rows.filter((r) => r.comGps).length,
         semConfirmacao: rows.filter((r) => r.semConfirmacao).length, dossies: sum('dossies'),
       },
       operacoes: rows,
@@ -481,7 +525,16 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     const lista = [b.photo, ...(Array.isArray(b.photos) ? b.photos : [])].filter(Boolean);
     if (lista.length > max) throw new D.DomainError(400, 'FOTOS_DEMAIS', `Envie no máximo ${max} fotos por registro.`);
     const salvas = [];
-    for (const f of lista) { const x = parseFile(f); if (!salvas.some((y) => y.sha256 === x.sha256)) salvas.push(x); }
+    for (const f of lista) {
+      // Cada foto chega como data URL ou como { data, origem, capturadaEm } (origem: câmera do app ou galeria).
+      const x = parseFile(typeof f === 'object' ? f.data : f);
+      if (typeof f === 'object') {
+        if (['camera', 'galeria'].includes(f.origem)) x.origem = f.origem;
+        const t = Date.parse(f.capturadaEm);
+        if (Number.isFinite(t) && t > Date.UTC(2020, 0, 1) && t < Date.now() + 86400000) x.capturadaEm = new Date(t).toISOString();
+      }
+      if (!salvas.some((y) => y.sha256 === x.sha256)) salvas.push(x);
+    }
     return salvas;
   }
 
@@ -527,7 +580,8 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
     const info = {
       operacao: { codigo: st.op.codigo, tipo: st.op.tipo, placa: st.op.placa, implemento: st.op.implemento || null, placasImplementos: st.op.placasImplementos || [], tac: st.op.tacNome || null, localNome: st.op.localNome, destinoNome: st.op.destinoNome },
-      acao: D.labelOf(link.confirmType), botao: { CHEGADA_CONFIRMADA: 'Confirmar chegada', INICIO_CONFIRMADO: 'Confirmar início', TERMINO_CONFIRMADO: 'Confirmar término' }[link.confirmType] || 'Confirmar', registro: ref ? { label: ref.type === 'CHEGADA' ? 'Chegada registrada pelo motorista' : D.labelOf(ref.type), em: ref.occurredAt, gps: ref.payload.gps || null, temFoto: D.fotosDo(st, ref).length > 0, fotos: D.fotosDo(st, ref).length } : null,
+      acao: D.labelOf(link.confirmType), botao: { CHEGADA_CONFIRMADA: 'Confirmar chegada', INICIO_CONFIRMADO: 'Confirmar início', TERMINO_CONFIRMADO: 'Confirmar término' }[link.confirmType] || 'Confirmar', registro: ref ? { label: ref.type === 'CHEGADA' ? 'Chegada registrada pelo motorista' : D.labelOf(ref.type), em: ref.occurredAt, gps: ref.payload.gps || null, temFoto: D.fotosDo(st, ref).length > 0, fotos: D.fotosDo(st, ref).length,
+        conferencia: st.analises[ref.id] ? { resultado: st.analises[ref.id].payload.resultado, rotulo: st.analises[ref.id].payload.rotulo, resumo: st.analises[ref.id].payload.resumo, ia: st.analises[ref.id].payload.motor === 'ia' } : null } : null,
       expiraEm: link.expiraEm, destinatario: link.destinatario.nome,
       confirmado: conf ? { em: conf.occurredAt, por: conf.actor.name } : null,
       contestado: (() => { const dv = st.divergences.find((x) => x.refEventId === link.refEventId && x.payload.linkId === link.id); return dv ? { em: dv.occurredAt, motivo: dv.payload.note } : null; })(),
@@ -708,7 +762,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
 
     if (p === '/api/config') {
-      return send(res, 200, { demo, zapModo: zcfg.mode, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS, catalogos: C.catalogos(), maxFotos: MAX_FOTOS,
+      return send(res, 200, { demo, zapModo: zcfg.mode, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS, catalogos: C.catalogos(), maxFotos: MAX_FOTOS, guiasFoto: V.GUIAS, iaFotos: !!ia,
         destinos: dir.data.orgs.filter((o) => o.tipo === 'destino').map((o) => ({ id: o.id, nome: o.nome })), permissoes: D.PERMISSOES });
     }
 

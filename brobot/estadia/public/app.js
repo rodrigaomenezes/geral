@@ -130,7 +130,7 @@
     });
   }
 
-  function compressImage(file, max = 1600) {
+  function compressImage(file, max = 1600, carimbo = null) {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
@@ -138,7 +138,15 @@
         const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
         const c = document.createElement('canvas');
         c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        if (carimbo) { // carimbo visível: operação, marco, hora do aparelho e GPS (o horário oficial é o do servidor)
+          const fs = Math.max(13, Math.round(Math.min(c.width, c.height) * 0.032)), h = Math.round(fs * 3.1), x = Math.round(fs * 0.7);
+          ctx.fillStyle = 'rgba(15,59,30,.78)'; ctx.fillRect(0, c.height - h, c.width, h);
+          ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+          ctx.font = `700 ${fs}px system-ui, sans-serif`; ctx.fillText(carimbo[0], x, c.height - h * 0.68, c.width - 2 * x);
+          ctx.font = `500 ${fs}px system-ui, sans-serif`; ctx.fillText(carimbo[1], x, c.height - h * 0.3, c.width - 2 * x);
+        }
         URL.revokeObjectURL(url);
         resolve(c.toDataURL('image/jpeg', 0.8));
       };
@@ -146,6 +154,25 @@
       img.src = url;
     });
   }
+  // Foto como prova (D-22 a D-25): guarda a origem (câmera do app ou galeria) e o horário do arquivo,
+  // e aplica o carimbo com a operação, o marco, a hora e o GPS antes de calcular o hash no servidor.
+  async function prepararFoto(file, { camera = false, op = null, marco = '', gps = null } = {}) {
+    const t = file.lastModified || Date.now();
+    const origem = camera && Math.abs(Date.now() - t) < 3 * 60000 ? 'camera' : 'galeria';
+    const quando = new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: TZ });
+    const local = gps && !gps.erro ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : 'sem GPS';
+    const carimbo = op ? [`Estadia BR · ${op.codigo} · ${marco}`, `${quando} · ${local}${origem === 'galeria' ? ' · da galeria' : ''}`] : null;
+    return { data: await compressImage(file, 1600, carimbo), origem, capturadaEm: new Date(t).toISOString() };
+  }
+  const fotoSrc = (f) => (typeof f === 'string' ? f : f.data);
+  const SELO = { aderente: ['ok', 'Foto conferida'], duvidosa: ['warn', 'Foto duvidosa'], nao_aderente: ['crit', 'Foto não aderente'] };
+  const conferenciaDe = (d, ev) => (ev ? d.timeline.filter((x) => x.type === 'EVIDENCIA_ANALISADA' && x.refEventId === ev.id).pop() : null);
+  function seloHtml(a, comResumo = true) {
+    if (!a) return '';
+    const p = a.payload, [tom, txt] = SELO[p.resultado] || SELO.duvidosa;
+    return `<span class="selo ${tom}" title="${esc(p.resumo)}">${p.resultado === 'aderente' ? '✓' : '!'} ${txt}${p.motor === 'ia' ? ' · IA' : ''}</span>${comResumo && p.resultado !== 'aderente' ? ` <span class="small">${esc(p.resumo)}</span>` : ''}`;
+  }
+  const guiaFoto = (k, op) => { const g = ((S.config && S.config.guiasFoto) || {})[k]; if (!g) return null; return k === 'TERMINO' && op ? { ...g, pedir: op.tipo === 'CARGA' ? 'Fotografe a carroceria aberta e carregada.' : 'Fotografe a carroceria aberta e vazia.' } : g; };
   const blobToDataUrl = (blob) => new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob); });
 
   const fileUrl = (f) => (f ? `/api/evidencias/${f.file}?token=${encodeURIComponent(S.token)}` : '');
@@ -863,8 +890,8 @@
     const t = tipoTxt(op), T = t.toUpperCase();
     return [
       { k: 'CHEGADA', titulo: 'Cheguei no local', botao: 'CHEGUEI', icon: 'pin', pergunta: `Você chegou em ${op.localNome}?`, foto: 'required', fotoTxt: 'Tire uma foto do caminhão no local', gps: 'capturar', avisa: 'a portaria' },
-      { k: 'INICIO', titulo: `Começou a ${t}`, botao: `COMEÇOU A ${T}`, icon: 'play', pergunta: `A ${t} começou agora?`, gps: 'capturar', avisa: 'a portaria' },
-      { k: 'TERMINO', titulo: `Terminou a ${t}`, botao: `TERMINOU A ${T}`, icon: 'stop', pergunta: `A ${t} terminou agora?`, gps: 'capturar', avisa: 'a portaria' },
+      { k: 'INICIO', titulo: `Começou a ${t}`, botao: `COMEÇOU A ${T}`, icon: 'play', pergunta: `A ${t} começou agora?`, foto: 'optional', gps: 'capturar', avisa: 'a portaria' },
+      { k: 'TERMINO', titulo: `Terminou a ${t}`, botao: `TERMINOU A ${T}`, icon: 'stop', pergunta: `A ${t} terminou agora?`, foto: 'optional', gps: 'capturar', avisa: 'a portaria' },
       { k: 'LIBERACAO', titulo: 'Fui liberado para viajar', botao: 'FUI LIBERADO', icon: 'doc', pergunta: 'Você foi liberado para seguir viagem?', foto: 'optional', fotoTxt: 'Foto do documento de liberação, se tiver', avisa: 'a portaria' },
       { k: 'SAIDA', titulo: 'Saí do local', botao: 'SAÍ DO LOCAL', icon: 'truck', pergunta: `Você está saindo de ${op.localNome}?`, foto: 'required', fotoTxt: 'Foto do comprovante ou documento de saída', gps: 'opcional', avisa: 'a transportadora' },
     ];
@@ -1052,6 +1079,7 @@
       const msgs = msgsDe(ev).filter((m) => m.finalidade === 'CONFIRMAR');
       return `<li class="${ev ? 'done' : i === idx ? 'now' : ''}"><span class="drv-dot">${ev ? ICON.check : i + 1}</span><div><b>${esc(p.titulo)}</b>
         ${ev ? `<span class="drv-muted">${hhmm(ev.occurredAt)}${ev.pendente ? ' · guardado no celular, envia quando tiver sinal' : ''}${!ev.pendente && fotosDe(d, ev).length ? ` · ${fotosDe(d, ev).length} foto${fotosDe(d, ev).length > 1 ? 's' : ''}` : ''}</span>
+          ${!ev.pendente && conferenciaDe(d, ev) ? (conferenciaDe(d, ev).payload.resultado === 'aderente' ? `<span class="drv-ok">✓ Foto conferida${conferenciaDe(d, ev).payload.motor === 'ia' ? ' pela IA' : ''}</span>` : `<span class="drv-alerta">! ${esc(conferenciaDe(d, ev).payload.resumo)} Se puder, tire outra foto.</span>`) : ''}
           ${!ev.pendente && op.tacUserId === S.user.id && !d.timeline.some((x) => x.type === 'OPERACAO_ENCERRADA') ? `<button type="button" class="drv-link left" data-maisfoto="${ev.id}">${ICON.cam} Adicionar fotos</button>` : ''}` : ''}
         ${c ? `<span class="drv-ok">${ICON.check} Confirmado por ${esc(primeiro(c.actor.name))} às ${hhmm(c.occurredAt)}</span>` : dv ? `<span class="drv-bad">Não confirmado: ${esc(dv.payload.note)}</span>` : ''}
         ${!c && !dv ? msgs.map((m) => linhaZap(m, ev)).join('') : ''}</div></li>`;
@@ -1074,7 +1102,8 @@
     } else if (atual) {
       agora = `<div class="drv-card now"><span class="drv-step">Passo ${idx + 1} de ${ps.length}</span>
         <button class="drv-giant" data-passo="${atual.k}">${ICON[atual.icon]}<span>${esc(atual.botao)}</span></button>
-        <p class="drv-muted center">${atual.foto === 'required' ? `${ICON.cam} Vai abrir a câmera. ` : ''}${avisoTxt(atual, true)}</p></div>`;
+        ${atual.foto === 'required' && guiaFoto(atual.k, op) ? `<p class="drv-guia">${ICON.cam} <span><b>Vai abrir a câmera.</b> ${esc(guiaFoto(atual.k, op).pedir)}</span></p>` : ''}
+        <p class="drv-muted center">${avisoTxt(atual, true)}</p></div>`;
     } else {
       const f = d.financeiro;
       agora = `<div class="drv-card done-card"><span class="drv-ok-big">${ICON.check}</span><h2>Viagem concluída</h2>
@@ -1122,7 +1151,7 @@
     }));
     const rec = $('#recebi');
     if (rec) rec.onclick = () => recebiSheet(id, d);
-    $$('[data-maisfoto]').forEach((b) => (b.onclick = () => fotosSheet(id, d.timeline.find((e) => e.id === b.dataset.maisfoto))));
+    $$('[data-maisfoto]').forEach((b) => (b.onclick = () => fotosSheet(id, d.timeline.find((e) => e.id === b.dataset.maisfoto), op)));
     bindDemoTools(d, id);
 
     // Tempo ao vivo e monitoramento de deslocamento (silencioso)
@@ -1139,6 +1168,8 @@
     const gpsP = p.gps ? getGps() : Promise.resolve(null);
     const fotos = [];
     const MAXF = (S.config && S.config.maxFotos) || 6;
+    const soCamera = p.k === 'CHEGADA' || p.k === 'SAIDA'; // marcos críticos: só foto tirada na hora (D-23)
+    const guia = guiaFoto(p.k, d.op);
     const enviar = async (bg) => {
       const go = $('#ps-go', bg); if (go) { go.disabled = true; go.textContent = 'ENVIANDO…'; }
       let gps = await gpsP;
@@ -1163,12 +1194,14 @@
     // Folha de confirmação: mostra as fotos já tiradas e deixa adicionar mais (até o limite) ou tirar uma.
     const confirmar = () => {
       const bg = sheet(`<div class="drv-sheet"><h2>${esc(p.pergunta)}</h2><p class="drv-muted">Horário: <b>${hhmm(occurredAt)}</b></p>
-        ${fotos.length ? `<div class="fotos-grid">${fotos.map((f, i) => `<figure><img src="${f}" alt="Foto ${i + 1}"><button type="button" class="foto-x" data-tirar="${i}" aria-label="Tirar a foto ${i + 1}">×</button></figure>`).join('')}</div>
+        ${guia && (fotos.length || p.foto) ? `<div class="drv-guia">${ICON.cam}<span><b>Na foto:</b> ${guia.itens.map((x) => esc(x.txt)).join(' · ')}</span></div>` : ''}
+        ${fotos.length ? `<div class="fotos-grid">${fotos.map((f, i) => `<figure><img src="${fotoSrc(f)}" alt="Foto ${i + 1}"><button type="button" class="foto-x" data-tirar="${i}" aria-label="Tirar a foto ${i + 1}">×</button></figure>`).join('')}</div>
           <p class="drv-muted center">${fotos.length} foto${fotos.length > 1 ? 's' : ''}${fotos.length < MAXF ? ` · pode juntar até ${MAXF}` : ''}</p>` : ''}
         <button class="drv-big ok" id="ps-go">SIM, ENVIAR</button>
         ${fotos.length && fotos.length < MAXF ? `<button class="drv-big alt" id="ps-mais">${ICON.cam} TIRAR MAIS UMA FOTO</button>` : ''}
         ${p.foto === 'optional' && !fotos.length ? `<button class="drv-big alt" id="ps-mais">${ICON.cam} TIRAR FOTO ANTES</button>` : ''}
-        ${fotos.length < MAXF ? '<button class="drv-link" id="ps-gal">Escolher fotos da galeria</button>' : ''}
+        ${fotos.length < MAXF && !soCamera ? '<button class="drv-link" id="ps-gal">Escolher fotos da galeria</button>' : ''}
+        ${soCamera ? '<p class="drv-muted center small">Nesta etapa a foto é tirada na hora, pela câmera.</p>' : ''}
         <button class="drv-link" data-x>Voltar</button></div>`);
       $('#ps-go', bg).onclick = () => {
         if (p.foto === 'required' && !fotos.length) { toast('Tire a foto para registrar.', true); bg.remove(); abrirCamera(); return; }
@@ -1185,7 +1218,8 @@
       document.body.appendChild(inp);
       inp.onchange = async () => {
         const lista = [...inp.files].slice(0, MAXF - fotos.length); inp.remove();
-        try { for (const f of lista) fotos.push(await compressImage(f)); } catch (e) { toast(e.message, true); }
+        const gps = await Promise.race([gpsP, new Promise((r) => setTimeout(() => r(null), 4000))]);
+        try { for (const f of lista) fotos.push(await prepararFoto(f, { camera: !galeria, op: d.op, marco: p.titulo, gps })); } catch (e) { toast(e.message, true); }
         if (inp.files.length > lista.length) toast(`Cabem ${MAXF} fotos por registro. Depois você pode adicionar mais.`);
         confirmar();
       };
@@ -1197,7 +1231,7 @@
   }
 
   // Adicionar fotos a um registro já feito: vira um evento próprio, sem alterar o registro original.
-  function fotosSheet(opId, ev) {
+  function fotosSheet(opId, ev, op = null) {
     const fotos = [];
     const MAXF = (S.config && S.config.maxFotos) || 6;
     const bg = sheet(`<div class="drv-sheet"><h2>Mais fotos: ${esc(ev.label)}</h2><p class="drv-muted">Registro de ${hhmm(ev.occurredAt)}. As novas fotos ficam com o horário de agora, sem mudar o registro.</p>
@@ -1207,14 +1241,19 @@
       <input id="fs-note" class="drv-input" placeholder="O que mostram as fotos? (opcional)" maxlength="300">
       <button class="drv-big ok" id="fs-go" disabled>ENVIAR FOTOS</button><button class="drv-link" data-x>Voltar</button></div>`);
     const desenhar = () => {
-      $('#fs-g', bg).innerHTML = fotos.map((f, i) => `<figure><img src="${f}" alt="Foto ${i + 1}"><button type="button" class="foto-x" data-tirar="${i}" aria-label="Tirar a foto ${i + 1}">×</button></figure>`).join('');
+      $('#fs-g', bg).innerHTML = fotos.map((f, i) => `<figure><img src="${fotoSrc(f)}" alt="Foto ${i + 1}"><button type="button" class="foto-x" data-tirar="${i}" aria-label="Tirar a foto ${i + 1}">×</button></figure>`).join('');
       $$('[data-tirar]', bg).forEach((b) => (b.onclick = () => { fotos.splice(Number(b.dataset.tirar), 1); desenhar(); }));
       $('#fs-go', bg).disabled = !fotos.length;
       $('#fs-go', bg).textContent = fotos.length > 1 ? `ENVIAR ${fotos.length} FOTOS` : 'ENVIAR FOTO';
     };
-    const ler = async (inp) => { const lista = [...inp.files].slice(0, MAXF - fotos.length); try { for (const f of lista) fotos.push(await compressImage(f)); } catch (e) { toast(e.message, true); } inp.value = ''; desenhar(); };
-    $('#fs-cam', bg).onchange = (e) => ler(e.target);
-    $('#fs-gal', bg).onchange = (e) => ler(e.target);
+    const ler = async (inp, camera) => {
+      const lista = [...inp.files].slice(0, MAXF - fotos.length);
+      const gps = camera ? await Promise.race([getGps(), new Promise((r) => setTimeout(() => r(null), 4000))]) : null;
+      try { for (const f of lista) fotos.push(await prepararFoto(f, { camera, op, marco: `${ev.label} (foto adicional)`, gps })); } catch (e) { toast(e.message, true); }
+      inp.value = ''; desenhar();
+    };
+    $('#fs-cam', bg).onchange = (e) => ler(e.target, true);
+    $('#fs-gal', bg).onchange = (e) => ler(e.target, false);
     $('#fs-go', bg).onclick = async () => {
       $('#fs-go', bg).disabled = true;
       try { await sendEvent(opId, { type: 'EVIDENCIA_ADICIONADA', occurredAt: new Date().toISOString(), refEventId: ev.id, photos: fotos, note: $('#fs-note', bg).value.trim() || undefined }); bg.remove(); refresh(); }
@@ -1339,7 +1378,7 @@
       </div></div>`;
 
     $$('[data-act]', main).forEach((b) => (b.onclick = () => captureSheet(id, acoes.find((a) => a.type === b.dataset.act))));
-    $$('[data-maisfoto]', main).forEach((b) => (b.onclick = () => fotosSheet(id, evById[b.dataset.maisfoto])));
+    $$('[data-maisfoto]', main).forEach((b) => (b.onclick = () => fotosSheet(id, evById[b.dataset.maisfoto], d.op)));
     $$('[data-confirm]', main).forEach((b) => (b.onclick = async () => {
       const a = acoes.find((x) => x.type === b.dataset.confirm); b.disabled = true;
       try { await sendEvent(id, { type: a.type, occurredAt: new Date().toISOString(), refEventId: a.refEventId }); refresh(); } catch (e) { toast(e.message, true); b.disabled = false; }
@@ -1432,7 +1471,8 @@
       <div class="evid">${fs.length ? `<div class="fotos-col">${fs.map((f, i) => `<a href="${fileUrl(f)}" target="_blank" rel="noopener"><img src="${fileUrl(f)}" alt="Foto ${i + 1}: ${esc(ref.label)}" loading="lazy"></a>`).join('')}</div>` : `<div class="kpi"><span class="label">Sem foto</span></div>`}
         <dl class="kv"><dt>Registro</dt><dd>${esc(ref.label)}</dd><dt>Por</dt><dd>${esc(ref.actor.name)}</dd><dt>Ocorrido</dt><dd class="mono">${dataHora(ref.occurredAt)}</dd>
         ${p.gps ? `<dt>Local</dt><dd class="mono">${esc(gpsTxt(p.gps))} ${mapLink(p.gps) ? `<a href="${mapLink(p.gps)}" target="_blank" rel="noopener">mapa</a>` : ''}</dd>` : ''}
-        ${p.note ? `<dt>Obs.</dt><dd>${esc(p.note)}</dd>` : ''}</dl></div>
+        ${p.note ? `<dt>Obs.</dt><dd>${esc(p.note)}</dd>` : ''}
+        ${conferenciaDe(d, ref) ? `<dt>Fotos</dt><dd>${seloHtml(conferenciaDe(d, ref))}</dd>` : ''}</dl></div>
       <div class="row"><button class="btn ok" data-confirm="${a.type}">${a.type === 'LIBERACAO_CONFIRMADA' ? 'Confirmar liberação' : 'Confirmar'}</button>
       ${contest ? `<button class="btn danger" data-contest="${ref.id}">Não reconheço este registro</button>` : ''}</div>
       <p class="small muted">A confirmação fica registrada com seu nome e horário próprios, sem alterar o horário do registro.</p></div>`;
@@ -1468,7 +1508,7 @@
   }
 
   const KIND = { registro: ['Registro', ''], confirmacao: ['Confirmação', 'ok'], divergencia: ['Divergência', 'crit'], ocorrencia: ['Ocorrência', 'crit'], apuracao: ['Apuração', 'acc'], financeiro: ['Financeiro', 'ok'],
-    dossie: ['Dossiê', 'sys'], juridico: ['Jurídico', 'sys'], cadastro: ['Cadastro', ''], tratamento: ['Tratamento', 'sys'], notificacao: ['Notificação', 'sys'], evidencia: ['Fotos', ''] };
+    dossie: ['Dossiê', 'sys'], juridico: ['Jurídico', 'sys'], cadastro: ['Cadastro', ''], tratamento: ['Tratamento', 'sys'], notificacao: ['Notificação', 'sys'], evidencia: ['Fotos', ''], analise: ['Conferência', 'sys'] };
   function timelineHtml(d, myPending) {
     const subs = {}, main = [];
     for (const e of d.timeline) {
@@ -1492,9 +1532,17 @@
         if (p.gps) body += `<div class="meta"><span>${esc(gpsTxt(p.gps))}</span>${mapLink(p.gps) ? `<a href="${mapLink(p.gps)}" target="_blank" rel="noopener">ver no mapa</a>` : ''}</div>`;
         const fs = p.photos || (p.photo ? [p.photo] : []);
         if (fs.length) body += `<span class="thumbs">${fs.map((f, i) => `<a href="${fileUrl(f)}" target="_blank" rel="noopener"><img class="thumb" src="${fileUrl(f)}" alt="Foto ${i + 1}: ${esc(e.label)}" loading="lazy"></a>`).join('')}</span>`;
+        if (conferenciaDe(d, e)) body += `<div class="row">${seloHtml(conferenciaDe(d, e))}</div>`;
         if (e.type !== 'OPERACAO_IDENTIFICADA' && d.podeFotos) body += `<button class="btn small" data-maisfoto="${e.id}">Adicionar fotos</button>`;
         if (p.note) body += `<span class="small">${esc(p.note)}</span>`;
         if ((Date.parse(e.receivedAt) - Date.parse(e.occurredAt)) / 60000 >= 2) body += `<div class="meta"><span>ocorrido ${hhmm(e.occurredAt)} · sincronizado ${hhmm(e.receivedAt)}</span></div>`;
+      } else if (e.type === 'EVIDENCIA_ANALISADA') {
+        body += `<div class="row">${seloHtml(e, false)}<span class="small muted">${p.motor === 'ia' ? 'Análise da imagem por IA + regras' : 'Regras automáticas (origem, horário, repetição)'} · ${p.fotos.length} foto${p.fotos.length > 1 ? 's' : ''}</span></div>
+          <span class="small">${esc(p.resumo)}</span>
+          ${(p.checagens || []).length ? `<ul class="chk-list">${p.checagens.map((c) => `<li class="${c.atendido === 'sim' ? 'ok' : c.atendido === 'nao' ? 'nok' : ''}">${c.atendido === 'sim' ? '✓' : c.atendido === 'nao' ? '✗' : '–'} ${esc(c.item)}${c.detalhe ? ` <span class="muted">· ${esc(c.detalhe)}</span>` : ''}</li>`).join('')}</ul>` : ''}
+          ${(p.achados || []).length ? `<ul class="chk-list">${p.achados.map((a) => `<li class="${a.resultado === 'aderente' ? '' : 'nok'}">! ${esc(a.txt)}</li>`).join('')}</ul>` : ''}
+          ${p.placaLida ? `<span class="small">Placa lida: <b class="mono">${esc(placaFmt(p.placaLida))}</b> ${p.placaConfere ? '· confere com o cadastro' : p.placaConfere === false ? '· <b>diferente do cadastro</b>' : ''}</span>` : ''}
+          <span class="small muted">Análise de apoio: não bloqueia o registro nem substitui a confirmação das partes.</span>`;
       } else if (e.kind === 'ocorrencia') {
         body += e.type === 'DESLOCAMENTO_FORA_DO_LIMITE' ? `<span class="small"><span class="mono">DESLOCAMENTO_FORA_DO_LIMITE</span> · ${p.distanciaM} m do local (limite ${p.limiteM} m)${p.simulado ? ' · simulado' : ''}</span>` : `<span class="small">${esc(p.marco)}: ${esc(p.motivo)}</span>`;
       } else if (e.kind === 'apuracao') {
@@ -1615,6 +1663,9 @@
             <td>${esc(m.por)}<br><span class="small muted">via ${esc(ORIGEM[m.origem] || m.origem)}</span></td><td class="mono small">${m.gps ? esc(gpsTxt(m.gps)) : '—'}</td><td>${m.confirmacao ? `${esc(m.confirmacao.por)}<br><span class="mono small">${dataHora(m.confirmacao.em)} · ${esc(ORIGEM[m.confirmacao.origem] || m.confirmacao.origem)}</span>` : '—'}</td></tr>`).join('')}
         </tbody></table></div></section>
         ${c.marcos.some((m) => (m.fotos || []).length || m.foto) ? `<section><span class="label">Evidências fotográficas</span><div class="photos">${c.marcos.flatMap((m) => (m.fotos || (m.foto ? [{ ...m.foto, em: m.em, por: m.por }] : [])).map((f, i, arr) => `<figure><img src="${fileUrl(f)}" alt="${esc(m.marco)} · foto ${i + 1}"><figcaption>${esc(m.marco)}${arr.length > 1 ? ` · ${i + 1}/${arr.length}` : ''} · ${dataHora(f.em || m.em)}${f.adicionada ? `<br>adicionada por ${esc(f.por)}${f.note ? ': ' + esc(f.note) : ''}` : ''}<br><span class="mono">sha256 ${f.sha256.slice(0, 16)}…</span></figcaption></figure>`)).join('')}</div></section>` : ''}
+        ${c.marcos.some((m) => m.conferenciaFotos) ? `<section><span class="label">Conferência das fotos</span><div class="tablewrap"><table><thead><tr><th>Marco</th><th>Resultado</th><th>Observações</th><th>Conferido por</th></tr></thead><tbody>
+          ${c.marcos.filter((m) => m.conferenciaFotos).map((m) => { const k = m.conferenciaFotos; return `<tr><td>${esc(m.marco)}</td><td><b>${esc(k.resultado)}</b>${k.placaLida ? `<br><span class="small mono">placa lida ${esc(placaFmt(k.placaLida))}${k.placaConfere === false ? ' (diferente)' : ''}</span>` : ''}</td><td class="small">${esc(k.resumo)}${(k.achados || []).filter((a) => a.txt !== k.resumo).map((a) => `<br>${esc(a.txt)}`).join('')}</td><td class="small">${esc(k.motor)}<br><span class="mono">${dataHora(k.em)}</span></td></tr>`; }).join('')}
+        </tbody></table></div><p class="small muted">Análise de apoio. Não substitui a confirmação das partes nem a avaliação humana.</p></section>` : ''}
         ${c.ocorrencias.length || c.marcos.some((m) => m.divergencias.length) ? `<section><span class="label">Ocorrências e divergências</span>
           ${c.ocorrencias.map((x) => `<p class="small" style="margin:4px 0"><span class="mono">${esc(x.codigo)}</span> · ${dataHora(x.em)} · ${x.codigo === 'DESLOCAMENTO_FORA_DO_LIMITE' ? `${x.dados.distanciaM} m do local (limite ${x.dados.limiteM} m)${x.dados.simulado ? ' · simulado' : ''}` : esc(x.dados.motivo || '')}</p>`).join('')}
           ${c.marcos.flatMap((m) => m.divergencias.map((dv) => `<p class="small" style="margin:4px 0"><b>${esc(m.marco)}</b> · ${esc(dv.por)} em ${dataHora(dv.em)}: ${esc(dv.descricao)}${dv.alegadoEm ? ` (horário reconhecido: ${hhmm(dv.alegadoEm)})` : ''} · ${dv.tratamento ? `tratada: ${esc(dv.tratamento.resolucao)}, ${esc(dv.tratamento.descricao)}` : '<b>em aberto</b>'}</p>`)).join('')}</section>` : ''}
@@ -1858,7 +1909,7 @@
       <span class="label">Operacionais</span><div class="kpis">${k('Operações', t.operacoes)}${k('Concluídas', t.concluidas)}${k('Tempo médio', dur(t.tempoMedioMin))}${k('Acima de 5 horas', t.acimaDoLimite)}
         ${k('Chegada → confirmação', dur(t.tempoMedioConfirmacaoMin))}${k('Chegada → início', dur(t.tempoMedioChegadaInicioMin))}${k('Início → término', dur(t.tempoMedioInicioTerminoMin))}</div>
       <span class="label">Financeiros</span><div class="kpis">${k('Valor devido', brl(t.devido))}${k('Valor pago', brl(t.pago))}${k('Saldo pendente', brl(t.saldo))}${k('Recuperado', t.percentualRecuperado == null ? '—' : num(t.percentualRecuperado) + '%')}</div>
-      <span class="label">Evidências e jurídico</span><div class="kpis">${k('Com foto na chegada', t.comFoto)}${k('Com GPS na chegada', t.comGps)}${k('Sem confirmação', t.semConfirmacao)}${k('Deslocamentos > 300 m', t.deslocamentos)}${k('Com divergência', t.comDivergencia)}${k('Dossiês gerados', t.dossies)}${k('Encaminhadas ao jurídico', t.encaminhadas)}</div>
+      <span class="label">Evidências e jurídico</span><div class="kpis">${k('Com foto na chegada', t.comFoto)}${k('Fotos com alerta na conferência', t.fotosComAlerta)}${k('Com GPS na chegada', t.comGps)}${k('Sem confirmação', t.semConfirmacao)}${k('Deslocamentos > 300 m', t.deslocamentos)}${k('Com divergência', t.comDivergencia)}${k('Dossiês gerados', t.dossies)}${k('Encaminhadas ao jurídico', t.encaminhadas)}</div>
       <div class="card"><h2>Por operação</h2><div class="tablewrap"><table><thead><tr><th>Código</th><th>Tipo</th><th>Destino</th><th>Situação</th><th>Tempo</th><th>Devido</th><th>Pago</th><th>Saldo</th><th>Chegada→conf.</th><th>Desloc.</th></tr></thead><tbody>
         ${r.operacoes.map((o) => `<tr class="click" data-op="${o.id}"><td class="mono">${esc(o.codigo)}</td><td>${tipoPill(o.tipo)}</td><td>${esc(o.destinoNome)}</td><td>${statusPill(o)}</td><td class="mono">${dur(o.tempoMin)}</td><td class="mono">${brl(o.devido)}</td><td class="mono">${o.devido == null ? '—' : brl(o.pago)}</td><td class="mono">${brl(o.saldo)}</td><td class="mono">${dur(o.chegadaConfirmacaoMin)}</td><td class="mono">${o.deslocamentos || ''}</td></tr>`).join('')}
       </tbody></table></div></div>

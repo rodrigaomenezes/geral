@@ -9,7 +9,7 @@ Projeto interno: cliente **Brobot Tecnologia** · requisitos **Menezes Gestão**
 
 ## Como rodar
 
-Requer apenas **Node.js 20 ou superior**. Não há dependências para instalar.
+Requer apenas **Node.js 20 ou superior**. Não há dependências obrigatórias: o único pacote (`@anthropic-ai/sdk`, opcional) só é usado quando a conferência de fotos por IA está ligada (`npm install`).
 
 ```bash
 cd brobot/estadia
@@ -124,6 +124,16 @@ Menu **Painel** (portal) e **Meu painel** (motorista). Cada perfil vê só as pr
 
 A demonstração traz um histórico fictício de viagens (desde 01/10/2026, início da regra vigente) para os painéis terem dados.
 
+### Fotos como prova e conferência automática
+
+- **Guia do que fotografar** em cada passo (ex.: chegada: "frente do caminhão com a placa legível e a portaria").
+- **Chegada e saída só pela câmera.** Nos outros passos a galeria é aceita, mas a foto fica marcada como "da galeria".
+- **Carimbo** na foto: operação, marco, data e hora e GPS.
+- **Conferência automática** após cada registro com foto e cada foto adicionada, gravada no log como "Fotos conferidas":
+  - regras sempre ativas: galeria nos marcos críticos, foto tirada a mais de 15 min do registro, foto repetida em outro registro e imagem pequena demais;
+  - **IA de visão** (opcional, com `ANTHROPIC_API_KEY`): confere a cena, lê a placa e compara com o cadastro, aponta foto de tela e falta de nitidez.
+- O resultado é um **selo** (conferida / duvidosa / não aderente) no app do motorista, na linha do tempo, na confirmação do destino, na página do link e no Dossiê. **Nunca bloqueia o registro**: é análise de apoio.
+
 ## O que mudou na versão 2.0
 
 | Item do documento | Implementação |
@@ -186,6 +196,9 @@ Os dados ficam em `data/` (ou no caminho de `ESTADIA_DATA`):
 | `PORT` | Porta HTTP |
 | `ESTADIA_DATA` | Pasta de dados (no Railway, o volume em `/data`) |
 | `ESTADIA_AUTOCADASTRO` | `0` desliga o autocadastro de motoristas e empresas (padrão: ligado) |
+| `ANTHROPIC_API_KEY` | Liga a conferência das fotos por IA (sem ela, só as regras automáticas) |
+| `ESTADIA_IA` | `0` desliga a IA mesmo com a chave configurada |
+| `ESTADIA_IA_MODELO` | Modelo de visão usado na conferência (padrão `claude-opus-5-5`) |
 | `ESTADIA_SECRET` | Chave de assinatura das sessões |
 | `ESTADIA_DEMO_RESET` | `0` desativa o reinício da demonstração e a simulação de deslocamento |
 | `ESTADIA_LINK_TTL_HORAS` | Validade dos links de confirmação (padrão 24) |

@@ -70,6 +70,7 @@ const OTHER_LABELS = {
   WHATSAPP_RESPOSTA: 'Resposta recebida pelo WhatsApp',
   WHATSAPP_DESTINATARIO: 'Número de envio informado pelo motorista',
   EVIDENCIA_ADICIONADA: 'Fotos adicionadas ao registro',
+  EVIDENCIA_ANALISADA: 'Fotos conferidas',
   VIAGEM_CADASTRADA_TAC: 'Viagem cadastrada pelo motorista',
   CONJUNTO_CADASTRADO: 'Veículo/conjunto cadastrado',
   CONJUNTO_DESATIVADO: 'Veículo/conjunto desativado',
@@ -93,7 +94,7 @@ function kindOf(type) {
     PAGAMENTO_REGISTRADO: 'financeiro', SITUACAO_FINANCEIRA: 'financeiro',
     DOSSIE_GERADO: 'dossie', ENCAMINHADO_JURIDICO: 'juridico', JURIDICO_STATUS: 'juridico',
     OPERACAO_CRIADA: 'cadastro', OPERACAO_RETIFICADA: 'cadastro', DADOS_INFORMADOS: 'cadastro',
-    OPERACAO_ENCERRADA: 'cadastro', USUARIO_CRIADO: 'admin', CONTATO_INFORMADO: 'cadastro', EVIDENCIA_ADICIONADA: 'evidencia',
+    OPERACAO_ENCERRADA: 'cadastro', USUARIO_CRIADO: 'admin', CONTATO_INFORMADO: 'cadastro', EVIDENCIA_ADICIONADA: 'evidencia', EVIDENCIA_ANALISADA: 'analise',
     CONJUNTO_CADASTRADO: 'admin', CONJUNTO_DESATIVADO: 'admin', AUTO_CADASTRO: 'admin',
   }[type] || 'sistema';
 }
@@ -152,7 +153,7 @@ function project(opEvents) {
   const op = { id: created.opId, ...created.payload, criadaEm: created.occurredAt, tacUserId: null };
   const st = {
     op, milestones: {}, confirmations: {}, divergences: [], treatments: {}, apuracoes: [], pagamentos: [],
-    situacoes: [], dossies: [], juridico: [], ocorrencias: [], retificacoes: [], links: [], mensagens: [], evidencias: [], dadosInformados: null, encerramento: null,
+    situacoes: [], dossies: [], juridico: [], ocorrencias: [], retificacoes: [], links: [], mensagens: [], evidencias: [], analises: {}, dadosInformados: null, encerramento: null,
   };
   for (const e of opEvents) {
     const t = e.type;
@@ -182,6 +183,7 @@ function project(opEvents) {
     else if (t.startsWith('WHATSAPP_') || t === 'CONTATO_INFORMADO') { /* projetado acima */ }
     else if (t === 'DADOS_INFORMADOS') st.dadosInformados = e;
     else if (t === 'EVIDENCIA_ADICIONADA') st.evidencias.push(e);
+    else if (t === 'EVIDENCIA_ANALISADA') st.analises[e.refEventId] = e;
     else if (t === 'OPERACAO_ENCERRADA') st.encerramento = e;
   }
   st.encaminhado = st.juridico.find((e) => e.type === 'ENCAMINHADO_JURIDICO') || null;

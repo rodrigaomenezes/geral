@@ -35,6 +35,7 @@
         <dt>Local</dt><dd>${esc(op.localNome)}</dd><dt>Destino</dt><dd>${esc(op.destinoNome)}</dd>
         ${reg ? `<dt>Registro</dt><dd>${esc(reg.label)}</dd><dt>Data e hora</dt><dd class="mono">${dt(reg.em)}</dd>` : ''}
         ${reg && reg.gps && !reg.gps.erro ? `<dt>Localização</dt><dd class="mono">${reg.gps.lat.toFixed(5)}, ${reg.gps.lng.toFixed(5)} <a href="https://www.openstreetmap.org/?mlat=${reg.gps.lat}&mlon=${reg.gps.lng}#map=17/${reg.gps.lat}/${reg.gps.lng}" target="_blank" rel="noopener">ver mapa</a></dd>` : ''}</dl>
+        ${reg && reg.conferencia && status !== 410 ? `<p class="small" style="margin:8px 0 0"><b>Conferência das fotos${reg.conferencia.ia ? ' (IA)' : ''}:</b> ${esc(reg.conferencia.rotulo)}. ${esc(reg.conferencia.resumo)}</p>` : ''}
         ${reg && reg.temFoto && status !== 410 ? Array.from({ length: Math.min(reg.fotos || 1, 12) }, (_, i) => `<img class="confirm-photo" src="${base}/foto?i=${i}" alt="Foto ${i + 1} do registro do motorista" loading="lazy">`).join('') : ''}</div>`;
       if (info.contestado) {
         main.innerHTML = head + `<div class="card"><h2>Registrado: não confere</h2><p>${esc(info.contestado.motivo)}</p><p class="small muted">O registro do motorista foi mantido e a divergência será analisada. Você já pode fechar esta página.</p></div>`;

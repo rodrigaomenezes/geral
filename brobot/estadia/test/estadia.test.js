@@ -478,3 +478,72 @@ test('A mesma foto em duas operações continua visível para quem vê qualquer 
     assert.equal((await fetch(`${base}/api/evidencias/${file}?token=${nova.body.token}`)).status, 404);
   } finally { await t.close(); }
 });
+
+test('Conferência das fotos: origem, horário e foto repetida viram selo de apoio, sem bloquear o registro', async () => {
+  const t = await boot();
+  try {
+    const joao = (await t.call('POST', '/api/login', { telefone: '11988880001', pin: '1234' })).body.token;
+    const op = (await t.call('GET', '/api/tac/viagens', null, joao)).body.disponiveis[0];
+    await t.call('POST', '/api/operations/identify', { codigo: op.codigo, placa: op.placa }, joao);
+    const cfg = (await t.call('GET', '/api/config', null, joao)).body;
+    assert.ok(cfg.guiasFoto.CHEGADA.pedir.includes('placa'));
+    assert.equal(cfg.iaFotos, false, 'sem chave da API a IA fica desligada');
+    const grande = 'data:image/png;base64,' + demoPhotoPng(400, 300).toString('base64');
+    // Foto da galeria, tirada 2 horas antes: o registro vale, mas a conferência marca como duvidosa
+    const ch = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI,
+      photos: [{ data: grande, origem: 'galeria', capturadaEm: now(-120) }] }, joao);
+    assert.equal(ch.status, 201);
+    assert.equal(ch.body.evento.payload.photos[0].origem, 'galeria');
+    const an = ch.body.detalhe.timeline.find((e) => e.type === 'EVIDENCIA_ANALISADA' && e.refEventId === ch.body.evento.id);
+    assert.ok(an, 'conferência gravada como evento próprio');
+    assert.equal(an.actor.role, 'sistema');
+    assert.equal(an.payload.resultado, 'duvidosa');
+    assert.equal(an.payload.motor, 'regras');
+    assert.ok(an.payload.achados.some((a) => a.regra === 'origem'));
+    assert.ok(an.payload.achados.some((a) => a.regra === 'horario'));
+    // Foto nova tirada na hora: reconfere o marco com todas as fotos
+    const outra = 'data:image/png;base64,' + demoPhotoPng(420, 300).toString('base64');
+    const ad = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'EVIDENCIA_ADICIONADA', occurredAt: now(), refEventId: ch.body.evento.id,
+      photos: [{ data: outra, origem: 'camera', capturadaEm: now() }] }, joao);
+    assert.equal(ad.status, 201);
+    assert.equal(ad.body.detalhe.timeline.filter((e) => e.type === 'EVIDENCIA_ANALISADA' && e.refEventId === ch.body.evento.id).pop().payload.fotos.length, 2);
+    // A mesma foto da chegada reaproveitada na saída: não aderente
+    const sai = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'SAIDA', occurredAt: now(), photos: [{ data: grande, origem: 'camera', capturadaEm: now() }] }, joao);
+    assert.equal(sai.status, 201);
+    const anSai = sai.body.detalhe.timeline.find((e) => e.type === 'EVIDENCIA_ANALISADA' && e.refEventId === sai.body.evento.id);
+    assert.equal(anSai.payload.resultado, 'nao_aderente');
+    assert.ok(anSai.payload.achados.some((a) => a.regra === 'repetida' && a.txt.includes(op.codigo)));
+    // O Dossiê da saída já sai com a conferência de cada marco
+    const doc = (await t.call('GET', `/api/dossies/${sai.body.detalhe.dossies[0].hash}`, null, joao)).body.content;
+    assert.equal(doc.marcos.find((m) => m.tipo === 'SAIDA').conferenciaFotos.resultado, 'Não aderente');
+    assert.match(doc.ressalva, /conferência das fotos/i);
+  } finally { await t.close(); }
+});
+
+test('IA de visão: lê a placa, confere a cena e o resultado entra no selo (cliente simulado)', async () => {
+  const V = require('../server/visao');
+  const pedidos = [];
+  const cliente = { beta: { messages: { create: async (req) => { pedidos.push(req); return { model: req.model, stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({
+    cena_corresponde: true, foto_de_tela: false, nitida: true, placa_lida: 'RTB-4F27', resumo: 'Caminhão na portaria com a placa legível.',
+    itens: [{ id: 'placa', atendido: 'sim', detalhe: 'RTB4F27' }, { id: 'local', atendido: 'sim', detalhe: 'Portaria com nome do CD' }] }) }] }; } } } };
+  const foto = { file: 'x.jpg', sha256: 'a'.repeat(64), bytes: 90000, mime: 'image/jpeg', origem: 'camera', capturadaEm: now() };
+  const base = { marco: 'CHEGADA', op: { placa: 'RTB4F27', placasImplementos: ['RTC5A12'], tipo: 'DESCARGA' }, fotos: [foto], ocorridoEm: now(), usosDe: () => [], lerArquivo: () => Buffer.from('img') };
+  const ok = await V.analisar(base, cliente);
+  assert.equal(ok.resultado, 'aderente');
+  assert.equal(ok.motor, 'ia');
+  assert.equal(ok.placaLida, 'RTB4F27');
+  assert.equal(ok.placaConfere, true);
+  assert.equal(pedidos[0].messages[0].content[0].type, 'image');
+  assert.equal(pedidos[0].output_config.format.type, 'json_schema');
+  // Placa diferente e item faltando: duvidosa; cena errada: não aderente
+  cliente.beta.messages.create = async (req) => ({ model: req.model, stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({
+    cena_corresponde: false, foto_de_tela: false, nitida: true, placa_lida: 'ABC1D23', resumo: 'Foto de dentro da cabine.', itens: [{ id: 'placa', atendido: 'nao', detalhe: '' }] }) }] });
+  const ruim = await V.analisar(base, cliente);
+  assert.equal(ruim.resultado, 'nao_aderente');
+  assert.equal(ruim.placaConfere, false);
+  // Falha da API não derruba nada: ficam as regras
+  cliente.beta.messages.create = async () => { throw new Error('rede'); };
+  const falha = await V.analisar(base, cliente);
+  assert.equal(falha.motor, 'regras');
+  assert.equal(falha.resultado, 'aderente');
+});
