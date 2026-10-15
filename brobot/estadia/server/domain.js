@@ -69,6 +69,7 @@ const OTHER_LABELS = {
   WHATSAPP_STATUS: 'Status da mensagem',
   WHATSAPP_RESPOSTA: 'Resposta recebida pelo WhatsApp',
   WHATSAPP_DESTINATARIO: 'Número de envio informado pelo motorista',
+  WHATSAPP_PLANO_ALTERADO: 'Plano de WhatsApp da transportadora alterado',
   EVIDENCIA_ADICIONADA: 'Fotos adicionadas ao registro',
   EVIDENCIA_ANALISADA: 'Fotos conferidas',
   VIAGEM_CADASTRADA_TAC: 'Viagem cadastrada pelo motorista',
@@ -503,7 +504,7 @@ function alertas(st) {
     const ref = Object.values(ms).find((e) => e.id === m.refEventId);
     if (!ref || st.confirmations[ref.id] || st.mensagens.some((x) => x.reenvioDe === m.id)) continue;
     if (m.status === 'falha') out.push({ nivel: 'atencao', codigo: 'WHATSAPP_FALHA', eventoId: m.eventoId, texto: `Mensagem para ${m.para.nome} não foi enviada: ${m.erro || 'falha no envio'}.` });
-    else { const min = Math.round((agora - Date.parse(m.enviadaEm)) / 60000); if (min >= 15) out.push({ nivel: 'atencao', codigo: 'SEM_RESPOSTA', eventoId: m.eventoId, texto: `${m.para.nome} ainda não respondeu (${fmtDur(min)}) sobre "${MILESTONES[ref.type].label}". Tentativa registrada.` }); }
+    else { const min = Math.round((agora - Date.parse(m.enviadaEm)) / 60000); if (min >= 15) { const aberto = m.linkId && st.links.find((l) => l.type === 'LINK_VISUALIZADO' && l.payload.linkId === m.linkId); out.push({ nivel: 'atencao', codigo: 'SEM_RESPOSTA', eventoId: m.eventoId, texto: aberto ? `${m.para.nome} abriu a mensagem às ${new Date(aberto.occurredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}, mas ainda não confirmou "${MILESTONES[ref.type].label}" (${fmtDur(min)}).` : `${m.para.nome} ainda não respondeu (${fmtDur(min)}) sobre "${MILESTONES[ref.type].label}". Tentativa registrada.` }); } }
   }
   for (const d of st.divergenciasAbertas) out.push({ nivel: 'atencao', codigo: 'DIVERGENCIA', eventoId: d.id, texto: `Divergência aberta: ${d.payload.note}` });
   return out;

@@ -881,7 +881,7 @@
 
   // Texto honesto sobre o aviso: no modo manual nada sai sozinho.
   function avisoTxt(p, antes) {
-    const manual = !S.config || S.config.zapModo === 'manual';
+    const manual = (S.zapOp || (S.config && S.config.zapModo) || 'manual') === 'manual';
     if (p.k === 'SAIDA' && manual) return 'A transportadora acompanha pelo sistema.';
     if (manual) return antes ? `Depois você avisa ${p.avisa} pelo seu WhatsApp.` : '';
     return `Avisamos ${p.avisa} pelo WhatsApp.`;
@@ -939,7 +939,7 @@
 
   function demoToolsHtml(d) {
     if (!(S.config && S.config.demo)) return '';
-    return `<details class="drv-demo"><summary>Ferramentas da demonstração · WhatsApp: ${esc({ manual: 'pelo celular do motorista', simulado: 'simulador', api: 'API oficial' }[S.config.zapModo] || S.config.zapModo)}</summary>
+    return `<details class="drv-demo"><summary>Ferramentas da demonstração · WhatsApp: ${esc({ manual: 'pelo celular do motorista', simulado: 'simulador', api: 'API oficial' }[d.zapModo] || d.zapModo)}</summary>
       <div class="row"><button class="btn small" id="dm-off">${S.simOffline ? 'Reativar sinal' : 'Simular sem sinal'}</button>
       ${d && d.referencia ? '<button class="btn small" id="dm-desl">Simular afastamento de 450 m</button>' : ''}
       ${S.config.zapModo === 'simulado' ? '<a class="btn small" href="/whatsapp.html" target="_blank" rel="noopener">Abrir celular do destino (simulador)</a>' : ''}
@@ -962,6 +962,7 @@
     if (r && r.interpretacao === 'SIM') return ['ok', m.finalidade === 'INFORMAR' ? `${nome} recebeu (${hhmm(r.em)})` : `${nome} confirmou às ${hhmm(r.em)}`];
     if (r && r.interpretacao === 'NAO') return ['crit', `${nome} respondeu NÃO: “${r.texto}”`];
     if (r) return ['warn', `${nome} respondeu: “${r.texto}”`];
+    if (m.linkAbertoEm && m.status !== 'falha') return ['ok', `${nome} abriu a mensagem às ${hhmm(m.linkAbertoEm)} · esperando confirmar`];
     return {
       aguardando_envio: ['warn', 'Falta avisar pelo WhatsApp'],
       enviada: m.modo === 'simulado' ? ['', `Enviado ao simulador de ${nome} (demonstração)`] : ['', `Enviado para ${nome} ✓`],
@@ -1026,6 +1027,7 @@
     for (const p of pend) if (!reg[p.body.type]) reg[p.body.type] = { type: p.body.type, occurredAt: p.body.occurredAt, pendente: true };
     const conf = (ev) => ev && !ev.pendente && d.timeline.find((c) => c.kind === 'confirmacao' && c.refEventId === ev.id);
     const div = (ev) => ev && !ev.pendente && d.timeline.find((c) => c.kind === 'divergencia' && c.refEventId === ev.id);
+    S.zapOp = d.zapModo; // plano de WhatsApp da transportadora desta viagem
     const ps = passos(op);
     const atual = ps.find((p) => !reg[p.k]);
     const idx = atual ? ps.indexOf(atual) : ps.length;
@@ -1065,10 +1067,10 @@
           <input id="tel-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome do contato"><button class="drv-mid" type="submit">ENVIAR AVISO</button></form>` : ''}
         ${aberto && m.status === 'aguardando_envio' ? envioBloco(m) : ''}
         ${aberto && m.status !== 'aguardando_envio' && !semNumero ? `<button type="button" class="drv-link left" data-trocar="${m.id}">Mandar para outra pessoa</button><form class="drv-tel" data-dest="${m.id}" hidden><label for="dn-${m.id}">Número de quem vai receber</label><input id="dn-${m.id}" type="tel" inputmode="tel" placeholder="(11) 99999-9999" required><input type="text" placeholder="Nome (opcional)" aria-label="Nome"><label class="chk"><input type="checkbox" checked> Usar nas próximas mensagens</label><button class="drv-mid" type="submit">${ICON.zap} ENVIAR PARA ESTE NÚMERO</button></form>` : ''}
-        ${aberto && m.status !== 'aguardando_envio' && !semNumero && (minutos >= 5 || m.status === 'falha' || m.modo === 'manual' || S.config.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém confirmou ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
-          ${m.modo === 'manual' || S.config.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR DE NOVO NO WHATSAPP</a>` : ''}
+        ${aberto && m.status !== 'aguardando_envio' && !semNumero && (minutos >= 5 || m.status === 'falha' || m.modo === 'manual' || d.zapModo === 'manual') ? `${minutos >= 5 && m.status !== 'aguardando_envio' ? `<b>Ninguém confirmou ainda (${dur(minutos)}).</b>` : ''}<div class="zap-acts">
+          ${m.modo === 'manual' || d.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR DE NOVO NO WHATSAPP</a>` : ''}
           ${m.status !== 'aguardando_envio' && (minutos >= 5 || m.status === 'falha') ? `<button class="btn" data-reenviar="${m.id}">Mandar de novo</button>` : ''}
-          ${m.status !== 'aguardando_envio' && S.config.zapModo !== 'manual' && m.whatsappUrl ? `<a class="btn" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Mandar pelo meu WhatsApp</a>` : ''}
+          ${m.status !== 'aguardando_envio' && d.zapModo !== 'manual' && m.whatsappUrl ? `<a class="btn" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Mandar pelo meu WhatsApp</a>` : ''}
           <button class="btn" data-print="${m.id}">Responderam no meu WhatsApp</button></div>` : ''}</div></div>`;
     };
 
@@ -1311,6 +1313,7 @@
         return `<div class="linkbox"><div class="row between"><b>${m.finalidade === 'CONFIRMAR' ? 'Pedido de confirmação' : 'Aviso'} · ${esc(ref ? ref.label : '')}</b><span class="mono small">${diaHora(m.enviadaEm)}</span></div>
           <span class="small">Para ${esc(m.para.nome)} · ${esc(m.telefoneFmt || 'sem número')} ${m.reenvioDe ? '· reenvio' : ''}</span>
           <span class="pill ${tom}">${esc(txt)}</span>
+          ${m.linkAbertoEm ? `<span class="small">Mensagem aberta às ${diaHora(m.linkAbertoEm)} (link de confirmação)</span>` : ''}
           ${m.respostas.map((r) => `<span class="small">Resposta ${hhmm(r.em)}: “${esc(r.texto)}” ${r.origem === 'print_whatsapp' ? '(print enviado pelo motorista)' : ''}</span>`).join('')}
           ${m.finalidade === 'CONFIRMAR' && !c && !m.reenviada ? `<div class="row"><button class="btn small" data-reenviar="${m.id}">Reenviar</button>${m.whatsappUrl ? `<a class="btn small" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Abrir no WhatsApp</a>` : ''}</div>` : ''}</div>`;
       }).join('')}
@@ -1678,7 +1681,7 @@
           ${f.negociacoes.map((n) => `<p class="small" style="margin:4px 0">Negociação: ${esc(n.situacao)} · ${dataHora(n.em)}${n.observacao ? ' · ' + esc(n.observacao) : ''}</p>`).join('')}</section>
         ${(c.mensagensWhatsApp || []).length ? `<section><span class="label">Mensagens de WhatsApp</span><div class="tablewrap"><table><thead><tr><th>Enviada</th><th>Para</th><th>Assunto</th><th>Situação</th><th>Resposta</th></tr></thead><tbody>
           ${c.mensagensWhatsApp.map((m) => `<tr><td class="mono">${diaHora(m.enviadaEm)}</td><td>${esc(m.para.nome)}<br><span class="small muted">${esc(m.para.papel)}</span></td><td>${m.finalidade === 'CONFIRMAR' ? 'Pedido de confirmação' : 'Aviso'}: ${esc(m.assunto)}</td>
-            <td class="small">${esc(m.status)}${m.erro ? ' · ' + esc(m.erro) : ''}</td><td class="small">${m.respostas.map((r) => `${hhmm(r.em)} “${esc(r.texto)}”${r.origem === 'print_whatsapp' ? ' (print)' : ''}`).join('<br>') || '—'}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
+            <td class="small">${esc(m.status)}${m.erro ? ' · ' + esc(m.erro) : ''}${m.linkAbertoEm ? `<br>aberta ${dataHora(m.linkAbertoEm)}` : ''}</td><td class="small">${m.respostas.map((r) => `${hhmm(r.em)} “${esc(r.texto)}”${r.origem === 'print_whatsapp' ? ' (print)' : ''}`).join('<br>') || '—'}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
         ${c.notificacoes.length ? `<section><span class="label">Notificações e links</span>${c.notificacoes.map((n) => `<p class="small" style="margin:3px 0">${dataHora(n.em)} · ${esc(n.tipo)}${n.destinatario ? ` · ${esc(n.destinatario.nome)}` : ''} · ${esc(n.por)}</p>`).join('')}</section>` : ''}
         ${c.retificacoes.length ? `<section><span class="label">Retificações</span>${c.retificacoes.map((r) => `<p class="small" style="margin:3px 0">${dataHora(r.em)} · ${esc(r.por)}: ${esc(r.campo)} ${esc(r.anterior ?? '—')} → ${esc(r.novo)} · motivo: ${esc(r.motivo)}</p>`).join('')}</section>` : ''}
         ${c.juridico.length ? `<section><span class="label">Jurídico</span>${c.juridico.map((j) => `<p class="small" style="margin:3px 0">${dataHora(j.em)} · ${esc(j.tipo)} · ${esc(jurLabel(j.status))}${j.observacao ? ' · ' + esc(j.observacao) : ''}${j.resultado ? ' · resultado: ' + esc(j.resultado) : ''}</p>`).join('')}</section>` : ''}
@@ -1932,6 +1935,11 @@
       <div class="card"><h2>Parâmetros versionados</h2><div class="tablewrap"><table><thead><tr><th>Regra</th><th>Vigência</th><th>Limite</th><th>R$/t·h</th><th>Marco inicial</th><th>Marco final</th><th>Fórmula</th></tr></thead><tbody>
         ${(cfg.regras || []).map((x) => `<tr><td class="mono">${esc(x.id)} v${esc(x.versao)}</td><td class="mono">${esc(x.vigenteDesde)}</td><td>${dur(x.limiteMin)}</td><td class="mono">${brl(x.valorTonHora)}</td><td class="small">${esc(x.marcoInicial)}</td><td class="small">${esc(x.marcoFinal)}</td><td class="small">${esc(x.descricaoFormula)}</td></tr>`).join('')}</tbody></table></div>
         <p class="small muted">Limite de Deslocamento do Local: ${cfg.limiteDeslocamentoM} m.</p></div>
+      <div class="card"><div class="card-h"><h2>WhatsApp por transportadora</h2><span class="pill ${dirData.whatsappApi ? 'ok' : ''}">${dirData.whatsappApi ? 'API oficial configurada' : 'API oficial não configurada'}</span></div>
+        <p class="small">Manual: sem custo, a mensagem sai do WhatsApp do motorista e a leitura é registrada quando a pessoa abre o link. API oficial: envio automático pelo número do Estadia BR, com entregue, lido e resposta SIM/NÃO; custo por conversa.</p>
+        <div class="tablewrap"><table><thead><tr><th>Transportadora</th><th>Plano</th><th>Em uso</th></tr></thead><tbody>
+        ${dirData.orgs.filter((o) => o.tipo === 'transportadora').map((o) => `<tr><td>${esc(o.nome)}</td><td><select data-zap-org="${o.id}" ${dirData.whatsappApi ? '' : 'disabled'}><option value="">Padrão do ambiente</option><option value="manual" ${o.whatsappModo === 'manual' ? 'selected' : ''}>Manual (sem custo)</option><option value="api" ${o.whatsappModo === 'api' ? 'selected' : ''}>API oficial</option></select></td><td>${o.whatsappEfetivo === 'api' ? '<span class="pill ok">API oficial</span>' : o.whatsappEfetivo === 'simulado' ? '<span class="pill">simulador</span>' : '<span class="pill">manual</span>'}</td></tr>`).join('')}
+        </tbody></table></div></div>
       <div class="card"><h2>Permissões por perfil</h2><div class="tablewrap"><table><thead><tr><th>Permissão</th>${Object.keys(dirData.permissoes).map((x) => `<th>${esc(ROLE[x])}</th>`).join('')}</tr></thead><tbody>
         ${perms.map((p) => `<tr><td>${esc(p.replace(/_/g, ' '))}</td>${Object.values(dirData.permissoes).map((list) => `<td>${list.includes(p) ? '<span class="pill ok">sim</span>' : ''}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
       <div class="card"><h2>Usuários</h2><div class="tablewrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Organização</th></tr></thead><tbody>
@@ -1944,6 +1952,10 @@
           <div class="field"><label class="label" for="uf-o">Organização</label><select id="uf-o">${dirData.orgs.map((x) => `<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></div>
           <div class="field"><label class="label" for="uf-p">Placa (TAC)</label><input id="uf-p"></div>
           <div class="field full"><button class="btn primary" type="submit">Criar usuário</button></div><p class="err field full" id="uf-err" hidden></p></form></details></div>`;
+    $$('[data-zap-org]').forEach((sel) => (sel.onchange = async () => {
+      try { await api('POST', `/api/admin/orgs/${sel.dataset.zapOrg}/whatsapp`, { modo: sel.value || null }); toast('Plano de WhatsApp atualizado.'); viewAdmin(); }
+      catch (e) { toast(e.message, true); viewAdmin(); }
+    }));
     const rst = $('#rst');
     if (rst) rst.onclick = () => {
       $('#rst-row').innerHTML = '<span class="small"><b>Tem certeza?</b> Isso não pode ser desfeito.</span><button class="btn danger" id="rst-yes">Sim, apagar e recriar</button><button class="btn" id="rst-no">Cancelar</button>';

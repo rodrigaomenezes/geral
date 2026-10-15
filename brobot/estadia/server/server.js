@@ -44,6 +44,19 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
   const autoCadastro = process.env.ESTADIA_AUTOCADASTRO !== '0';
   const SYS = { userId: 'sistema', name: 'Estadia BR', role: 'sistema', orgId: 'estadia-br' };
   const zcfg = Z.config(process.env);
+  const apiOk = !!(zcfg.token && zcfg.phoneId); // API oficial configurada
+  /**
+   * Modo de WhatsApp de uma operação: o simulador vale para tudo; sem API configurada, é sempre o WhatsApp
+   * do motorista (manual). Com a API, cada transportadora pode estar no plano manual (sem custo) ou API (envio
+   * automático com entregue e lido). Padrão da transportadora: o modo global (WHATSAPP_MODE ou api se configurada).
+   */
+  function modoDe(op) {
+    if (zcfg.mode === 'simulado') return 'simulado';
+    if (!apiOk) return 'manual';
+    const org = op && dir.org(op.transportadoraOrgId);
+    const escolha = org && org.whatsappModo;
+    return escolha === 'api' || escolha === 'manual' ? escolha : (zcfg.mode === 'api' ? 'api' : 'manual');
+  }
   const ia = V.criarCliente(); // análise de imagem por IA (opcional: precisa de ANTHROPIC_API_KEY)
   const autoRespostas = []; // respostas automáticas do número Estadia BR (exibidas no simulador)
   const cadastros = new Map(); // limite de autocadastros por IP
@@ -105,7 +118,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       ocorrencias: st.ocorrencias.map((o) => ({ codigo: o.type, descricao: D.labelOf(o.type), ...ev(o), dados: o.payload })),
       notificacoes: st.links.map((l) => ({ tipo: D.labelOf(l.type), ...ev(l), canal: l.payload.canal || null, destinatario: l.payload.destinatario || null })),
       mensagensWhatsApp: st.mensagens.map((m) => ({ id: m.id, finalidade: m.finalidade, assunto: m.assunto, para: m.para, enviadaEm: m.enviadaEm, modo: m.modo, status: m.status, erro: m.erro,
-        historico: m.historico, respostas: m.respostas.map((r) => ({ em: r.em, texto: r.texto, interpretacao: r.interpretacao, origem: r.origem })), reenvioDe: m.reenvioDe })),
+        historico: m.historico, linkAbertoEm: (() => { const l = m.linkId && st.links.find((x) => x.type === 'LINK_VISUALIZADO' && x.payload.linkId === m.linkId); return l ? l.occurredAt : null; })(), respostas: m.respostas.map((r) => ({ em: r.em, texto: r.texto, interpretacao: r.interpretacao, origem: r.origem })), reenvioDe: m.reenvioDe })),
       retificacoes: st.retificacoes.map((r) => ({ ...ev(r), campo: r.payload.campo, anterior: r.payload.anterior, novo: r.payload.novo, motivo: r.payload.motivo })),
       alertas: D.alertas(st),
       apuracao: ap,
@@ -162,8 +175,9 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         + (linkId ? '\n\nVer foto e local: {{link}}' : '');
   }
 
-  async function enviarZap(st, para, { finalidade, ev, confirmType, extra = '', baseUrl, reenvioDe, by = SYS, modo = zcfg.mode, linkId = null }) {
+  async function enviarZap(st, para, { finalidade, ev, confirmType, extra = '', baseUrl, reenvioDe, by = SYS, modo, linkId = null }) {
     const op = st.op;
+    modo = modo || modoDe(op);
     if (!linkId && finalidade === 'CONFIRMAR' && baseUrl) linkId = createLink(st, ev, confirmType, by, false).id;
     const assunto = frase(ev.type, op);
     const texto = montarTexto(op, ev, finalidade, extra, linkId, modo);
@@ -171,9 +185,9 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     let status, externalId = null, erro = null;
     if (modo === 'manual') status = 'aguardando_envio'; // sem número, o WhatsApp abre para o motorista escolher o contato
     else if (!para.telefone) { status = 'falha'; erro = 'Contato sem número de WhatsApp'; }
-    else if (zcfg.mode === 'api') {
+    else if (modo === 'api') {
       try { ({ externalId } = await Z.enviarApi(zcfg, para.telefone, textoReal({ texto, linkId }, baseUrl))); status = 'enviada'; } catch (e) { status = 'falha'; erro = e.message; }
-    } else status = zcfg.mode === 'simulado' ? 'enviada' : 'aguardando_envio';
+    } else status = modo === 'simulado' ? 'enviada' : 'aguardando_envio';
     store.append({ opId: op.id, type: 'WHATSAPP_ENVIADA', actor: by, origem: 'sistema', payload: {
       mensagemId, externalId, para, finalidade, confirmType: confirmType || null, refEventId: ev.id, assunto, texto, linkId, modo, status, erro: erro || undefined, reenvioDe: reenvioDe || undefined } });
     return { mensagemId, status };
@@ -185,7 +199,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     if (D.CONFIRMATIONS[ev.type] && ['CHEGADA', 'INICIO', 'TERMINO', 'LIBERACAO'].includes(ev.type)) {
       await enviarZap(st, c.destino, { finalidade: 'CONFIRMAR', ev, confirmType: D.CONFIRMATIONS[ev.type].type, baseUrl });
     }
-    if (zcfg.mode === 'manual') return; // um envio por passo: a transportadora acompanha pelo portal
+    if (modoDe(st.op) === 'manual') return; // um envio por passo: a transportadora acompanha pelo portal
     if (['CHEGADA', 'LIBERACAO'].includes(ev.type)) await enviarZap(stateOf(st.op.id), c.transportadora, { finalidade: 'INFORMAR', ev, baseUrl });
     if (ev.type === 'SAIDA') {
       const s2 = stateOf(st.op.id);
@@ -208,7 +222,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
 
   async function responderAuto(fone, texto) {
     if (zcfg.mode === 'simulado') autoRespostas.push({ telefone: fone, texto, em: new Date().toISOString() });
-    else if (zcfg.mode === 'api') { try { await Z.enviarApi(zcfg, fone, texto); } catch { /* resposta automática é opcional */ } }
+    else if (apiOk) { try { await Z.enviarApi(zcfg, fone, texto); } catch { /* resposta automática é opcional */ } }
   }
 
   /** Processa a resposta de um contato: registra, e se for SIM/NÃO para um pedido de confirmação, cria o evento. */
@@ -357,7 +371,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       apuracao: D.apurar(st), apuracoes: st.apuracoes.length, alertas: D.alertas(st), acoes: D.nextActions(st, user),
       financeiro: { ...st.financeiro, pagamentos: timeline(st.pagamentos), origens: D.ORIGENS_PAGAMENTO },
       links: parte && baseUrl ? linksAtivos(st, baseUrl) : [],
-      mensagens: parte ? mensagensView(st, baseUrl) : [], contatos: contatos(st.op), zapModo: zcfg.mode,
+      mensagens: parte ? mensagensView(st, baseUrl) : [], contatos: contatos(st.op), zapModo: modoDe(st.op),
       dossies: st.dossies.map((d) => ({ hash: d.payload.hash, geradoEm: d.occurredAt, por: d.actor.name })),
       juridico: { elegivel: D.elegivelJuridico(st), status: st.statusJuridico, historico: timeline(st.juridico) },
       divergenciasAbertas: st.divergenciasAbertas.map((d) => d.id),
@@ -762,7 +776,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     }
 
     if (p === '/api/config') {
-      return send(res, 200, { demo, zapModo: zcfg.mode, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS, catalogos: C.catalogos(), maxFotos: MAX_FOTOS, guiasFoto: V.GUIAS, iaFotos: !!ia,
+      return send(res, 200, { demo, zapModo: zcfg.mode, whatsappApi: apiOk, regraAtual: D.ruleFor(), regras: D.RULES, limiteDeslocamentoM: D.LIMITE_DESLOCAMENTO_M, status: D.STATUS, catalogos: C.catalogos(), maxFotos: MAX_FOTOS, guiasFoto: V.GUIAS, iaFotos: !!ia,
         destinos: dir.data.orgs.filter((o) => o.tipo === 'destino').map((o) => ({ id: o.id, nome: o.nome })), permissoes: D.PERMISSOES });
     }
 
@@ -1001,7 +1015,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         const nome = String(b.nome || '').trim().slice(0, 60) || 'Contato informado pelo motorista';
         const para = { nome, telefone: tel, papel: msg.para.papel };
         if (b.salvar !== false) append({ opId, type: 'CONTATO_INFORMADO', payload: { papel: msg.para.papel, nome, telefone: `+${tel}` } });
-        if (zcfg.mode === 'manual' && ['aguardando_envio', 'falha'].includes(msg.status)) {
+        if (modoDe(st.op) === 'manual' && ['aguardando_envio', 'falha'].includes(msg.status)) {
           append({ opId, type: 'WHATSAPP_DESTINATARIO', payload: { mensagemId: msg.id, para } });
           if (b.viaMotorista) append({ opId, type: 'WHATSAPP_STATUS', payload: { mensagemId: msg.id, status: 'enviada_manual' } });
         } else if (b.viaMotorista) {
@@ -1124,7 +1138,17 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       return send(res, 200, { ok: true, mensagem: 'Demonstração reiniciada.' });
     }
     if (p === '/api/admin/integrity') return send(res, 200, store.verify());
-    if (p === '/api/admin/users' && req.method === 'GET') return send(res, 200, { orgs: dir.data.orgs, users: dir.data.users.map((x) => publicUser(x, dir.org(x.orgId))), permissoes: D.PERMISSOES });
+    if ((m = /^\/api\/admin\/orgs\/([\w-]+)\/whatsapp$/.exec(p)) && req.method === 'POST') {
+      const org = dir.org(m[1]);
+      if (!org || org.tipo !== 'transportadora') return fail(res, 404, 'ORG', 'Transportadora não encontrada.');
+      const b = await readBody(req);
+      const modo = b.modo === 'api' || b.modo === 'manual' ? b.modo : null;
+      if (modo === 'api' && !apiOk) return fail(res, 409, 'SEM_API', 'A API oficial do WhatsApp não está configurada neste ambiente.');
+      org.whatsappModo = modo || undefined; dir.save();
+      append({ type: 'WHATSAPP_PLANO_ALTERADO', payload: { orgId: org.id, orgNome: org.nome, modo: modo || 'padrao' } });
+      return send(res, 200, { orgId: org.id, whatsappModo: modo, efetivo: modoDe({ transportadoraOrgId: org.id }) });
+    }
+    if (p === '/api/admin/users' && req.method === 'GET') return send(res, 200, { whatsappApi: apiOk, orgs: dir.data.orgs.map((o) => (o.tipo === 'transportadora' ? { ...o, whatsappEfetivo: modoDe({ transportadoraOrgId: o.id }) } : o)), users: dir.data.users.map((x) => publicUser(x, dir.org(x.orgId))), permissoes: D.PERMISSOES });
     if (p === '/api/admin/users' && req.method === 'POST') {
       const b = await readBody(req);
       if (!D.PERMISSOES[b.role]) return fail(res, 400, 'PERFIL', 'Perfil inválido.');

@@ -3,7 +3,7 @@
 **Produto:** Estadia BR — Plataforma de Gestão e Comprovação de Eventos Logísticos
 **Base:** Documento de Atividades DEV 2.0 (05/10/2026) + decisões tomadas na construção e nos testes do MVP de demonstração
 **Objetivo deste material:** descrever o **sistema ideal** em atividades prontas para o backlog, indicando o que entra no **MVP** e o que deve ficar com a **estrutura pronta** para ser ligado depois, sem refazer o produto.
-**Versão deste documento:** 1.5 · 15/10/2026
+**Versão deste documento:** 1.6 · 15/10/2026
 
 ### 🗂️ Histórico de versões
 
@@ -15,6 +15,7 @@
 | 1.3 | 15/10/2026 | Fotos como prova e conferência automática (Atividade 33): câmera ao vivo nos marcos críticos, origem e horário de cada foto, carimbo visível, guia do que fotografar por marco, regras automáticas (galeria, horário, foto repetida) e análise da imagem por IA como apoio, com selo no app, no portal, no link e no Dossiê. Vídeo curto e carimbo do tempo ICP-Brasil ficam como estrutura. Decisões D-22 a D-28. |
 | 1.4 | 15/10/2026 | **Início da contagem revisto (D-29, regra ESTADIA-BR 2.1):** o tempo conta do registro da chegada pelo motorista, comprovado pela localização no local (até 300 m) e pela foto, sem depender da confirmação do destino. A confirmação passa a reforçar a prova e só é o marco quando falta localização válida. Contestação não pausa a contagem. Atividades 10, 15, 16 e 32 e Anexos A e B atualizados. |
 | 1.5 | 15/10/2026 | Reforço da regra de cálculo: passou do limite, todo o tempo desde a chegada é cobrado (sem franquia; 5 h 15 min cobra 5 h 15 min). Limite tratado como parâmetro sujeito a mudança na lei. Critério de aceite novo. |
+| 1.6 | 15/10/2026 | WhatsApp por transportadora (D-30): plano manual sem custo, com registro de quando a pessoa abre a mensagem, ou plano API oficial com envio automático, entregue, lido e resposta SIM/NÃO. Integrações não oficiais com o WhatsApp pessoal descartadas. |
 
 ---
 
@@ -2037,6 +2038,7 @@ Aumentar a força de prova das fotos de cada marco: saber **como** e **quando** 
 | D-27 | A IA **não bloqueia**: gera selo aderente / duvidosa / não aderente, gravado como evento próprio e levado ao Dossiê como análise de apoio. | Erro da IA não pode tirar o direito do motorista. A decisão final é humana. | Mantém-se. |
 | D-28 | Vídeo curto na chegada fica como estrutura (fase seguinte), com armazenamento em nuvem. | Custo de dados do motorista e de armazenamento. Foto resolve o MVP. | Ligar quando houver armazenamento de objetos. |
 | D-29 | O tempo de estadia conta do **registro da chegada** pelo motorista, comprovado pela localização no local (até 300 m) e pela foto. A confirmação do destino reforça, mas não condiciona; só vira o marco quando falta localização válida. Contestação não pausa a contagem. Regra ESTADIA-BR 2.1. | Orientação de 15/10/2026: proteger o motorista da má-fé da outra parte. A proposta de valor é comprovar os eventos com dados que não podem ser alterados (localização e imagens com data, hora e local). | Validação jurídica do marco; carimbo do tempo ICP-Brasil reforça a prova. |
+| D-30 | WhatsApp definido **por transportadora**: plano **manual** (sem custo, mensagem pelo WhatsApp do motorista; a abertura do link é registrada como prova de que a pessoa viu) ou plano **API oficial** (envio automático pelo número do Estadia BR, com entregue, lido e resposta SIM/NÃO, custo por conversa repassado ao cliente). **Não** se usam bibliotecas não oficiais conectadas ao WhatsApp pessoal. | Custo de mensageria só para quem quer automação; bibliotecas não oficiais violam os termos do WhatsApp, arriscam o número do motorista e dariam ao sistema acesso às conversas pessoais (LGPD). | Plano API vira produto pago; demonstração com o número de teste gratuito da Meta. |
 
 ---
 

@@ -199,6 +199,8 @@ Os dados ficam em `data/` (ou no caminho de `ESTADIA_DATA`):
 | `ANTHROPIC_API_KEY` | Liga a conferência das fotos por IA (sem ela, só as regras automáticas) |
 | `ESTADIA_IA` | `0` desliga a IA mesmo com a chave configurada |
 | `ESTADIA_IA_MODELO` | Modelo de visão usado na conferência (padrão `claude-opus-5-5`) |
+| `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_VERIFY_TOKEN` | API oficial do WhatsApp (Cloud API). Com elas, a administração escolhe o plano de cada transportadora (manual ou API) em **Administração → WhatsApp por transportadora**. Webhook: `/api/whatsapp/webhook` |
+| `WHATSAPP_MODE` | `manual` (padrão sem API), `api` (padrão quando a API está configurada) ou `simulado` (demonstração com o celular do destino simulado) |
 | `ESTADIA_SECRET` | Chave de assinatura das sessões |
 | `ESTADIA_DEMO_RESET` | `0` desativa o reinício da demonstração e a simulação de deslocamento |
 | `ESTADIA_LINK_TTL_HORAS` | Validade dos links de confirmação (padrão 24) |

@@ -567,3 +567,52 @@ test('IA de visão: lê a placa, confere a cena e o resultado entra no selo (cli
   assert.equal(falha.motor, 'regras');
   assert.equal(falha.resultado, 'aderente');
 });
+
+test('WhatsApp por transportadora: plano manual (sem custo) ou API oficial, escolhido pela administração', async () => {
+  const antes = { mode: process.env.WHATSAPP_MODE, token: process.env.WHATSAPP_TOKEN, id: process.env.WHATSAPP_PHONE_ID };
+  const fetchReal = global.fetch;
+  const enviados = [];
+  global.fetch = async (url, opts) => {
+    if (String(url).startsWith('https://graph.facebook.com/')) { enviados.push(JSON.parse(opts.body)); return new Response(JSON.stringify({ messages: [{ id: 'wamid.teste' + enviados.length }] }), { status: 200 }); }
+    return fetchReal(url, opts);
+  };
+  process.env.WHATSAPP_MODE = 'manual'; process.env.WHATSAPP_TOKEN = 'token-teste'; process.env.WHATSAPP_PHONE_ID = '123';
+  const t = await boot();
+  try {
+    const carla = await t.login('operacao@rodoviasul.demo');
+    const admin = await t.login('admin@estadiabr.demo');
+    const joao = (await t.call('POST', '/api/login', { telefone: '11988880001', pin: '1234' })).body.token;
+    const lista = (await t.call('GET', '/api/admin/users', null, admin)).body;
+    assert.equal(lista.whatsappApi, true);
+    assert.equal(lista.orgs.find((o) => o.id === 'rodovia-sul').whatsappEfetivo, 'manual', 'padrão do ambiente: manual');
+    // Plano manual: a mensagem fica para o motorista enviar pelo próprio WhatsApp
+    const op1 = await nova(t, carla);
+    await t.call('POST', '/api/operations/identify', { codigo: op1.codigo, placa: 'RTB4F27', occurredAt: now() }, joao);
+    const c1 = await t.call('POST', `/api/operations/${op1.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photo: PHOTO }, joao);
+    assert.equal(c1.body.detalhe.zapModo, 'manual');
+    assert.equal(c1.body.detalhe.mensagens[0].status, 'aguardando_envio');
+    assert.equal(enviados.length, 0);
+    // A administração passa a Rodovia Sul para a API oficial: envio automático, sem o motorista sair do app
+    assert.equal((await t.call('POST', '/api/admin/orgs/rodovia-sul/whatsapp', { modo: 'api' }, carla)).status, 403);
+    const r = await t.call('POST', '/api/admin/orgs/rodovia-sul/whatsapp', { modo: 'api' }, admin);
+    assert.equal(r.body.efetivo, 'api');
+    const op2 = await nova(t, carla, { nfe: '1000' });
+    await t.call('POST', '/api/operations/identify', { codigo: op2.codigo, placa: 'RTB4F27', occurredAt: now() }, joao);
+    const c2 = await t.call('POST', `/api/operations/${op2.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photo: PHOTO }, joao);
+    assert.equal(c2.body.detalhe.zapModo, 'api');
+    const m = c2.body.detalhe.mensagens.find((x) => x.para.papel === 'destino');
+    assert.equal(m.status, 'enviada');
+    assert.equal(enviados[0].to, '5511900000001');
+    assert.match(enviados[0].text.body, /Responda \*SIM\*/);
+    // A resposta SIM chega pelo webhook e confirma a chegada
+    const hook = { entry: [{ changes: [{ value: { messages: [{ from: '5511900000001', id: 'wamid.resp', type: 'text', text: { body: 'Sim' }, context: { id: m.externalId }, timestamp: String(Math.floor(Date.now() / 1000)) }], statuses: [{ id: m.externalId, status: 'read', timestamp: String(Math.floor(Date.now() / 1000)) }] } }] }] };
+    assert.equal((await t.call('POST', '/api/whatsapp/webhook', hook)).status, 200);
+    const det = (await t.call('GET', `/api/operations/${op2.id}`, null, joao)).body;
+    assert.ok(det.timeline.some((e) => e.type === 'CHEGADA_CONFIRMADA' && e.origem === 'whatsapp'));
+    assert.equal(det.mensagens.find((x) => x.id === m.id).status, 'lida');
+  } finally {
+    await t.close();
+    global.fetch = fetchReal;
+    for (const [k, v] of [['WHATSAPP_MODE', antes.mode], ['WHATSAPP_TOKEN', antes.token], ['WHATSAPP_PHONE_ID', antes.id]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+});
