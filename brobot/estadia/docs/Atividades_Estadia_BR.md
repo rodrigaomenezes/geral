@@ -3,7 +3,7 @@
 **Produto:** Estadia BR — Plataforma de Gestão e Comprovação de Eventos Logísticos
 **Base:** Documento de Atividades DEV 2.0 (05/10/2026) + decisões tomadas na construção e nos testes do MVP de demonstração
 **Objetivo deste material:** descrever o **sistema ideal** em atividades prontas para o backlog, indicando o que entra no **MVP** e o que deve ficar com a **estrutura pronta** para ser ligado depois, sem refazer o produto.
-**Versão deste documento:** 1.3 · 15/10/2026
+**Versão deste documento:** 1.4 · 15/10/2026
 
 ### 🗂️ Histórico de versões
 
@@ -13,6 +13,7 @@
 | 1.1 | 13/10/2026 | Reunião de 13/10: frota (veículos, implementos, composições e tipos de carga), várias fotos por registro, autocadastro de motorista e empresa, cadastro guiado do caminhão e da viagem, nova logo. Atividades 29 a 31. |
 | 1.2 | 14/10/2026 | Painéis por perfil com filtros e acesso às viagens (Atividade 32). Histórico de demonstração para os painéis. Regra de acesso a fotos repetidas entre operações. Códigos de operação sem colisão e lista por chegada mais recente. Decisões D-18 a D-21. |
 | 1.3 | 15/10/2026 | Fotos como prova e conferência automática (Atividade 33): câmera ao vivo nos marcos críticos, origem e horário de cada foto, carimbo visível, guia do que fotografar por marco, regras automáticas (galeria, horário, foto repetida) e análise da imagem por IA como apoio, com selo no app, no portal, no link e no Dossiê. Vídeo curto e carimbo do tempo ICP-Brasil ficam como estrutura. Decisões D-22 a D-28. |
+| 1.4 | 15/10/2026 | **Início da contagem revisto (D-29, regra ESTADIA-BR 2.1):** o tempo conta do registro da chegada pelo motorista, comprovado pela localização no local (até 300 m) e pela foto, sem depender da confirmação do destino. A confirmação passa a reforçar a prova e só é o marco quando falta localização válida. Contestação não pausa a contagem. Atividades 10, 15, 16 e 32 e Anexos A e B atualizados. |
 
 ---
 
@@ -36,6 +37,7 @@ Dentro dos **RF**, cada item tem uma etiqueta de fase:
 5. **Regras de cálculo são versionadas.** Mudar um parâmetro cria uma versão nova e não altera operações já apuradas.
 6. **Marca neutra (white-label).** O usuário final só vê **Estadia BR**.
 7. **Honestidade de status.** O sistema nunca mostra "enviado" ou "confirmado" sem ter certeza.
+8. **A prova não depende da boa-fé da outra parte.** O registro do motorista, com localização no local e foto com data, hora e local, é o que inicia a estadia. A confirmação do destino reforça a prova, mas não é condição (D-29).
 
 ### 📋 Índice de atividades
 
@@ -350,7 +352,7 @@ Fazer o motorista operar **sozinho**, sem treinamento: o app mostra **um único 
 2. **[MVP]** O sistema deve exibir os passos na sequência: identificar → **CHEGUEI** → **COMECEI** → **TERMINEI** → **FUI LIBERADO** → **SAÍ**.
 3. **[MVP]** O sistema deve mostrar uma faixa de progresso com os passos feitos, o atual e os que faltam.
 4. **[MVP]** O sistema deve mostrar, após cada passo, quem já confirmou e quem ainda falta confirmar.
-5. **[MVP]** O sistema deve mostrar o relógio da estadia (tempo desde a chegada confirmada e quanto falta para as 5 horas).
+5. **[MVP]** O sistema deve mostrar o relógio da estadia (tempo desde a chegada comprovada e quanto falta para as 5 horas).
 6. **[MVP]** O sistema deve abrir a câmera direto quando o passo exigir foto.
 7. **[MVP]** O sistema deve mostrar o aviso "Registrado no celular, vai enviar quando tiver sinal" quando estiver sem internet.
 8. **[MVP]** O sistema deve atualizar a tela sozinho quando alguém confirmar pelo link (sem o motorista recarregar).
@@ -417,9 +419,9 @@ Produzir o primeiro marco comprovável da operação: **foto + localização + d
 ---
 
 ## 📜 Regras de Negócio (RN)
-1. Registrar a chegada **não significa** que o destino confirmou a chegada.
+1. Registrar a chegada **não significa** que o destino confirmou a chegada, mas, com a localização a até 300 m do local, **já inicia a contagem da estadia** (D-29). A confirmação do destino é um evento separado que reforça a prova.
 2. A foto de chegada é **obrigatória**. Sem foto, o passo não avança.
-3. O GPS é desejado, mas **não bloqueia** a chegada. A falta vira ocorrência técnica.
+3. O GPS é desejado, mas **não bloqueia** a chegada. A falta vira ocorrência técnica e a contagem passa a depender da confirmação do destino. O app deve insistir para o motorista ativar a localização antes de tocar em CHEGUEI.
 4. O horário do aparelho não pode estar mais de **5 minutos no futuro** em relação ao servidor. Nesse caso, o sistema avisa para conferir o relógio.
 5. A posição da chegada passa a ser o **ponto de referência** da operação quando o local não tiver ponto cadastrado.
 
@@ -437,7 +439,7 @@ Produzir o primeiro marco comprovável da operação: **foto + localização + d
 - **Dado** uma operação identificada, **quando** o motorista tocar em CHEGUEI e tirar a foto, **então** o evento deve ser gravado com foto, GPS, horário do aparelho e do servidor.
 - **Dado** que o GPS está desligado, **quando** registrar a chegada, **então** o evento deve ser gravado com a ocorrência GPS_INDISPONIVEL.
 - **Dado** que o motorista cancelou a câmera, **quando** tentar concluir, **então** o sistema deve pedir a foto novamente.
-- **Dado** a chegada registrada, **quando** o destino ainda não confirmou, **então** o status deve ser "Aguardando confirmação da chegada".
+- **Dado** a chegada registrada, **quando** o destino ainda não confirmou, **então** o status deve ser "No local · aguardando confirmação da chegada" e o relógio da estadia já deve estar correndo, se a chegada tiver localização no local.
 
 ---
 
@@ -648,7 +650,7 @@ Permitir que portaria, destino ou embarcador **confirmem um marco sem instalar n
 2. O link é **não previsível**, ligado a **uma** operação e a **uma** ação. Não dá acesso ao resto da operação.
 3. Cada marco só pode ser confirmado **uma vez**. Cliques repetidos não geram nova confirmação.
 4. A confirmação é um **evento independente** e **não altera** o horário do registro original.
-5. **A confirmação da chegada inicia a contagem do Limite de Estadia (5 h).**
+5. **A confirmação da chegada reforça a prova, mas não inicia nem condiciona a contagem.** O Limite de Estadia começa no registro da chegada com localização no local; só quando falta essa localização é que a confirmação vira o marco inicial (D-29).
 6. "NÃO CONFERE" gera **divergência** para análise. Não apaga o registro do motorista.
 7. O link deve funcionar mesmo que o confirmador não tenha cadastro no sistema.
 
@@ -976,7 +978,7 @@ Calcular automaticamente o **valor devido de estadia** a partir dos eventos, com
 ---
 
 ## ✅ Requisitos Funcionais (RF)
-1. **[MVP]** O sistema deve calcular o **tempo efetivo** = horário da **liberação registrada** − horário da **confirmação da chegada**.
+1. **[MVP]** O sistema deve calcular o **tempo efetivo** = horário da **liberação registrada** − horário da **chegada comprovada**. Chegada comprovada = registro da chegada pelo motorista com GPS a até **300 m** do local cadastrado (ou GPS válido, se o local não tiver coordenadas). Sem isso, vale o horário da **confirmação da chegada** pelo destino.
 2. **[MVP]** O sistema deve aplicar a regra vigente na data da chegada.
 3. **[MVP]** O sistema deve exibir a memória de cálculo (marcos, tempo, capacidade, valor, fórmula, versão e resultado).
 4. **[MVP]** O sistema deve mostrar, durante a operação, o relógio da estadia e o horário em que as 5 horas se completam.
@@ -992,9 +994,11 @@ Calcular automaticamente o **valor devido de estadia** a partir dos eventos, com
 3. Tempo efetivo **> 5 h** → **Valor devido = Tempo efetivo TOTAL × Capacidade do veículo (t) × R$ 2,50 por t·h**.
 4. **É proibido** calcular apenas o excedente (tempo − 5 h) na regra vigente.
 5. Exemplo de referência: 6 h × 30 t × R$ 2,50 = **R$ 450,00**.
-6. Regra vigente: **ESTADIA-BR 2.0**, vigente desde **01/10/2026** (marco inicial = chegada confirmada, marco final = liberação). A versão anterior (ESTADIA-REF 0.1, calculada sobre o excedente) fica preservada para operações antigas.
+6. Regra vigente: **ESTADIA-BR 2.1**, vigente desde **01/10/2026** (marco inicial = **chegada comprovada**, marco final = liberação). Ela substitui a 2.0, que usava a chegada confirmada pelo destino. A versão ESTADIA-REF 0.1 (calculada sobre o excedente) fica preservada para operações antigas.
 7. Uma operação apurada **mantém** a versão da regra usada, mesmo que surja uma regra nova.
-8. Sem chegada confirmada, a apuração fica **pendente**. O sistema informa o motivo e não calcula.
+8. Sem chegada comprovada (sem localização no local e sem confirmação do destino), a apuração fica **pendente**. O sistema informa o motivo e não calcula.
+8a. A contestação do destino ("NÃO CONFERE") **não pausa** a contagem. Vira divergência, tratada com as provas: localização, fotos conferidas, horários e mensagens.
+8b. A memória de cálculo informa qual prova iniciou a contagem (localização no local, com a distância, ou confirmação do destino).
 9. Os marcos, o tratamento de frações e a capacidade considerada dependem de **validação jurídica**. Por isso devem ser parâmetros, não código fixo.
 
 ---
@@ -1007,10 +1011,12 @@ Calcular automaticamente o **valor devido de estadia** a partir dos eventos, com
 ---
 
 ## 🧪 Critérios de Aceite (QA)
-- **Dado** a chegada confirmada às 08:00 e a liberação às 12:30, **quando** apurada, **então** o valor devido deve ser R$ 0,00.
+- **Dado** a chegada registrada às 08:00 com GPS a 50 m do local, sem confirmação do destino, e a liberação às 12:30, **quando** apurada, **então** o tempo deve contar desde 08:00 e o valor devido deve ser R$ 0,00.
+- **Dado** a chegada registrada às 08:00 com GPS a 50 m do local e a liberação às 14:00 (30 t), **quando** apurada, **então** o valor deve ser R$ 450,00, mesmo que o destino nunca confirme.
+- **Dado** a chegada registrada com GPS a 1 km do local e confirmada pelo destino às 08:40, **quando** apurada, **então** o tempo deve contar desde 08:40.
 - **Dado** 6 h de tempo efetivo e 30 t, **quando** apurada, **então** o valor deve ser R$ 450,00, e não R$ 75,00.
 - **Dado** uma operação de setembro/2026, **quando** apurada, **então** deve usar a regra ESTADIA-REF 0.1 e mostrar essa versão.
-- **Dado** a chegada não confirmada, **quando** a apuração for solicitada, **então** deve indicar "aguardando confirmação da chegada".
+- **Dado** a chegada registrada sem localização válida e não confirmada, **quando** a apuração for solicitada, **então** deve ficar pendente e explicar que a contagem começa na confirmação do destino.
 
 ---
 
@@ -1817,7 +1823,7 @@ Dar a cada participante uma visão consolidada das **suas** viagens (quantidades
 
 ## ✅ Requisitos Funcionais (RF)
 1. **[MVP]** O sistema deve oferecer o menu **Painel** no portal e o atalho **Meu painel** no app do motorista.
-2. **[MVP]** O sistema deve exibir os indicadores: viagens (concluídas e em andamento), tempo médio de estadia, quantidade e percentual acima de 5 h, espera média da chegada confirmada até o início, valor devido, valor recebido e saldo pendente.
+2. **[MVP]** O sistema deve exibir os indicadores: viagens (concluídas e em andamento), tempo médio de estadia, quantidade e percentual acima de 5 h, espera média da chegada comprovada até o início, valor devido, valor recebido e saldo pendente.
 3. **[MVP]** O sistema deve exibir o gráfico **Viagens por dia**, separando as viagens dentro do limite das acima de 5 h, pela data de chegada.
 4. **[MVP]** O sistema deve exibir a **distribuição do tempo de estadia** por faixas: até 2 h, 2 a 5 h, 5 a 8 h, 8 a 12 h e 12 h ou mais.
 5. **[MVP]** O sistema deve exibir rankings por perfil:
@@ -1846,7 +1852,7 @@ Dar a cada participante uma visão consolidada das **suas** viagens (quantidades
 
 ## 📜 Regras de Negócio (RN)
 1. Cada perfil vê **somente** as viagens que pode ver na operação: transportadora as suas, destino as do seu local, motorista as dele, jurídico as encaminhadas e administração todas.
-2. O tempo de estadia é o da apuração: da **chegada confirmada** à **liberação**. Viagens em andamento entram nas contagens, mas não nas médias de tempo final.
+2. O tempo de estadia é o da apuração: da **chegada comprovada** à **liberação**. Viagens em andamento entram nas contagens, mas não nas médias de tempo final.
 3. "Acima de 5 h" considera só as viagens já apuradas.
 4. O dia de uma viagem é a data da chegada no horário de Brasília. Sem chegada, vale a data de criação.
 5. O saldo pendente soma apenas saldos positivos.
@@ -1988,7 +1994,7 @@ Aumentar a força de prova das fotos de cada marco: saber **como** e **quando** 
 | Marco | Quem registra | Quem confirma | Evidência | GPS |
 |---|---|---|---|---|
 | Identificação | TAC (Amélia) | — (confirmação única do TAC) | Texto/áudio | Não |
-| Chegada | TAC | Destino/portaria (link) | **Foto obrigatória pela câmera** + localização + conferência | Sim (falta = ocorrência) |
+| Chegada | TAC (**inicia a estadia**, se a localização estiver no local) | Destino/portaria (link): reforça; só vira o marco sem localização válida | **Foto obrigatória pela câmera** + localização + conferência | Sim (falta = ocorrência; contagem passa a depender da confirmação) |
 | Início | TAC ou destino | A outra parte | Registro | Se disponível |
 | Término | TAC ou destino | A outra parte | Foto/documento opcional | Se disponível |
 | Liberação | Destino **ou TAC (MVP)** | A outra parte (obrigatória se foi o TAC) | Comprovante quando houver | Não obrigatório |
@@ -2007,7 +2013,7 @@ Aumentar a força de prova das fotos de cada marco: saber **como** e **quando** 
 | D-05 | Número de quem está na portaria pode ser informado **na hora**. | O contato cadastrado nem sempre é quem atende. | Contatos por local/turno. |
 | D-06 | O TAC pode registrar a liberação, com confirmação obrigatória do destino. | O motorista não pode ficar travado esperando o destino registrar. | Parâmetro por organização. |
 | D-07 | A transportadora acompanha pelo portal ao vivo, sem mensagens no MVP. | Menos envios para o motorista fazer. | Avisos automáticos via API. |
-| D-08 | Regra ESTADIA-BR 2.0 (5 h, R$ 2,50 t·h, tempo total, chegada confirmada → liberação), versionada e vigente desde 01/10/2026. | Regra consolidada pelo cliente. | Novas versões após validação jurídica. |
+| D-08 | Regra ESTADIA-BR 2.0 (5 h, R$ 2,50 t·h, tempo total, chegada confirmada → liberação), versionada e vigente desde 01/10/2026. **Revista pela D-29 (versão 2.1).** | Regra consolidada pelo cliente. | Novas versões após validação jurídica. |
 | D-09 | Registro de eventos somente de inclusão, com cadeia de integridade. | Força de prova do Dossiê. | Carimbo de tempo externo / assinatura ICP-Brasil. |
 | D-10 | Amélia com extração por regras e transcrição do aparelho no MVP. | Custo zero e previsível na fase inicial. | IA generativa + transcrição no servidor. |
 | D-11 | Validade do link de 24 h, com "Pedir novo link". | Segurança sem travar quem confirma depois. | Parâmetro por organização. |
@@ -2028,12 +2034,13 @@ Aumentar a força de prova das fotos de cada marco: saber **como** e **quando** 
 | D-26 | Conferência automática por regras sempre ativa; IA de visão opcional por chave de API. | Funciona sem custo no MVP e melhora quando a IA é ligada. | IA ligada por padrão após validação de custo e precisão. |
 | D-27 | A IA **não bloqueia**: gera selo aderente / duvidosa / não aderente, gravado como evento próprio e levado ao Dossiê como análise de apoio. | Erro da IA não pode tirar o direito do motorista. A decisão final é humana. | Mantém-se. |
 | D-28 | Vídeo curto na chegada fica como estrutura (fase seguinte), com armazenamento em nuvem. | Custo de dados do motorista e de armazenamento. Foto resolve o MVP. | Ligar quando houver armazenamento de objetos. |
+| D-29 | O tempo de estadia conta do **registro da chegada** pelo motorista, comprovado pela localização no local (até 300 m) e pela foto. A confirmação do destino reforça, mas não condiciona; só vira o marco quando falta localização válida. Contestação não pausa a contagem. Regra ESTADIA-BR 2.1. | Orientação de 15/10/2026: proteger o motorista da má-fé da outra parte. A proposta de valor é comprovar os eventos com dados que não podem ser alterados (localização e imagens com data, hora e local). | Validação jurídica do marco; carimbo do tempo ICP-Brasil reforça a prova. |
 
 ---
 
 # 📌 Anexo C — Pontos que ainda dependem de validação
 
-- **Jurídico:** força de prova das fotos com carimbo e conferência automática, necessidade de carimbo do tempo ICP-Brasil, aviso de LGPD para imagens de pessoas e placas;
+- **Jurídico:** registro do motorista com localização e foto como marco inicial da estadia, sem confirmação da outra parte (D-29); força de prova das fotos com carimbo e conferência automática, necessidade de carimbo do tempo ICP-Brasil, aviso de LGPD para imagens de pessoas e placas;
 - **Jurídico (regra):** marco legal de início e fim da contagem, tratamento de frações de hora, capacidade considerada, força de prova da confirmação por link, prazos de retenção.
 - **Negócio:** indicadores e metas que cada cliente quer acompanhar no painel (ex.: meta de tempo médio por local), e se o motorista deve ver valores de todas as viagens ou só das dele.
 - **Técnico:** provedor e custos da API do WhatsApp e da IA (incluindo o custo por viagem da conferência de fotos e a taxa de acerto da IA em fotos reais de campo); volume esperado de viagens por cliente (define quando o painel passa a agregar no servidor); app nativo × PWA (monitoramento de GPS em segundo plano exige app nativo); banco relacional e armazenamento de evidências em nuvem; domínio **stadiabr.com.br**.

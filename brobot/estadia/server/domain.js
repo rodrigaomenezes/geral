@@ -103,7 +103,7 @@ function kindOf(type) {
 const STATUS = {
   CRIADA: 'Criada',
   AGUARDANDO_CHEGADA: 'Aguardando chegada',
-  AGUARDANDO_CONFIRMACAO_CHEGADA: 'Aguardando confirmação da chegada',
+  AGUARDANDO_CONFIRMACAO_CHEGADA: 'No local · aguardando confirmação da chegada',
   CHEGADA_CONFIRMADA: 'Chegada confirmada',
   OPERACAO_INICIADA: 'Operação iniciada',
   INICIO_CONFIRMADO: 'Início confirmado',
@@ -135,7 +135,15 @@ const RULES = [
     id: 'ESTADIA-BR', versao: '2.0', vigenteDesde: '2026-10-01',
     limiteMin: 300, valorTonHora: 2.5, marcoInicial: 'CHEGADA_CONFIRMADA', marcoFinal: 'LIBERACAO', formula: 'TEMPO_TOTAL',
     descricaoFormula: 'Até 5h: R$ 0,00. Acima de 5h: tempo efetivo total × capacidade do veículo × R$ 2,50 por t·h',
-    fonte: 'Regra consolidada pelo cliente (DEV 2.0). Marco final, frações e parâmetros sujeitos a validação jurídica.',
+    fonte: 'Regra consolidada pelo cliente (DEV 2.0). Substituída pela versão 2.1 em 15/10/2026.',
+  },
+  {
+    // D-29: a chegada registrada pelo motorista, comprovada pela localização no local, inicia o tempo.
+    // A confirmação do destino reforça a prova, mas não é condição: protege o motorista da má-fé da outra parte.
+    id: 'ESTADIA-BR', versao: '2.1', vigenteDesde: '2026-10-01',
+    limiteMin: 300, valorTonHora: 2.5, marcoInicial: 'CHEGADA_COMPROVADA', marcoFinal: 'LIBERACAO', formula: 'TEMPO_TOTAL',
+    descricaoFormula: 'Até 5h: R$ 0,00. Acima de 5h: tempo efetivo total × capacidade do veículo × R$ 2,50 por t·h',
+    fonte: 'Regra consolidada pelo cliente (DEV 2.0), revisada em 15/10/2026: o tempo conta da chegada registrada com localização no local (até 300 m), sem depender da confirmação do destino; sem localização válida, conta da confirmação. Marco final, frações e parâmetros sujeitos a validação jurídica.',
   },
 ];
 const LIMITE_DESLOCAMENTO_M = 300;
@@ -371,7 +379,25 @@ const minutesBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 60
 const fmtDur = (min) => { min = Math.max(0, Math.round(min)); return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`; };
 const fmtNum = (v, d = 2) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
+/**
+ * Chegada comprovada (regra 2.1): o registro do motorista com GPS a até 300 m do local cadastrado
+ * (ou com GPS válido, quando o local não tem coordenadas). Sem isso, vale a confirmação do destino.
+ */
+function chegadaComprovada(st) {
+  const ch = st.milestones.CHEGADA;
+  if (!ch) return null;
+  const g = ch.payload.gps;
+  const local = st.op.lat != null && st.op.lng != null ? { lat: Number(st.op.lat), lng: Number(st.op.lng) } : null;
+  if (g && !g.erro) {
+    const distanciaM = local ? haversineM(g, local) : null;
+    if (distanciaM == null || distanciaM <= LIMITE_DESLOCAMENTO_M) return { em: ch.occurredAt, prova: 'localizacao', distanciaM };
+  }
+  const c = st.confirmations[ch.id];
+  return c ? { em: c.occurredAt, prova: 'confirmacao', distanciaM: g && !g.erro && local ? haversineM(g, local) : null } : null;
+}
+
 function marcoTime(st, marco) {
+  if (marco === 'CHEGADA_COMPROVADA') { const c = chegadaComprovada(st); return c ? c.em : null; }
   if (CONFIRMATION_OF[marco]) {
     const ref = st.milestones[CONFIRMATION_OF[marco]];
     const c = ref && st.confirmations[ref.id];
@@ -386,7 +412,10 @@ function apurar(st, nowIso = new Date().toISOString(), rule) {
   const inicio = marcoTime(st, rule.marcoInicial);
   const base = { regra: { ...rule }, capacidadeToneladas: Number(st.op.capacidadeToneladas) || 0 };
   if (!inicio) {
-    return { ...base, pendente: true, motivo: chegada ? 'Aguardando a confirmação da chegada pelo destino, que inicia o Limite de Estadia.' : 'Aguardando a chegada do veículo.' };
+    const motivo = !chegada ? 'Aguardando a chegada do veículo.'
+      : rule.marcoInicial === 'CHEGADA_COMPROVADA' ? 'A chegada foi registrada sem localização no local. O Limite de Estadia começa quando o destino confirmar a chegada.'
+        : 'Aguardando a confirmação da chegada pelo destino, que inicia o Limite de Estadia.';
+    return { ...base, pendente: true, motivo };
   }
   const fimIso = marcoTime(st, rule.marcoFinal);
   const fim = fimIso || nowIso;
@@ -407,12 +436,16 @@ function apurar(st, nowIso = new Date().toISOString(), rule) {
   }
   const cenarios = [];
   const add = (label, a, b, ativo = false) => { if (a && b) cenarios.push({ label, inicio: a, fim: b, minutos: Math.max(0, minutesBetween(a, b)), ativo }); };
-  add('Chegada confirmada → liberação · regra ativa', inicio, fimIso, true);
-  add('Chegada confirmada → saída física', inicio, marcoTime(st, 'SAIDA'));
-  add('Chegada registrada pelo TAC → liberação', marcoTime(st, 'CHEGADA'), fimIso);
+  const comprovada = rule.marcoInicial === 'CHEGADA_COMPROVADA' ? chegadaComprovada(st) : null;
+  const nomeInicio = comprovada ? (comprovada.prova === 'localizacao' ? 'Chegada registrada no local' : 'Chegada confirmada pelo destino') : rule.marcoInicial === 'CHEGADA' ? 'Chegada registrada' : 'Chegada confirmada';
+  add(`${nomeInicio} → liberação · regra ativa`, inicio, fimIso, true);
+  add(`${nomeInicio} → saída física`, inicio, marcoTime(st, 'SAIDA'));
+  if (comprovada && comprovada.prova === 'localizacao') add('Chegada confirmada pelo destino → liberação', marcoTime(st, 'CHEGADA_CONFIRMADA'), fimIso);
+  else add('Chegada registrada pelo TAC → liberação', marcoTime(st, 'CHEGADA'), fimIso);
   return {
     ...base, pendente: false,
-    marcoInicial: inicio, marcoFinal: fimIso, emCurso: !fimIso, limiteEm: new Date(Date.parse(inicio) + rule.limiteMin * 60000).toISOString(),
+    marcoInicial: inicio, inicioPor: comprovada ? comprovada.prova : rule.marcoInicial === 'CHEGADA' ? 'registro' : 'confirmacao',
+    distanciaChegadaM: comprovada ? comprovada.distanciaM : null, marcoFinal: fimIso, emCurso: !fimIso, limiteEm: new Date(Date.parse(inicio) + rule.limiteMin * 60000).toISOString(),
     tempoMin, horas: round2(horas), excedeu, valorDevido, memoria, cenarios,
     ressalva: 'Cálculo pela regra vigente. Não constitui conclusão jurídica.',
   };
@@ -502,5 +535,5 @@ module.exports = {
   DomainError, PERMISSOES, can, MILESTONES, SEQUENCE, CONFIRMATIONS, CONFIRMATION_OF, OCORRENCIAS, STATUS, RULES, ruleFor,
   LIMITE_DESLOCAMENTO_M, ORIGENS_PAGAMENTO, CAMPOS_RETIFICAVEIS,
   labelOf, kindOf, project, validateEvent, nextActions, apurar, alertas, haversineM, verificarDeslocamento,
-  pontoReferencia, fmtDur, elegivelJuridico, financeiro, round2, isParty, fotosDo,
+  pontoReferencia, chegadaComprovada, fmtDur, elegivelJuridico, financeiro, round2, isParty, fotosDo,
 };

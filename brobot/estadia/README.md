@@ -48,7 +48,7 @@ O motorista opera sozinho. Portaria, embarcador e transportadora não precisam i
    - A cada passo, o sistema manda uma mensagem para a portaria pedindo **SIM** ou **NÃO**, com um link para ver a foto e o local.
    - Chegada, liberação e saída também geram um aviso para a transportadora, que responde **OK**.
    - O motorista vê no próprio passo: *enviado ✓*, *chegou no celular ✓✓*, *leu*, *confirmou às 06:20* ou *respondeu NÃO*. O celular vibra quando chega uma confirmação.
-6. **Tempo de espera grande na tela:** começa quando a portaria confirma a chegada e mostra quando vencem as 5 horas.
+6. **Tempo de espera grande na tela:** começa no registro da chegada, quando a localização mostra o caminhão no local (até 300 m), sem esperar a portaria, e mostra quando vencem as 5 horas. Sem localização válida, começa na confirmação da portaria.
 7. **Se der problema:**
    - **Sem internet:** o app guarda tudo no celular e envia sozinho depois.
    - **Contato sem número:** o app pede o WhatsApp da portaria e reenvia a mensagem.
@@ -94,7 +94,7 @@ Para iniciar conversas fora da janela de 24h, a Meta exige *templates* aprovados
 4. **Confirmação:** no celular 1 aparece "Confirmado por Marina" e o tempo de espera começa.
 5. **Divergência:** siga com **COMEÇOU A DESCARGA**. Desta vez, no simulador, responda **NÃO**: vira divergência.
 6. **Até o fim:** **TERMINOU**, **FUI LIBERADO** e **SAÍ DO LOCAL** (foto do comprovante). Veja a tela final com tempo e valor.
-7. **Computador, Carla (transportadora):** abra a operação, veja o quadro *Mensagens de WhatsApp* com cada resposta, e o dossiê. Em `OP-2026-0003` há um histórico completo com R$ 840,00 devidos.
+7. **Computador, Carla (transportadora):** abra a operação, veja o quadro *Mensagens de WhatsApp* com cada resposta, e o dossiê. Em `OP-2026-0003` há um histórico completo com R$ 850,00 devidos.
 
 **Para repetir:** use **Administração → Reiniciar demonstração**.
 
@@ -143,7 +143,7 @@ A demonstração traz um histórico fictício de viagens (desde 01/10/2026, iní
 | Dados da operação (RF-02) | Tipo, implemento, capacidade, peso, volume, carga, NF-e, CT-e, MDF-e, local, data prevista, responsável e WhatsApp do destino |
 | Amélia (épico 02, 36) | Texto ou áudio. O áudio é gravado e guardado como evidência; a transcrição usa o navegador quando disponível. O TAC confirma uma única vez e cada dado mostra o trecho de onde veio, sem inventar informação (RN-03) |
 | Confirmação via WhatsApp (épicos 04, 21, 22, 38) | A **resposta** SIM/NÃO/OK no WhatsApp confirma o evento ou o recebimento. A mensagem também leva um link único, que expira e mostra a foto e o local. Envio, entrega, leitura e resposta ficam auditados |
-| Limite de Estadia (RN-10, 22) | Começa na **confirmação da chegada** e vai até a **liberação** (marco final a homologar). A tela mostra uma contagem regressiva |
+| Limite de Estadia (RN-10, 22) | Começa na **chegada registrada com localização no local** (regra 2.1, D-29; a confirmação do destino reforça a prova e só é o marco quando falta localização) e vai até a **liberação** (marco final a homologar). A tela mostra uma contagem regressiva |
 | Cálculo (RN-23 a 27) | Até 5h: **R$ 0,00**. Acima de 5h: **tempo total × capacidade × R$ 2,50**. Exemplo do documento (6h × 30 t = R$ 450,00) coberto por teste |
 | Versionamento (RN-28) | Regras `ESTADIA-REF 0.1` (antiga) e `ESTADIA-BR 2.0` (vigente), com vigência, fórmula, capacidade, tempo e resultado gravados em cada apuração |
 | Deslocamento (épico 05) | Raio fixo de **300 m** sobre o local cadastrado (ou a posição da chegada). O app envia a posição a cada 2 min; acima do limite, registra `DESLOCAMENTO_FORA_DO_LIMITE`, que entra no dossiê |

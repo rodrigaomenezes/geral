@@ -1048,7 +1048,7 @@
       tempo = `<div class="drv-timer ${passou ? 'over' : ''}"><span class="drv-label">${ap.emCurso ? 'Tempo de espera' : 'Tempo total de estadia'}</span><b id="drv-t">${dur(t)}</b>
         <span>${passou ? 'Passou de 5 horas: o tempo todo conta para a estadia.' : ap.emCurso ? `Limite de 5 horas às ${hhmm(ap.limiteEm)}` : 'Dentro das 5 horas'}</span></div>`;
     } else if (reg.CHEGADA) {
-      tempo = `<div class="drv-timer wait"><span class="drv-label">Tempo de espera</span><b>—</b><span>O tempo começa quando a portaria confirmar sua chegada.</span></div>`;
+      tempo = `<div class="drv-timer wait"><span class="drv-label">Tempo de espera</span><b>—</b><span>Não deu para comprovar sua localização no local. O tempo começa quando a portaria confirmar a chegada.</span></div>`;
     }
 
     // Mensagens ligadas a cada passo
@@ -1451,12 +1451,12 @@
   }
 
   function limiteHtml(ap) {
-    if (!ap || ap.pendente) return `<div id="limite-live" class="limite"><span class="label">Limite de Estadia · 5 horas</span><p class="small muted">${esc(ap ? ap.motivo : '')} O limite começa a contar na confirmação da chegada pelo destino.</p></div>`;
+    if (!ap || ap.pendente) return `<div id="limite-live" class="limite"><span class="label">Limite de Estadia · 5 horas</span><p class="small muted">${esc(ap ? ap.motivo : '')} O limite conta da chegada registrada com localização no local; sem ela, da confirmação do destino.</p></div>`;
     const lim = ap.regra.limiteMin, scale = Math.max(12 * 60, ap.tempoMin * 1.1);
     const w = Math.min(100, (ap.tempoMin / scale) * 100), lp = (lim / scale) * 100;
     const ticks = [0, 0.25, 0.5, 0.75, 1].map((k) => `<span>${Math.round((scale * k) / 60)}h</span>`).join('');
     const rest = lim - ap.tempoMin;
-    return `<div id="limite-live" class="limite"><div class="row between small"><span><span class="label">Limite de Estadia</span> desde ${hhmm(ap.marcoInicial)} (confirmação da chegada) · <b class="mono">${dur(ap.tempoMin)}</b> ${ap.emCurso ? 'em curso' : 'até a liberação'}</span>
+    return `<div id="limite-live" class="limite"><div class="row between small"><span><span class="label">Limite de Estadia</span> desde ${hhmm(ap.marcoInicial)} (${ap.inicioPor === 'localizacao' ? 'chegada registrada no local' : 'confirmação da chegada'}) · <b class="mono">${dur(ap.tempoMin)}</b> ${ap.emCurso ? 'em curso' : 'até a liberação'}</span>
       ${ap.excedeu ? `<span style="color:var(--crit);font-weight:600">limite excedido · valor calculado sobre o tempo total</span>` : `<span class="muted">${ap.emCurso ? `restam ${dur(rest)} (vence ${hhmm(ap.limiteEm)})` : 'dentro do limite'}</span>`}</div>
       <div class="meter"><div class="fill ${ap.excedeu ? 'over' : ''}" style="width:${w}%"></div><div class="tick" style="left:${lp}%"><span>5h</span></div></div><div class="scale">${ticks}</div></div>`;
   }
@@ -1540,7 +1540,7 @@
         body += `<div class="row">${seloHtml(e, false)}<span class="small muted">${p.motor === 'ia' ? 'Análise da imagem por IA + regras' : 'Regras automáticas (origem, horário, repetição)'} · ${p.fotos.length} foto${p.fotos.length > 1 ? 's' : ''}</span></div>
           <span class="small">${esc(p.resumo)}</span>
           ${(p.checagens || []).length ? `<ul class="chk-list">${p.checagens.map((c) => `<li class="${c.atendido === 'sim' ? 'ok' : c.atendido === 'nao' ? 'nok' : ''}">${c.atendido === 'sim' ? '✓' : c.atendido === 'nao' ? '✗' : '–'} ${esc(c.item)}${c.detalhe ? ` <span class="muted">· ${esc(c.detalhe)}</span>` : ''}</li>`).join('')}</ul>` : ''}
-          ${(p.achados || []).length ? `<ul class="chk-list">${p.achados.map((a) => `<li class="${a.resultado === 'aderente' ? '' : 'nok'}">! ${esc(a.txt)}</li>`).join('')}</ul>` : ''}
+          ${(p.achados || []).filter((a) => a.txt !== p.resumo).length ? `<ul class="chk-list">${p.achados.filter((a) => a.txt !== p.resumo).map((a) => `<li class="${a.resultado === 'aderente' ? '' : 'nok'}">! ${esc(a.txt)}</li>`).join('')}</ul>` : ''}
           ${p.placaLida ? `<span class="small">Placa lida: <b class="mono">${esc(placaFmt(p.placaLida))}</b> ${p.placaConfere ? '· confere com o cadastro' : p.placaConfere === false ? '· <b>diferente do cadastro</b>' : ''}</span>` : ''}
           <span class="small muted">Análise de apoio: não bloqueia o registro nem substitui a confirmação das partes.</span>`;
       } else if (e.kind === 'ocorrencia') {
@@ -1579,7 +1579,7 @@
     const ultAp = d.timeline.filter((e) => e.type === 'APURACAO').pop();
     return `<div class="card"><div class="card-h"><h2>Apuração</h2><span class="pill ${ap.emCurso ? 'warn' : 'ok'}">${ap.emCurso ? 'prévia em curso' : `${d.apuracoes} registrada${d.apuracoes > 1 ? 's' : ''}`}</span></div>
       <div class="row between"><div><span class="label">Valor devido</span><div class="bignum">${brl(ap.valorDevido)}</div></div><div style="text-align:right"><span class="label">Tempo efetivo</span><div class="bignum" style="font-size:32px">${dur(ap.tempoMin)}</div></div></div>
-      <div class="calc"><span>Marco inicial · chegada confirmada</span><span class="v">${diaHora(ap.marcoInicial)}</span>
+      <div class="calc"><span>Marco inicial · ${ap.inicioPor === 'localizacao' ? `chegada registrada no local${ap.distanciaChegadaM != null ? ` (${ap.distanciaChegadaM} m)` : ''}` : 'chegada confirmada pelo destino'}</span><span class="v">${diaHora(ap.marcoInicial)}</span>
         <span>Marco final · liberação</span><span class="v">${ap.marcoFinal ? diaHora(ap.marcoFinal) : 'em aberto'}</span>
         <span>Limite de Estadia</span><span class="v">${dur(regra.limiteMin)}</span><span>Capacidade do veículo</span><span class="v">${num(ap.capacidadeToneladas)} t</span>
 </div>
@@ -1814,7 +1814,7 @@
       const fxMax = Math.max(1, ...fx.map(([, v]) => v));
       const hist = `<div class="cols hist">${fx.map(([n, v], i) => `<button type="button" class="col ${F.filtros.faixa === n ? 'sel' : ''}" data-dim="faixa" data-val="${n}" data-tip="<b>${n}</b><br>${v} viage${v === 1 ? 'm' : 'ns'} · ${pct(v, apuradas.length)}" aria-label="${n}: ${v} viagens">
           <span class="col-v">${v}</span><span class="col-bar"><i class="seg ${i >= 2 ? 'acima' : 'ok'}" style="height:${(v / fxMax) * 100}%"></i></span><span class="col-x">${n}</span></button>`).join('')}</div>
-        <p class="small muted">Da chegada confirmada à liberação. A partir de 5h o valor é calculado sobre o tempo total.</p>`;
+        <p class="small muted">Da chegada comprovada à liberação. A partir de 5h o valor é calculado sobre o tempo total.</p>`;
 
       // Rankings (métrica escolhida)
       const ranking = ([k, titulo]) => {
@@ -1860,7 +1860,7 @@
           ${kpi('Viagens', rows.length, `${rows.filter((r) => r.concluida).length} concluídas · ${rows.filter((r) => !r.concluida).length} em andamento`)}
           ${kpi('Tempo médio de estadia', dur(avg(apuradas.map((r) => r.tempoMin))), `${apuradas.length} apuradas`)}
           ${kpi('Acima de 5h', acima.length, `${pct(acima.length, apuradas.length)} das apuradas · toque para filtrar`, 'acima', F.acima)}
-          ${kpi('Espera até começar', dur(avg(rows.map((r) => r.esperaMin).filter((v) => v != null))), 'da chegada confirmada ao início')}
+          ${kpi('Espera até começar', dur(avg(rows.map((r) => r.esperaMin).filter((v) => v != null))), 'da chegada comprovada ao início')}
           ${kpi('Valor devido', brl(soma(rows.map((r) => r.devido))), `recebido ${brl(soma(rows.map((r) => r.pago)))}`)}
           ${kpi('Saldo pendente', brl(soma(rows.map((r) => (r.saldo > 0 ? r.saldo : 0)))), `${rows.filter((r) => r.saldo > 0).length} viagens · toque para filtrar`, 'saldo', F.saldo)}
         </div>

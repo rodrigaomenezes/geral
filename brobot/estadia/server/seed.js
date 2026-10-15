@@ -165,7 +165,7 @@ function seed(dir, store, { quiet = false } = {}) {
   zap(marinaZap, [-1, 17, 32], 'CONFIRMAR', l3, 'LIBERACAO_CONFIRMADA', 'foi liberado para viagem às 17:32', 'sim', [-1, 17, 35]);
   zap(carlaZap, [-1, 17, 32], 'INFORMAR', l3, null, 'foi liberado para viagem às 17:32', 'Recebido', [-1, 17, 50]);
   const s3 = e3('SAIDA', u.ana, [-1, 17, 41], { payload: { photo: doc } });
-  zap(carlaZap, [-1, 17, 42], 'INFORMAR', s3, null, 'saiu do local às 17:41. Tempo de estadia 11h12, valor devido R$ 840,00', 'ok', [-1, 18, 2]);
+  zap(carlaZap, [-1, 17, 42], 'INFORMAR', s3, null, 'saiu do local às 17:41. Tempo de estadia 11h20, valor devido R$ 850,00', 'ok', [-1, 18, 2]);
 
   const historico = gerarHistorico({ dir, store, o, u, actor, photo, doc, sistema });
 

@@ -429,7 +429,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
         tempoMin: ap.pendente ? null : ap.tempoMin, emCurso: !ap.pendente && ap.emCurso, excedeu: !ap.pendente && ap.excedeu,
         devido: st.financeiro.devido, pago: st.financeiro.pago, saldo: st.financeiro.saldo,
         confirmacaoMin: mins(ms.CHEGADA && ms.CHEGADA.occurredAt, conf('CHEGADA') && conf('CHEGADA').occurredAt),
-        esperaMin: mins(conf('CHEGADA') && conf('CHEGADA').occurredAt, ms.INICIO && ms.INICIO.occurredAt),
+        esperaMin: mins(D.chegadaComprovada(st) && D.chegadaComprovada(st).em, ms.INICIO && ms.INICIO.occurredAt),
         operacaoMin: mins(ms.INICIO && ms.INICIO.occurredAt, ms.TERMINO && ms.TERMINO.occurredAt),
         divergencias: st.divergences.length, deslocamentos: st.ocorrencias.filter((o) => o.type === 'DESLOCAMENTO_FORA_DO_LIMITE').length,
         semConfirmacao: Object.keys(D.CONFIRMATIONS).some((t) => ms[t] && !st.confirmations[ms[t].id]),
@@ -1049,7 +1049,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
 
       if (sub === '/apuracao' && req.method === 'POST') {
         if (!D.can(user, 'gerar_dossie')) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não solicita apuração.');
-        if (!recordApuracao(st, actorOf(user))) return fail(res, 409, 'SEM_MARCO', 'A apuração começa na confirmação da chegada.');
+        if (!recordApuracao(st, actorOf(user))) return fail(res, 409, 'SEM_MARCO', 'A apuração começa na chegada registrada com localização no local ou, sem ela, na confirmação do destino.');
         return send(res, 201, fresh());
       }
 

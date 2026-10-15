@@ -78,7 +78,7 @@ test('Motorista opera sozinho: registra cada passo e o destino confirma responde
     assert.match(mDest.texto, /Responda \*SIM\*/);
     assert.match(mDest.texto, /\/c\/[A-Za-z0-9_-]{20,}/, 'mensagem leva o link da foto');
     assert.equal(mTransp.finalidade, 'INFORMAR');
-    assert.equal(cheg.body.detalhe.apuracao.pendente, true, 'limite só começa na confirmação');
+    assert.equal(cheg.body.detalhe.apuracao.pendente, false, 'D-29: com GPS no local o limite começa no registro, sem esperar a confirmação');
     assert.ok(!fs.readFileSync(path.join(t.dataDir, 'events.jsonl'), 'utf8').match(/\/c\/[A-Za-z0-9_-]{20,}/), 'link não fica no log');
 
     // Simulador marca entregue/lida; resposta "Sim" vira confirmação com origem WhatsApp
@@ -90,7 +90,8 @@ test('Motorista opera sozinho: registra cada passo e o destino confirma responde
     const confEv = det.timeline.find((e) => e.type === 'CHEGADA_CONFIRMADA');
     assert.equal(confEv.origem, 'whatsapp');
     assert.match(confEv.actor.name, /Marina \(WhatsApp\)/);
-    assert.equal(det.apuracao.marcoInicial, confEv.occurredAt, 'QA-08: confirmação inicia o Limite de Estadia');
+    assert.equal(det.apuracao.marcoInicial, cheg.body.evento.occurredAt, 'D-29: chegada registrada com GPS no local inicia o Limite de Estadia');
+    assert.equal(det.apuracao.inicioPor, 'localizacao');
     assert.equal(det.mensagens.find((m) => m.id === mDest.id).status, 'lida');
     // Transportadora responde OK = ciência do aviso
     const r2 = await sim('5511900000010', 'ok');
@@ -197,7 +198,25 @@ test('RN-22..27: até 5h → R$ 0; acima de 5h → tempo total × capacidade × 
   assert.equal(D.apurar(mk(360)).valorDevido, 450, 'exemplo do documento');
   assert.equal(D.apurar(mk(301)).valorDevido, Math.round((301 / 60) * 30 * 2.5 * 100) / 100, 'tempo total, não só o excedente');
   assert.equal(D.apurar(mk(360, 24)).valorDevido, 360);
-  assert.equal(D.apurar(mk(360)).marcoInicial, '2026-10-05T09:00:00.000Z', 'marco inicial = confirmação da chegada');
+  assert.equal(D.apurar(mk(360)).marcoInicial, '2026-10-05T09:00:00.000Z', 'sem GPS na chegada: marco inicial = confirmação da chegada');
+  // D-29: com GPS no local, o tempo conta do registro do motorista, mesmo sem confirmação do destino
+  const comGps = (gps, confirma) => {
+    const t0 = Date.parse('2026-10-05T09:00:00Z');
+    const ev = (id, type, min, extra = {}) => ({ id, type, opId: 'y', occurredAt: new Date(t0 + min * 60000).toISOString(), receivedAt: new Date(t0 + min * 60000).toISOString(), actor: { role: 'tac' }, refEventId: null, payload: {}, ...extra });
+    return D.project([
+      { id: 'c', type: 'OPERACAO_CRIADA', opId: 'y', occurredAt: '2026-10-05T08:00:00Z', receivedAt: '2026-10-05T08:00:00Z', actor: { role: 'transportadora' }, payload: { capacidadeToneladas: 30, lat: JUNDIAI.lat, lng: JUNDIAI.lng } },
+      ev('a', 'CHEGADA', 0, { payload: { gps } }), ...(confirma ? [ev('b', 'CHEGADA_CONFIRMADA', 40, { refEventId: 'a', actor: { role: 'destino' } })] : []), ev('l', 'LIBERACAO', 360),
+    ]);
+  };
+  const noLocal = D.apurar(comGps(JUNDIAI, false));
+  assert.equal(noLocal.pendente, false, 'não depende da confirmação');
+  assert.equal(noLocal.inicioPor, 'localizacao');
+  assert.equal(noLocal.valorDevido, 450, '6h desde o registro × 30 t × R$ 2,50');
+  const longe = D.apurar(comGps({ lat: JUNDIAI.lat + 0.01, lng: JUNDIAI.lng, acc: 10 }, false));
+  assert.equal(longe.pendente, true, 'GPS a mais de 300 m não comprova a chegada');
+  const longeConfirmado = D.apurar(comGps({ lat: JUNDIAI.lat + 0.01, lng: JUNDIAI.lng, acc: 10 }, true));
+  assert.equal(longeConfirmado.inicioPor, 'confirmacao');
+  assert.equal(longeConfirmado.marcoInicial, '2026-10-05T09:40:00.000Z');
 });
 
 test('RN-29..34: conciliação financeira e status (aguardando, parcial, divergente, em tratativa, pago)', async () => {
@@ -208,9 +227,9 @@ test('RN-29..34: conciliação financeira e status (aguardando, parcial, diverge
     const marina = await t.login('portaria@serraazul.demo');
     const ops = (await t.call('GET', '/api/operations', null, carla)).body;
     const op3 = ops.find((o) => o.codigo === 'OP-2026-0003');
-    assert.equal(op3.financeiro.devido, 840, '11,2 h × 30 t × R$ 2,50');
+    assert.equal(op3.financeiro.devido, 850, '11h20 desde a chegada registrada no local × 30 t × R$ 2,50');
     assert.equal(op3.financeiro.pago, 400);
-    assert.equal(op3.financeiro.saldo, 440);
+    assert.equal(op3.financeiro.saldo, 450);
     assert.equal(op3.statusCode, 'PAGAMENTO_PARCIAL');
     assert.equal(ops.find((o) => o.codigo === 'OP-2026-0004').statusCode, 'ENCERRADA');
 
@@ -218,7 +237,7 @@ test('RN-29..34: conciliação financeira e status (aguardando, parcial, diverge
     assert.equal((await post(marina, { type: 'PAGAMENTO_REGISTRADO', occurredAt: now(), valor: 10 })).status, 403, 'destino não registra pagamento');
     let r = await post(ana, { type: 'SITUACAO_FINANCEIRA', occurredAt: now(), situacao: 'EM_TRATATIVA', note: 'Negociando saldo' });
     assert.equal(r.body.detalhe.resumo.statusCode, 'EM_TRATATIVA');
-    r = await post(carla, { type: 'PAGAMENTO_REGISTRADO', occurredAt: now(), valor: '440,00', origem: 'negociacao' });
+    r = await post(carla, { type: 'PAGAMENTO_REGISTRADO', occurredAt: now(), valor: '450,00', origem: 'negociacao' });
     assert.equal(r.body.detalhe.financeiro.saldo, 0);
     assert.equal(r.body.detalhe.resumo.statusCode, 'PAGO');
     r = await post(carla, { type: 'PAGAMENTO_REGISTRADO', occurredAt: now(), valor: 50, origem: 'outros' });
