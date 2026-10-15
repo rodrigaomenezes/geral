@@ -142,7 +142,7 @@ const RULES = [
     // A confirmação do destino reforça a prova, mas não é condição: protege o motorista da má-fé da outra parte.
     id: 'ESTADIA-BR', versao: '2.1', vigenteDesde: '2026-10-01',
     limiteMin: 300, valorTonHora: 2.5, marcoInicial: 'CHEGADA_COMPROVADA', marcoFinal: 'LIBERACAO', formula: 'TEMPO_TOTAL',
-    descricaoFormula: 'Até 5h: R$ 0,00. Acima de 5h: tempo efetivo total × capacidade do veículo × R$ 2,50 por t·h',
+    descricaoFormula: 'Passou do limite de 5h: todo o tempo desde a chegada × capacidade do veículo × R$ 2,50 por t·h, sem franquia (5h15 cobra 5h15). Operação inteira dentro de 5h: R$ 0,00',
     fonte: 'Regra consolidada pelo cliente (DEV 2.0), revisada em 15/10/2026: o tempo conta da chegada registrada com localização no local (até 300 m), sem depender da confirmação do destino; sem localização válida, conta da confirmação. Marco final, frações e parâmetros sujeitos a validação jurídica.',
   },
 ];

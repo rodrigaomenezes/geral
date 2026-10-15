@@ -3,7 +3,7 @@
 **Produto:** Estadia BR — Plataforma de Gestão e Comprovação de Eventos Logísticos
 **Base:** Documento de Atividades DEV 2.0 (05/10/2026) + decisões tomadas na construção e nos testes do MVP de demonstração
 **Objetivo deste material:** descrever o **sistema ideal** em atividades prontas para o backlog, indicando o que entra no **MVP** e o que deve ficar com a **estrutura pronta** para ser ligado depois, sem refazer o produto.
-**Versão deste documento:** 1.4 · 15/10/2026
+**Versão deste documento:** 1.5 · 15/10/2026
 
 ### 🗂️ Histórico de versões
 
@@ -14,6 +14,7 @@
 | 1.2 | 14/10/2026 | Painéis por perfil com filtros e acesso às viagens (Atividade 32). Histórico de demonstração para os painéis. Regra de acesso a fotos repetidas entre operações. Códigos de operação sem colisão e lista por chegada mais recente. Decisões D-18 a D-21. |
 | 1.3 | 15/10/2026 | Fotos como prova e conferência automática (Atividade 33): câmera ao vivo nos marcos críticos, origem e horário de cada foto, carimbo visível, guia do que fotografar por marco, regras automáticas (galeria, horário, foto repetida) e análise da imagem por IA como apoio, com selo no app, no portal, no link e no Dossiê. Vídeo curto e carimbo do tempo ICP-Brasil ficam como estrutura. Decisões D-22 a D-28. |
 | 1.4 | 15/10/2026 | **Início da contagem revisto (D-29, regra ESTADIA-BR 2.1):** o tempo conta do registro da chegada pelo motorista, comprovado pela localização no local (até 300 m) e pela foto, sem depender da confirmação do destino. A confirmação passa a reforçar a prova e só é o marco quando falta localização válida. Contestação não pausa a contagem. Atividades 10, 15, 16 e 32 e Anexos A e B atualizados. |
+| 1.5 | 15/10/2026 | Reforço da regra de cálculo: passou do limite, todo o tempo desde a chegada é cobrado (sem franquia; 5 h 15 min cobra 5 h 15 min). Limite tratado como parâmetro sujeito a mudança na lei. Critério de aceite novo. |
 
 ---
 
@@ -989,9 +990,9 @@ Calcular automaticamente o **valor devido de estadia** a partir dos eventos, com
 ---
 
 ## 📜 Regras de Negócio (RN)
-1. **Limite de Estadia: 5 horas.**
-2. Tempo efetivo **≤ 5 h** → **Valor devido = R$ 0,00**.
-3. Tempo efetivo **> 5 h** → **Valor devido = Tempo efetivo TOTAL × Capacidade do veículo (t) × R$ 2,50 por t·h**.
+1. **Limite de Estadia: 5 horas** (parâmetro da regra; se a lei mudar, cria-se uma nova versão, sem mudar o sistema).
+2. Operação inteira dentro do limite (tempo efetivo **≤ 5 h**) → **Valor devido = R$ 0,00**.
+3. Tempo efetivo **> 5 h** → **Valor devido = Tempo efetivo TOTAL × Capacidade do veículo (t) × R$ 2,50 por t·h**. Passou do limite, **todo o tempo desde a chegada é cobrado**: não existe franquia nem tempo sem cobrança. Ex.: 5 h 15 min cobra 5 h 15 min (5,25 h × 30 t × R$ 2,50 = R$ 393,75).
 4. **É proibido** calcular apenas o excedente (tempo − 5 h) na regra vigente.
 5. Exemplo de referência: 6 h × 30 t × R$ 2,50 = **R$ 450,00**.
 6. Regra vigente: **ESTADIA-BR 2.1**, vigente desde **01/10/2026** (marco inicial = **chegada comprovada**, marco final = liberação). Ela substitui a 2.0, que usava a chegada confirmada pelo destino. A versão ESTADIA-REF 0.1 (calculada sobre o excedente) fica preservada para operações antigas.
@@ -1015,6 +1016,7 @@ Calcular automaticamente o **valor devido de estadia** a partir dos eventos, com
 - **Dado** a chegada registrada às 08:00 com GPS a 50 m do local e a liberação às 14:00 (30 t), **quando** apurada, **então** o valor deve ser R$ 450,00, mesmo que o destino nunca confirme.
 - **Dado** a chegada registrada com GPS a 1 km do local e confirmada pelo destino às 08:40, **quando** apurada, **então** o tempo deve contar desde 08:40.
 - **Dado** 6 h de tempo efetivo e 30 t, **quando** apurada, **então** o valor deve ser R$ 450,00, e não R$ 75,00.
+- **Dado** 5 h 15 min de tempo efetivo e 30 t, **quando** apurada, **então** o valor deve ser R$ 393,75 (as 5 h 15 min inteiras), e não R$ 18,75.
 - **Dado** uma operação de setembro/2026, **quando** apurada, **então** deve usar a regra ESTADIA-REF 0.1 e mostrar essa versão.
 - **Dado** a chegada registrada sem localização válida e não confirmada, **quando** a apuração for solicitada, **então** deve ficar pendente e explicar que a contagem começa na confirmação do destino.
 

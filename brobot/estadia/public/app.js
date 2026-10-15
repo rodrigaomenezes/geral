@@ -1046,7 +1046,7 @@
       const t = ap.emCurso ? Math.max(0, Math.round((Date.now() - Date.parse(ap.marcoInicial)) / 60000)) : ap.tempoMin;
       const passou = t > ap.regra.limiteMin;
       tempo = `<div class="drv-timer ${passou ? 'over' : ''}"><span class="drv-label">${ap.emCurso ? 'Tempo de espera' : 'Tempo total de estadia'}</span><b id="drv-t">${dur(t)}</b>
-        <span>${passou ? 'Passou de 5 horas: o tempo todo conta para a estadia.' : ap.emCurso ? `Limite de 5 horas às ${hhmm(ap.limiteEm)}` : 'Dentro das 5 horas'}</span></div>`;
+        <span>${passou ? 'Passou de 5 horas: todo o tempo desde a chegada é cobrado.' : ap.emCurso ? `Limite de 5 horas às ${hhmm(ap.limiteEm)}` : 'Dentro das 5 horas'}</span></div>`;
     } else if (reg.CHEGADA) {
       tempo = `<div class="drv-timer wait"><span class="drv-label">Tempo de espera</span><b>—</b><span>Não deu para comprovar sua localização no local. O tempo começa quando a portaria confirmar a chegada.</span></div>`;
     }

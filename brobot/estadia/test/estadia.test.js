@@ -197,6 +197,7 @@ test('RN-22..27: até 5h → R$ 0; acima de 5h → tempo total × capacidade × 
   assert.equal(D.apurar(mk(299)).valorDevido, 0);
   assert.equal(D.apurar(mk(360)).valorDevido, 450, 'exemplo do documento');
   assert.equal(D.apurar(mk(301)).valorDevido, Math.round((301 / 60) * 30 * 2.5 * 100) / 100, 'tempo total, não só o excedente');
+  assert.equal(D.apurar(mk(315)).valorDevido, 393.75, '5h15 cobra 5h15: não há tempo sem cobrança');
   assert.equal(D.apurar(mk(360, 24)).valorDevido, 360);
   assert.equal(D.apurar(mk(360)).marcoInicial, '2026-10-05T09:00:00.000Z', 'sem GPS na chegada: marco inicial = confirmação da chegada');
   // D-29: com GPS no local, o tempo conta do registro do motorista, mesmo sem confirmação do destino
