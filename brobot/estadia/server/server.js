@@ -214,7 +214,9 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     for (const st of allStates()) for (const m of st.mensagens) all.push({ st, m });
     if (mensagemId) return all.find((x) => x.m.id === mensagemId) || null;
     if (contextId) { const x = all.find((y) => y.m.externalId === contextId || y.m.id === contextId); if (x) return x; }
-    const doFone = all.filter((x) => x.m.para.telefone === fone && Date.now() - Date.parse(x.m.enviadaEm) < 72 * 3600000)
+    // O WhatsApp identifica muitos celulares brasileiros sem o 9 após o DDD (55 11 9xxxx-xxxx → 55 11 xxxx-xxxx).
+    const sem9 = (t) => (t && /^55\d{2}9\d{8}$/.test(t) ? t.slice(0, 4) + t.slice(5) : t);
+    const doFone = all.filter((x) => sem9(x.m.para.telefone) === sem9(fone) && Date.now() - Date.parse(x.m.enviadaEm) < 72 * 3600000)
       .sort((a, b) => b.m.enviadaEm.localeCompare(a.m.enviadaEm));
     const pendente = doFone.find((x) => x.m.finalidade === 'CONFIRMAR' && !x.m.respostas.some((r) => r.interpretacao !== 'OUTRO') && !x.st.confirmations[x.m.refEventId]);
     return pendente || doFone.find((x) => !x.m.respostas.length) || doFone[0] || null;

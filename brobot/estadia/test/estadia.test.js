@@ -610,6 +610,13 @@ test('WhatsApp por transportadora: plano manual (sem custo) ou API oficial, esco
     const det = (await t.call('GET', `/api/operations/${op2.id}`, null, joao)).body;
     assert.ok(det.timeline.some((e) => e.type === 'CHEGADA_CONFIRMADA' && e.origem === 'whatsapp'));
     assert.equal(det.mensagens.find((x) => x.id === m.id).status, 'lida');
+    // Resposta sem citar a mensagem, vinda do número sem o 9 (como o WhatsApp identifica muitos celulares do Brasil)
+    const op3 = await nova(t, carla, { nfe: '1001' });
+    await t.call('POST', '/api/operations/identify', { codigo: op3.codigo, placa: 'RTB4F27', occurredAt: now() }, joao);
+    await t.call('POST', `/api/operations/${op3.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photo: PHOTO }, joao);
+    const hook2 = { entry: [{ changes: [{ value: { messages: [{ from: '551100000001', id: 'wamid.resp2', type: 'text', text: { body: 'sim' }, timestamp: String(Math.floor(Date.now() / 1000)) }] } }] }] };
+    await t.call('POST', '/api/whatsapp/webhook', hook2);
+    assert.ok((await t.call('GET', `/api/operations/${op3.id}`, null, joao)).body.timeline.some((e) => e.type === 'CHEGADA_CONFIRMADA'), 'número sem o 9 também confirma');
   } finally {
     await t.close();
     global.fetch = fetchReal;
