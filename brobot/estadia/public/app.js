@@ -939,7 +939,7 @@
 
   function demoToolsHtml(d) {
     if (!(S.config && S.config.demo)) return '';
-    return `<details class="drv-demo"><summary>Ferramentas da demonstração · WhatsApp: ${esc({ manual: 'pelo celular do motorista', simulado: 'simulador', api: 'API oficial' }[d.zapModo] || d.zapModo)}</summary>
+    return `<details class="drv-demo"><summary>Ferramentas da demonstração · WhatsApp: ${esc({ manual: 'pelo celular do motorista', simulado: 'simulador', api: 'API oficial' }[(d && d.zapModo) || S.config.zapModo] || (d && d.zapModo) || S.config.zapModo)}</summary>
       <div class="row"><button class="btn small" id="dm-off">${S.simOffline ? 'Reativar sinal' : 'Simular sem sinal'}</button>
       ${d && d.referencia ? '<button class="btn small" id="dm-desl">Simular afastamento de 450 m</button>' : ''}
       ${S.config.zapModo === 'simulado' ? '<a class="btn small" href="/whatsapp.html" target="_blank" rel="noopener">Abrir celular do destino (simulador)</a>' : ''}
