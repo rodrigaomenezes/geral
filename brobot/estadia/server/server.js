@@ -118,7 +118,7 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       ocorrencias: st.ocorrencias.map((o) => ({ codigo: o.type, descricao: D.labelOf(o.type), ...ev(o), dados: o.payload })),
       notificacoes: st.links.map((l) => ({ tipo: D.labelOf(l.type), ...ev(l), canal: l.payload.canal || null, destinatario: l.payload.destinatario || null })),
       mensagensWhatsApp: st.mensagens.map((m) => ({ id: m.id, finalidade: m.finalidade, assunto: m.assunto, para: m.para, enviadaEm: m.enviadaEm, modo: m.modo, status: m.status, erro: m.erro,
-        historico: m.historico, linkAbertoEm: (() => { const l = m.linkId && st.links.find((x) => x.type === 'LINK_VISUALIZADO' && x.payload.linkId === m.linkId); return l ? l.occurredAt : null; })(), respostas: m.respostas.map((r) => ({ em: r.em, texto: r.texto, interpretacao: r.interpretacao, origem: r.origem })), reenvioDe: m.reenvioDe })),
+        historico: m.historico, sms: m.sms, linkAbertoEm: (() => { const l = m.linkId && st.links.find((x) => x.type === 'LINK_VISUALIZADO' && x.payload.linkId === m.linkId); return l ? l.occurredAt : null; })(), respostas: m.respostas.map((r) => ({ em: r.em, texto: r.texto, interpretacao: r.interpretacao, origem: r.origem })), reenvioDe: m.reenvioDe })),
       retificacoes: st.retificacoes.map((r) => ({ ...ev(r), campo: r.payload.campo, anterior: r.payload.anterior, novo: r.payload.novo, motivo: r.payload.motivo })),
       alertas: D.alertas(st),
       apuracao: ap,
@@ -259,14 +259,24 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     return { resultado, opId: st.op.id, mensagemId: m.id };
   }
 
+  // SMS curto (sem a formatação do WhatsApp) com o mesmo link de confirmação.
+  function smsDe(op, m, ev, baseUrl) {
+    const tk = m.linkId && tokenDoLink(m.linkId);
+    const quando = ev ? ` às ${fmtH(ev.occurredAt)}` : '';
+    return `Estadia BR ${op.codigo}: ${op.tacNome || 'o motorista'} (placa ${placaF(op.placa)}) informou que ${m.assunto || 'registrou um passo'}${quando}.`
+      + (tk && baseUrl ? ` Confirme ou conteste: ${baseUrl}/c/${tk}` : '');
+  }
+
   function mensagensView(st, baseUrl) {
     return st.mensagens.map((m) => {
       const real = textoReal(m, baseUrl);
       const aberto = m.linkId && st.links.find((l) => l.type === 'LINK_VISUALIZADO' && l.payload.linkId === m.linkId);
       const ev = Object.values(st.milestones).find((e) => e.id === m.refEventId);
       const textoManual = ev ? textoReal({ texto: montarTexto(st.op, ev, m.finalidade, '', m.linkId, 'manual'), linkId: m.linkId }, baseUrl) : real;
+      const smsTexto = smsDe(st.op, m, ev, baseUrl);
       return { ...m, texto: real, textoManual, telefoneFmt: Z.fmtFone(m.para.telefone), linkAbertoEm: aberto ? aberto.occurredAt : null,
         whatsappUrl: `https://wa.me/${m.para.telefone || ''}?text=${encodeURIComponent(real)}`,
+        smsTexto, smsUrl: m.para.telefone ? `sms:+${m.para.telefone}?&body=${encodeURIComponent(smsTexto)}` : null,
         respondida: m.respostas.length > 0, ultimaResposta: m.respostas[m.respostas.length - 1] || null, reenviada: st.mensagens.some((x) => x.reenvioDe === m.id) };
     });
   }
@@ -930,6 +940,22 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
     if (p === '/api/relatorios') {
       if (!D.can(user, 'relatorios')) return fail(res, 403, 'SEM_PERMISSAO', 'Seu perfil não acessa relatórios.');
       return send(res, 200, relatorios(user));
+    }
+
+    // Status do SMS que o celular do motorista enviou (APK: enviado/entregue pela operadora; web: app de SMS aberto).
+    if ((m = /^\/api\/operations\/([0-9a-f-]{36})\/sms\/([0-9a-z-]{8,40})$/.exec(p)) && req.method === 'POST') {
+      const st = stateOf(m[1]);
+      if (!canSee(user, st)) return fail(res, 404, 'NAO_ENCONTRADA', 'Operação não encontrada.');
+      if (user.role !== 'tac' || st.op.tacUserId !== user.id) return fail(res, 403, 'SEM_PERMISSAO', 'Somente o motorista da operação.');
+      const msg = st.mensagens.find((x) => x.id === m[2]);
+      if (!msg) return fail(res, 404, 'MENSAGEM', 'Mensagem não encontrada.');
+      const b = await readBody(req);
+      if (!['aberto', 'enviado', 'entregue', 'falha'].includes(b.status)) return fail(res, 400, 'STATUS', 'Status inválido.');
+      const via = b.via === 'app' ? 'app' : 'link';
+      if (!(msg.sms && msg.sms.historico.some((h) => h.status === b.status))) {
+        append({ opId: st.op.id, type: 'SMS_STATUS', payload: { mensagemId: msg.id, status: b.status, via, para: msg.para.telefone ? `+${msg.para.telefone}` : undefined, erro: b.erro ? String(b.erro).slice(0, 120) : undefined } });
+      }
+      return send(res, 201, { ok: true });
     }
 
     if ((m = /^\/api\/operations\/([0-9a-f-]{36})(\/[a-z-]+(?:\/[a-z-]+)?)?(?:\/([0-9a-z-]{8,40})\/(enviado|enviada))?$/.exec(p))) {

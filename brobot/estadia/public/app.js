@@ -1015,6 +1015,66 @@
     }));
   }
 
+  // ---------- SMS pelo chip do motorista ----------
+  // No APK (EstadiaNativo) o SMS sai sozinho, sem sair da tela, com aviso de enviado/entregue da operadora.
+  // No navegador, abre o app de SMS já preenchido (o navegador não deixa enviar sozinho).
+  const nativo = () => { try { return !!(window.EstadiaNativo && window.EstadiaNativo.podeSms()); } catch { return false; } };
+  const smsOps = () => { try { return JSON.parse(store.get('estadia.sms.ops') || '{}'); } catch { return {}; } };
+  function smsReport(opId, mensagemId, status, via, erro) {
+    return api('POST', `/api/operations/${opId}/sms/${mensagemId}`, { status, via, erro }).catch(() => {});
+  }
+  // Retorno do APK: chamado quando a operadora informa que o SMS foi enviado, entregue ou falhou.
+  window.estadiaSmsRetorno = (mensagemId, status, erro) => {
+    const opId = smsOps()[mensagemId];
+    if (!opId) return;
+    smsReport(opId, mensagemId, status, 'app', erro).then(() => { if (status !== 'enviado' || !erro) setTimeout(() => refresh(), 300); });
+    if (status === 'entregue') toast('SMS entregue no celular da portaria ✓✓');
+    if (status === 'falha') toast('O SMS não foi enviado' + (erro ? `: ${erro}` : '') + '. Tente pelo WhatsApp.', true);
+  };
+  function enviarSmsNativo(opId, m) {
+    const ops = smsOps(); ops[m.id] = opId; store.set('estadia.sms.ops', JSON.stringify(ops));
+    try { window.EstadiaNativo.enviarSms(m.id, '+' + m.para.telefone, m.smsTexto); return true; } catch { return false; }
+  }
+  function smsResumo(m) {
+    const s = m.sms;
+    if (!s) return '';
+    if (s.entregueEm) return `SMS pelo chip do motorista: enviado ${hhmm(s.enviadoEm || s.entregueEm)}, entregue ${hhmm(s.entregueEm)} (operadora)`;
+    if (s.enviadoEm) return `SMS pelo chip do motorista: enviado ${hhmm(s.enviadoEm)}, entrega não confirmada pela operadora`;
+    if (s.status === 'falha') return `SMS não enviado${s.erro ? ': ' + s.erro : ''}`;
+    if (s.abertoEm) return `SMS aberto no celular do motorista às ${hhmm(s.abertoEm)} (envio não confirmado)`;
+    return '';
+  }
+  function smsLinha(m) {
+    if (!m.smsUrl || m.para.papel !== 'destino') return '';
+    const s = m.sms;
+    const ico = '<span class="zap-ico">SMS</span>';
+    if (s && s.status === 'entregue') return `<div class="zap ok sms">${ico}<div class="zap-b"><span>SMS entregue às ${hhmm(s.entregueEm)} ✓✓ (comprovante da operadora)</span></div></div>`;
+    if (s && s.status === 'enviado') return `<div class="zap sms">${ico}<div class="zap-b"><span>SMS enviado pelo seu chip às ${hhmm(s.enviadoEm)} ✓ · aguardando a operadora confirmar a entrega</span></div></div>`;
+    const btn = nativo() ? `<button type="button" class="btn" data-sms="${m.id}">${s && s.status === 'falha' ? 'Tentar o SMS de novo' : 'Enviar por SMS (sem sair do app)'}</button>`
+      : `<a class="btn" href="${esc(m.smsUrl)}" data-smsweb="${m.id}">Enviar por SMS</a>`;
+    const txt = s && s.status === 'falha' ? `SMS não foi enviado${s.erro ? ': ' + esc(s.erro) : ''}` : s && s.status === 'aberto' ? `Abrimos o seu SMS às ${hhmm(s.abertoEm)}. Se não enviou, toque de novo.` : 'Também dá para avisar por SMS, pelo seu chip.';
+    return `<div class="zap ${s && s.status === 'falha' ? 'crit' : ''} sms">${ico}<div class="zap-b"><span>${txt}</span><div class="zap-acts">${btn}</div></div></div>`;
+  }
+  function bindSms(root, opId, msgs) {
+    $$('[data-sms]', root).forEach((b) => (b.onclick = () => {
+      const m = msgs.find((x) => x.id === b.dataset.sms);
+      b.disabled = true;
+      if (m && enviarSmsNativo(opId, m)) toast('Enviando SMS pelo seu chip…'); else { b.disabled = false; toast('Não deu para enviar o SMS por este celular.', true); }
+    }));
+    $$('a[data-smsweb]', root).forEach((a) => (a.onclick = () => { smsReport(opId, a.dataset.smsweb, 'aberto', 'link').then(() => setTimeout(() => refresh(), 800)); }));
+    // APK: na chegada (e nos outros passos) o SMS para a portaria sai sozinho, uma vez por mensagem.
+    if (!nativo()) return;
+    const feitos = new Set((store.get('estadia.sms.auto') || '').split(',').filter(Boolean));
+    for (const m of msgs) {
+      if (m.finalidade !== 'CONFIRMAR' || m.para.papel !== 'destino' || !m.smsTexto || !m.para.telefone || m.sms || m.reenviada || feitos.has(m.id)) continue;
+      if (Date.now() - Date.parse(m.enviadaEm) > 30 * 60000) continue;
+      if (!root.querySelector(`[data-sms="${m.id}"]`)) continue; // só passos ainda sem confirmação
+      feitos.add(m.id);
+      store.set('estadia.sms.auto', [...feitos].slice(-50).join(','));
+      if (enviarSmsNativo(opId, m)) toast('Avisando a portaria por SMS, pelo seu chip…');
+    }
+  }
+
   async function viewOpMotorista(id) {
     let d;
     try { d = await api('GET', `/api/operations/${id}`); store.set('estadia.cache.op.' + id, JSON.stringify(d)); }
@@ -1071,7 +1131,7 @@
           ${m.modo === 'manual' || d.zapModo === 'manual' ? `<a class="drv-mid zapbtn" href="${esc(m.whatsappUrl || '#')}" target="_blank" rel="noopener" data-manual="${m.id}">${ICON.zap} ENVIAR DE NOVO NO WHATSAPP</a>` : ''}
           ${m.status !== 'aguardando_envio' && (minutos >= 5 || m.status === 'falha') ? `<button class="btn" data-reenviar="${m.id}">Mandar de novo</button>` : ''}
           ${m.status !== 'aguardando_envio' && d.zapModo !== 'manual' && m.whatsappUrl ? `<a class="btn" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Mandar pelo meu WhatsApp</a>` : ''}
-          <button class="btn" data-print="${m.id}">Responderam no meu WhatsApp</button></div>` : ''}</div></div>`;
+          <button class="btn" data-print="${m.id}">Responderam no meu WhatsApp</button></div>` : ''}</div></div>${aberto ? smsLinha(m) : ''}`;
     };
 
     // Lista de passos (checklist)
@@ -1145,6 +1205,7 @@
     if (nl) nl.onclick = () => divergenceSheet(id, d.acoes.find((a) => a.kind === 'divergencia' && a.refEventId === confLibPortal.refEventId) || { refEventId: confLibPortal.refEventId }, reg.LIBERACAO);
     $$('[data-reenviar]').forEach((b) => (b.onclick = async () => { b.disabled = true; try { await api('POST', `/api/operations/${id}/whatsapp/reenviar`, { mensagemId: b.dataset.reenviar }); toast('Mensagem enviada de novo.'); refresh(); } catch (e) { toast(e.message, true); b.disabled = false; } }));
     bindEnvio(main, id, () => refresh());
+    bindSms(main, id, d.mensagens);
     $$('[data-print]').forEach((b) => (b.onclick = () => printSheet(id, d.mensagens.find((m) => m.id === b.dataset.print))));
     $$('form[data-tel]').forEach((f) => (f.onsubmit = async (e) => {
       e.preventDefault();
@@ -1314,6 +1375,7 @@
           <span class="small">Para ${esc(m.para.nome)} · ${esc(m.telefoneFmt || 'sem número')} ${m.reenvioDe ? '· reenvio' : ''}</span>
           <span class="pill ${tom}">${esc(txt)}</span>
           ${m.linkAbertoEm ? `<span class="small">Mensagem aberta às ${diaHora(m.linkAbertoEm)} (link de confirmação)</span>` : ''}
+          ${smsResumo(m) ? `<span class="small">${esc(smsResumo(m))}</span>` : ''}
           ${m.respostas.map((r) => `<span class="small">Resposta ${hhmm(r.em)}: “${esc(r.texto)}” ${r.origem === 'print_whatsapp' ? '(print enviado pelo motorista)' : ''}</span>`).join('')}
           ${m.finalidade === 'CONFIRMAR' && !c && !m.reenviada ? `<div class="row"><button class="btn small" data-reenviar="${m.id}">Reenviar</button>${m.whatsappUrl ? `<a class="btn small" href="${esc(m.whatsappUrl)}" target="_blank" rel="noopener">Abrir no WhatsApp</a>` : ''}</div>` : ''}</div>`;
       }).join('')}
@@ -1681,7 +1743,7 @@
           ${f.negociacoes.map((n) => `<p class="small" style="margin:4px 0">Negociação: ${esc(n.situacao)} · ${dataHora(n.em)}${n.observacao ? ' · ' + esc(n.observacao) : ''}</p>`).join('')}</section>
         ${(c.mensagensWhatsApp || []).length ? `<section><span class="label">Mensagens de WhatsApp</span><div class="tablewrap"><table><thead><tr><th>Enviada</th><th>Para</th><th>Assunto</th><th>Situação</th><th>Resposta</th></tr></thead><tbody>
           ${c.mensagensWhatsApp.map((m) => `<tr><td class="mono">${diaHora(m.enviadaEm)}</td><td>${esc(m.para.nome)}<br><span class="small muted">${esc(m.para.papel)}</span></td><td>${m.finalidade === 'CONFIRMAR' ? 'Pedido de confirmação' : 'Aviso'}: ${esc(m.assunto)}</td>
-            <td class="small">${esc(m.status)}${m.erro ? ' · ' + esc(m.erro) : ''}${m.linkAbertoEm ? `<br>aberta ${dataHora(m.linkAbertoEm)}` : ''}</td><td class="small">${m.respostas.map((r) => `${hhmm(r.em)} “${esc(r.texto)}”${r.origem === 'print_whatsapp' ? ' (print)' : ''}`).join('<br>') || '—'}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
+            <td class="small">${esc(m.status)}${m.erro ? ' · ' + esc(m.erro) : ''}${m.linkAbertoEm ? `<br>aberta ${dataHora(m.linkAbertoEm)}` : ''}${smsResumo(m) ? `<br>${esc(smsResumo(m))}` : ''}</td><td class="small">${m.respostas.map((r) => `${hhmm(r.em)} “${esc(r.texto)}”${r.origem === 'print_whatsapp' ? ' (print)' : ''}`).join('<br>') || '—'}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
         ${c.notificacoes.length ? `<section><span class="label">Notificações e links</span>${c.notificacoes.map((n) => `<p class="small" style="margin:3px 0">${dataHora(n.em)} · ${esc(n.tipo)}${n.destinatario ? ` · ${esc(n.destinatario.nome)}` : ''} · ${esc(n.por)}</p>`).join('')}</section>` : ''}
         ${c.retificacoes.length ? `<section><span class="label">Retificações</span>${c.retificacoes.map((r) => `<p class="small" style="margin:3px 0">${dataHora(r.em)} · ${esc(r.por)}: ${esc(r.campo)} ${esc(r.anterior ?? '—')} → ${esc(r.novo)} · motivo: ${esc(r.motivo)}</p>`).join('')}</section>` : ''}
         ${c.juridico.length ? `<section><span class="label">Jurídico</span>${c.juridico.map((j) => `<p class="small" style="margin:3px 0">${dataHora(j.em)} · ${esc(j.tipo)} · ${esc(jurLabel(j.status))}${j.observacao ? ' · ' + esc(j.observacao) : ''}${j.resultado ? ' · resultado: ' + esc(j.resultado) : ''}</p>`).join('')}</section>` : ''}

@@ -4,13 +4,19 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.app.PendingIntent;
+import android.telephony.SmsManager;
+import java.util.ArrayList;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -21,11 +27,14 @@ import android.webkit.WebViewClient;
 /**
  * App Android do Estadia BR (piloto): abre o sistema web em tela cheia, sem barra do navegador,
  * com câmera, GPS e microfone. Links do WhatsApp abrem no próprio WhatsApp do motorista.
+ * O SMS para a portaria sai pelo chip do motorista sem sair da tela (ponte EstadiaNativo),
+ * e a operadora avisa quando foi enviado e entregue.
  */
 public class MainActivity extends Activity {
     static final String URL_INICIAL = "https://estadia-production-1784.up.railway.app/";
     static final String HOST = "estadia-production-1784.up.railway.app";
-    static final int REQ_ARQUIVO = 1, REQ_GPS = 2, REQ_MIC = 3;
+    static final int REQ_ARQUIVO = 1, REQ_GPS = 2, REQ_MIC = 3, REQ_SMS = 4;
+    static MainActivity atual;
 
     WebView web;
     ValueCallback<Uri[]> retornoArquivo;
@@ -33,10 +42,13 @@ public class MainActivity extends Activity {
     GeolocationPermissions.Callback retornoGps;
     String origemGps;
     PermissionRequest pedidoMic;
+    String[] smsPendente; // {mensagemId, numero, texto} aguardando a permissão
+    int seqSms = 0;
 
     @Override
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
+        atual = this;
         web = new WebView(this);
         setContentView(web);
 
@@ -53,6 +65,9 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView v, String url) {
                 return abrirFora(Uri.parse(url)); // a versão com WebResourceRequest chama esta por padrão
             }
+
+            @Override
+            public void onPageFinished(WebView v, String url) { entregarGuardados(); }
         });
 
         web.setWebChromeClient(new WebChromeClient() {
@@ -97,6 +112,8 @@ public class MainActivity extends Activity {
             }
         });
 
+        web.addJavascriptInterface(new Ponte(), "EstadiaNativo");
+
         if (estado != null) web.restoreState(estado);
         else web.loadUrl(URL_INICIAL);
     }
@@ -112,12 +129,77 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    /** Ponte chamada pelo sistema web. Só existe neste app, nunca no navegador. */
+    class Ponte {
+        @JavascriptInterface public boolean podeSms() { return getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY); }
+        @JavascriptInterface public void enviarSms(final String id, final String numero, final String texto) {
+            runOnUiThread(new Runnable() { public void run() {
+                if (temPermissao(Manifest.permission.SEND_SMS)) enviarSmsAgora(id, numero, texto);
+                else { smsPendente = new String[] { id, numero, texto }; requestPermissions(new String[] { Manifest.permission.SEND_SMS }, REQ_SMS); }
+            } });
+        }
+    }
+
+    void enviarSmsAgora(String id, String numero, String texto) {
+        try {
+            SmsManager sms = SmsManager.getDefault();
+            ArrayList<String> partes = sms.divideMessage(texto);
+            ArrayList<PendingIntent> enviados = new ArrayList<PendingIntent>(), entregues = new ArrayList<PendingIntent>();
+            for (int i = 0; i < partes.size(); i++) {
+                // Só a última parte avisa o sistema (uma mensagem longa vai em várias partes).
+                boolean ultima = i == partes.size() - 1;
+                enviados.add(ultima ? retorno(id, "enviado") : null);
+                entregues.add(ultima ? retorno(id, "entregue") : null);
+            }
+            sms.sendMultipartTextMessage(numero, null, partes, enviados, entregues);
+        } catch (Exception e) {
+            avisarWeb(id, "falha", "não foi possível usar o chip (" + e.getClass().getSimpleName() + ")");
+        }
+    }
+
+    PendingIntent retorno(String id, String etapa) {
+        Intent i = new Intent(this, SmsRetorno.class).setAction("br.com.estadia.SMS_" + etapa).putExtra("id", id).putExtra("etapa", etapa);
+        return PendingIntent.getBroadcast(this, ++seqSms, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Repassa ao sistema web o resultado informado pela operadora. */
+    void avisarWeb(String id, String status, String erro) {
+        final String js = "window.estadiaSmsRetorno && window.estadiaSmsRetorno(" + jsStr(id) + "," + jsStr(status) + "," + (erro == null ? "null" : jsStr(erro)) + ")";
+        runOnUiThread(new Runnable() { public void run() { web.evaluateJavascript(js, null); } });
+    }
+
+    /** Avisos da operadora que chegaram com o app fechado. */
+    static void guardar(Context ctx, String id, String status, String erro) {
+        SharedPreferences p = ctx.getSharedPreferences("sms", MODE_PRIVATE);
+        p.edit().putString(id + "|" + status, erro == null ? "" : erro).apply();
+    }
+
+    void entregarGuardados() {
+        SharedPreferences p = getSharedPreferences("sms", MODE_PRIVATE);
+        for (java.util.Map.Entry<String, ?> e : p.getAll().entrySet()) {
+            String[] k = e.getKey().split("\\|", 2);
+            String erro = String.valueOf(e.getValue());
+            if (k.length == 2) avisarWeb(k[0], k[1], erro.isEmpty() ? null : erro);
+        }
+        p.edit().clear().apply();
+    }
+
+    static String jsStr(String s) {
+        StringBuilder b = new StringBuilder("'");
+        for (char c : s.toCharArray()) { if (c == '\\' || c == '\'') b.append('\\'); if (c >= 32 && c != '<') b.append(c); }
+        return b.append("'").toString();
+    }
+
     boolean temPermissao(String p) { return checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED; }
 
     @Override
     public void onRequestPermissionsResult(int req, String[] perms, int[] res) {
         boolean ok = res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED;
         if (req == REQ_GPS && retornoGps != null) { retornoGps.invoke(origemGps, ok, false); retornoGps = null; }
+        if (req == REQ_SMS && smsPendente != null) {
+            String[] p = smsPendente; smsPendente = null;
+            if (ok) enviarSmsAgora(p[0], p[1], p[2]); else avisarWeb(p[0], "falha", "permissão de SMS negada");
+        }
         if (req == REQ_MIC && pedidoMic != null) {
             if (ok) pedidoMic.grant(new String[] { PermissionRequest.RESOURCE_AUDIO_CAPTURE }); else pedidoMic.deny();
             pedidoMic = null;
@@ -146,6 +228,9 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (web.canGoBack()) web.goBack(); else super.onBackPressed();
     }
+
+    @Override
+    protected void onDestroy() { if (atual == this) atual = null; super.onDestroy(); }
 
     @Override
     protected void onSaveInstanceState(Bundle s) { super.onSaveInstanceState(s); web.saveState(s); }

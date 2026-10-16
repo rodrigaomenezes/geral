@@ -292,6 +292,7 @@ body.motorista .page { max-width: 560px; padding-block: 12px 48px; }
 .zap-ico { color: #1f9d55; font-size: 22px; }
 .zap.crit { background: var(--crit-soft); } .zap.crit .zap-ico { color: var(--crit); }
 .zap.warn { background: var(--warn-soft); }
+.zap.sms .zap-ico { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: .02em; padding-top: 3px; }
 .zap.ok { background: var(--ok-soft); }
 .zap.sys .zap-b > span:first-child { color: var(--sys); font-weight: 600; }
 .zap-b { display: flex; flex-direction: column; gap: 8px; min-width: 0; }

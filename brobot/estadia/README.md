@@ -86,6 +86,16 @@ Variáveis para o modo `api`:
 
 Para iniciar conversas fora da janela de 24h, a Meta exige *templates* aprovados. Isso precisa ser contratado e validado pelo time técnico.
 
+### SMS pelo chip do motorista
+
+Canal complementar ao WhatsApp, sem custo para o sistema. O SMS leva o mesmo link de confirmação, em texto curto.
+
+- **App Android (`android/`):** o SMS para a portaria sai **sozinho**, sem sair da tela, quando o motorista registra um passo que pede confirmação. A operadora avisa quando foi **enviado** e **entregue**, e esses horários entram na linha do tempo e no Dossiê (evento `SMS_STATUS`). Na primeira vez, o Android pede permissão para enviar SMS.
+- **Navegador e iPhone:** o botão **Enviar por SMS** abre o app de SMS já preenchido. O motorista toca em enviar; o sistema registra só que o SMS foi aberto.
+- O tempo continua contando pela chegada registrada com GPS. O SMS é notificação, não gatilho.
+
+Para gerar o APK: `android/build.sh` (instruções no próprio arquivo).
+
 ### Roteiro sugerido (10 minutos, dois celulares)
 
 1. **Celular 1, motorista:** entre como João, toque em **É ESSA · COMEÇAR** e depois em **ESTÁ CERTO**.

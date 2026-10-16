@@ -623,3 +623,32 @@ test('WhatsApp por transportadora: plano manual (sem custo) ou API oficial, esco
     for (const [k, v] of [['WHATSAPP_MODE', antes.mode], ['WHATSAPP_TOKEN', antes.token], ['WHATSAPP_PHONE_ID', antes.id]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }
 });
+
+test('SMS pelo chip do motorista: texto curto com o link, enviado e entregue entram na mensagem e no Dossiê', async () => {
+  const t = await boot();
+  try {
+    const carla = await t.login('operacao@rodoviasul.demo');
+    const joao = (await t.call('POST', '/api/login', { telefone: '11988880001', pin: '1234' })).body.token;
+    const op = await nova(t, carla);
+    await t.call('POST', '/api/operations/identify', { codigo: op.codigo, placa: 'RTB4F27', occurredAt: now() }, joao);
+    const c = await t.call('POST', `/api/operations/${op.id}/events`, { type: 'CHEGADA', occurredAt: now(), gps: JUNDIAI, photo: PHOTO }, joao);
+    const m = c.body.detalhe.mensagens.find((x) => x.para.papel === 'destino');
+    assert.match(m.smsTexto, /^Estadia BR OP-.*informou que chegou a CD Jundiaí às \d\d:\d\d\. Confirme ou conteste: http.*\/c\//);
+    assert.ok(!m.smsTexto.includes('*'), 'SMS sem a formatação do WhatsApp');
+    assert.ok(m.smsUrl.startsWith('sms:+5511900000001?&body='));
+    // Só o motorista da operação informa o SMS
+    assert.equal((await t.call('POST', `/api/operations/${op.id}/sms/${m.id}`, { status: 'enviado', via: 'app' }, carla)).status, 403);
+    assert.equal((await t.call('POST', `/api/operations/${op.id}/sms/${m.id}`, { status: 'qualquer' }, joao)).status, 400);
+    assert.equal((await t.call('POST', `/api/operations/${op.id}/sms/${m.id}`, { status: 'enviado', via: 'app' }, joao)).status, 201);
+    await t.call('POST', `/api/operations/${op.id}/sms/${m.id}`, { status: 'enviado', via: 'app' }, joao); // repetido: ignora
+    await t.call('POST', `/api/operations/${op.id}/sms/${m.id}`, { status: 'entregue', via: 'app' }, joao);
+    const d = (await t.call('GET', `/api/operations/${op.id}`, null, joao)).body;
+    const s = d.mensagens.find((x) => x.id === m.id).sms;
+    assert.equal(s.status, 'entregue'); assert.equal(s.via, 'app'); assert.ok(s.enviadoEm && s.entregueEm);
+    assert.equal(d.timeline.filter((e) => e.type === 'SMS_STATUS').length, 2);
+    // O tempo continua contando pela chegada com GPS, independente do SMS
+    assert.equal(d.apuracao.inicioPor, 'localizacao');
+    const dz = await t.call('POST', `/api/operations/${op.id}/dossie`, {}, carla);
+    assert.equal(dz.status, 201);
+  } finally { await t.close(); }
+});

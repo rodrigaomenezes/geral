@@ -70,6 +70,7 @@ const OTHER_LABELS = {
   WHATSAPP_RESPOSTA: 'Resposta recebida pelo WhatsApp',
   WHATSAPP_DESTINATARIO: 'Número de envio informado pelo motorista',
   WHATSAPP_PLANO_ALTERADO: 'Plano de WhatsApp da transportadora alterado',
+  SMS_STATUS: 'SMS pelo celular do motorista',
   EVIDENCIA_ADICIONADA: 'Fotos adicionadas ao registro',
   EVIDENCIA_ANALISADA: 'Fotos conferidas',
   VIAGEM_CADASTRADA_TAC: 'Viagem cadastrada pelo motorista',
@@ -89,7 +90,7 @@ function kindOf(type) {
   if (MILESTONES[type]) return 'registro';
   if (CONFIRMATION_OF[type]) return 'confirmacao';
   if (OCORRENCIAS[type]) return 'ocorrencia';
-  if (type.startsWith('LINK_') || type.startsWith('WHATSAPP_')) return 'notificacao';
+  if (type.startsWith('LINK_') || type.startsWith('WHATSAPP_') || type.startsWith('SMS_')) return 'notificacao';
   return {
     DIVERGENCIA: 'divergencia', OCORRENCIA_TRATADA: 'tratamento', APURACAO: 'apuracao',
     PAGAMENTO_REGISTRADO: 'financeiro', SITUACAO_FINANCEIRA: 'financeiro',
@@ -174,8 +175,10 @@ function project(opEvents) {
     }
     if (t === 'WHATSAPP_ENVIADA') st.mensagens.push({ id: e.payload.mensagemId, eventoId: e.id, externalId: e.payload.externalId || null, para: e.payload.para, finalidade: e.payload.finalidade,
       confirmType: e.payload.confirmType || null, refEventId: e.payload.refEventId || null, assunto: e.payload.assunto || null, texto: e.payload.texto, linkId: e.payload.linkId || null,
-      modo: e.payload.modo, enviadaEm: e.occurredAt, status: e.payload.status, erro: e.payload.erro || null, historico: [{ status: e.payload.status, em: e.occurredAt }], respostas: [], reenvioDe: e.payload.reenvioDe || null });
+      modo: e.payload.modo, enviadaEm: e.occurredAt, status: e.payload.status, erro: e.payload.erro || null, historico: [{ status: e.payload.status, em: e.occurredAt }], respostas: [], reenvioDe: e.payload.reenvioDe || null, sms: null });
     if (t === 'WHATSAPP_STATUS') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { const ordem = ['falha', 'aguardando_envio', 'enviada', 'enviada_manual', 'entregue', 'lida']; if (ordem.indexOf(e.payload.status) > ordem.indexOf(m.status) || e.payload.status === 'falha') m.status = e.payload.status; m.historico.push({ status: e.payload.status, em: e.occurredAt }); if (e.payload.erro) m.erro = e.payload.erro; } }
+    // SMS enviado pelo chip do motorista (APK) ou aberto no app de SMS (web): status e horários informados pelo celular.
+    if (t === 'SMS_STATUS') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { const s = m.sms || (m.sms = { status: null, via: e.payload.via, para: e.payload.para || m.para.telefone, historico: [] }); const ordem = ['aberto', 'falha', 'enviado', 'entregue']; if (ordem.indexOf(e.payload.status) > ordem.indexOf(s.status)) s.status = e.payload.status; s.historico.push({ status: e.payload.status, em: e.occurredAt }); if (e.payload.status === 'enviado') { s.enviadoEm = s.enviadoEm || e.occurredAt; s.via = e.payload.via; } if (e.payload.status === 'entregue') s.entregueEm = s.entregueEm || e.occurredAt; if (e.payload.status === 'aberto') s.abertoEm = s.abertoEm || e.occurredAt; if (e.payload.erro) s.erro = e.payload.erro; } }
     if (t === 'WHATSAPP_DESTINATARIO') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { m.para = { ...m.para, ...e.payload.para }; m.historico.push({ status: 'destinatario_alterado', em: e.occurredAt }); } }
     if (t === 'WHATSAPP_RESPOSTA') { const m = st.mensagens.find((x) => x.id === e.payload.mensagemId); if (m) { m.respostas.push({ texto: e.payload.texto, interpretacao: e.payload.interpretacao, em: e.occurredAt, origem: e.origem, eventoId: e.id }); if (m.status !== 'lida') { m.status = 'lida'; } } }
     if (MILESTONES[t]) st.milestones[t] = e;
@@ -189,7 +192,7 @@ function project(opEvents) {
     else if (t === 'ENCAMINHADO_JURIDICO' || t === 'JURIDICO_STATUS') st.juridico.push(e);
     else if (OCORRENCIAS[t]) st.ocorrencias.push(e);
     else if (t.startsWith('LINK_')) st.links.push(e);
-    else if (t.startsWith('WHATSAPP_') || t === 'CONTATO_INFORMADO') { /* projetado acima */ }
+    else if (t.startsWith('WHATSAPP_') || t.startsWith('SMS_') || t === 'CONTATO_INFORMADO') { /* projetado acima */ }
     else if (t === 'DADOS_INFORMADOS') st.dadosInformados = e;
     else if (t === 'EVIDENCIA_ADICIONADA') st.evidencias.push(e);
     else if (t === 'EVIDENCIA_ANALISADA') st.analises[e.refEventId] = e;
