@@ -25,6 +25,9 @@ class EventStore extends EventEmitter {
     this.file = path.join(dir, 'events.jsonl');
     this.events = [];
     this.byClientId = new Map();
+    // Índice por operação (mantido no append): consultar uma operação não varre o log inteiro.
+    this.byOp = new Map();
+    this.ops = [];
     this.lastHash = GENESIS;
     if (fs.existsSync(this.file)) {
       for (const line of fs.readFileSync(this.file, 'utf8').split('\n')) {
@@ -32,6 +35,7 @@ class EventStore extends EventEmitter {
         const ev = JSON.parse(line);
         this.events.push(ev);
         if (ev.clientEventId) this.byClientId.set(ev.clientEventId, ev);
+        this.indexar(ev);
         this.lastHash = ev.hash;
       }
     }
@@ -62,6 +66,7 @@ class EventStore extends EventEmitter {
     fs.appendFileSync(this.file, JSON.stringify(ev) + '\n');
     this.events.push(ev);
     if (ev.clientEventId) this.byClientId.set(ev.clientEventId, ev);
+    this.indexar(ev);
     this.lastHash = ev.hash;
     this.emit('append', ev);
     return { event: ev, duplicate: false };
@@ -77,16 +82,27 @@ class EventStore extends EventEmitter {
     }
     this.events = [];
     this.byClientId.clear();
+    this.byOp.clear();
+    this.ops = [];
     this.lastHash = GENESIS;
     this.emit('reset');
   }
 
+  indexar(ev) {
+    if (!ev.opId) return;
+    const lista = this.byOp.get(ev.opId);
+    if (lista) lista.push(ev);
+    else this.byOp.set(ev.opId, [ev]);
+    if (ev.type === 'OPERACAO_CRIADA') this.ops.push(ev.opId);
+  }
+
+  /** Eventos da operação, na ordem do log (cópia: quem chama pode ordenar ou filtrar à vontade). */
   forOp(opId) {
-    return this.events.filter((e) => e.opId === opId);
+    return (this.byOp.get(opId) || []).slice();
   }
 
   opIds() {
-    return this.events.filter((e) => e.type === 'OPERACAO_CRIADA').map((e) => e.opId);
+    return this.ops.slice();
   }
 
   /** Recalcula a cadeia inteira. Retorna o primeiro ponto de quebra, se houver. */

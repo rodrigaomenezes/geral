@@ -22,7 +22,7 @@ server/server.js (node:http) ── rotas, estáticos, página pública do link,
 ```
 
 O estado de cada operação é **projetado dos eventos** (`D.project(store.forOp(opId))`); nada é guardado já
-calculado. Um processo, uma réplica.
+calculado. O `EventStore` mantém em memória um índice `opId → eventos` (montado ao abrir e a cada `append`). Um processo, uma réplica.
 
 ## Dados (pasta `ESTADIA_DATA`, no Railway o Volume `/data`)
 
@@ -46,10 +46,9 @@ demonstração só para administrador e só com `ESTADIA_DEMO_RESET` diferente d
 ## Testes e publicação
 
 `npm test` (`node:test`, servidor real com pasta temporária). CI: `.github/workflows/estadia.yml` (na raiz do
-repositório). Publicação: Railway com `Dockerfile` e `railway.json` (Volume em `/data`). `render.yaml` na raiz é
-antigo (dados em `/tmp`): não usar.
+repositório). Publicação: Railway com `Dockerfile` e `railway.json` (Volume em `/data`).
 
 ## Limites conhecidos
 
-Ver "Deficiências encontradas" em `../../docs/POLITICA_ENGENHARIA.md` (varredura do log por consulta, `server.js`
-grande, sem versão de formato nos dados).
+Ver "Deficiências encontradas" em `../../docs/POLITICA_ENGENHARIA.md` (lista sem paginação, `server.js` grande, sem
+versão de formato nos dados).
