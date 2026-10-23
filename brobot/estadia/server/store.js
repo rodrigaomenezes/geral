@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { gravarAtomico } = require('./arquivo');
 const { EventEmitter } = require('node:events');
 
 const GENESIS = 'GENESIS';
@@ -116,12 +117,12 @@ class EventStore extends EventEmitter {
   // Links de confirmação: o token fica fora do log (no log vai apenas o hash dele).
   get linksFile() { return path.join(this.dir, 'links.json'); }
   loadLinks() { return fs.existsSync(this.linksFile) ? JSON.parse(fs.readFileSync(this.linksFile, 'utf8')) : {}; }
-  saveLinks(links) { fs.writeFileSync(this.linksFile, JSON.stringify(links, null, 2)); }
+  saveLinks(links) { gravarAtomico(this.linksFile, JSON.stringify(links, null, 2)); }
 
   saveDossie(content) {
     const body = JSON.stringify(content);
     const hash = sha256(body);
-    fs.writeFileSync(path.join(this.dir, 'dossies', `${hash}.json`), JSON.stringify({ hash, content }));
+    gravarAtomico(path.join(this.dir, 'dossies', `${hash}.json`), JSON.stringify({ hash, content }));
     return hash;
   }
 

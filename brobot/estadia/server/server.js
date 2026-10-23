@@ -511,10 +511,13 @@ function createApp({ dataDir, publicDir = path.join(__dirname, '..', 'public'), 
       }
     }
   }
-  if (dir.empty && seedIfEmpty) seedAll();
-  function resetDemo() { store.reset(); dir.reset(); autoRespostas.length = 0; seedAll(); }
+  // Dados criados pela demonstração ficam marcados: só eles podem ser recriados sozinhos no boot.
+  function semearDemonstracao() { seedAll(); dir.data.demonstracao = true; dir.save(); }
+  if (dir.empty && seedIfEmpty) semearDemonstracao();
+  function resetDemo() { store.reset(); dir.reset(); autoRespostas.length = 0; semearDemonstracao(); }
   // Dados de demonstração de versões anteriores (sem transportadora, sem PIN ou sem frota) são recriados no formato atual.
-  if (demo && !dir.empty && (!dir.data.orgs.some((o) => o.tipo === 'transportadora') || dir.data.users.some((u) => u.role === 'tac' && !u.pinHash) || !dir.data.conjuntos.length || !dir.data.orgs.some((o) => o.id === 'porto-santos'))) {
+  // Nunca em dados sem a marca de demonstração: lá estão provas de clientes, e recriar apagaria o log, fotos e dossiês.
+  if (demo && !dir.empty && dir.data.demonstracao === true && (!dir.data.orgs.some((o) => o.tipo === 'transportadora') || dir.data.users.some((u) => u.role === 'tac' && !u.pinHash) || !dir.data.conjuntos.length || !dir.data.orgs.some((o) => o.id === 'porto-santos'))) {
     if (!quiet) console.log('Dados de demonstração de versão anterior encontrados: recriando no formato atual.');
     resetDemo();
   }

@@ -652,3 +652,42 @@ test('SMS pelo chip do motorista: texto curto com o link, enviado e entregue ent
     assert.equal(dz.status, 201);
   } finally { await t.close(); }
 });
+
+test('Boot nunca apaga dados sem a marca de demonstração (provas de clientes); dados da demonstração seguem recriáveis', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'estadia-'));
+  try {
+    const subir = () => createApp({ dataDir, quiet: true });
+    const primeira = subir();
+    assert.equal(primeira.dir.data.demonstracao, true, 'a demonstração semeada fica marcada');
+    // Simula uma base real: sem a marca e sem a empresa de exemplo que o boot usava para "detectar versão antiga".
+    const arqDir = path.join(dataDir, 'directory.json');
+    const real = JSON.parse(fs.readFileSync(arqDir, 'utf8'));
+    delete real.demonstracao;
+    real.orgs = real.orgs.filter((o) => o.id !== 'porto-santos');
+    fs.writeFileSync(arqDir, JSON.stringify(real));
+    const eventosAntes = fs.readFileSync(path.join(dataDir, 'events.jsonl'), 'utf8');
+    subir();
+    assert.equal(fs.readFileSync(path.join(dataDir, 'events.jsonl'), 'utf8'), eventosAntes, 'o log de eventos fica intacto');
+    assert.ok(!JSON.parse(fs.readFileSync(arqDir, 'utf8')).orgs.some((o) => o.id === 'porto-santos'), 'os cadastros ficam como estavam');
+    // Com a marca (dados da própria demonstração), a recriação automática continua.
+    fs.writeFileSync(arqDir, JSON.stringify({ ...real, demonstracao: true }));
+    const terceira = subir();
+    assert.ok(terceira.dir.data.orgs.some((o) => o.id === 'porto-santos'), 'demonstração antiga é recriada no formato atual');
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('Cadastros e links são gravados de uma vez (sem arquivo pela metade nem temporário sobrando)', () => {
+  const { gravarAtomico } = require('../server/arquivo');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'estadia-'));
+  try {
+    const arq = path.join(dir, 'directory.json');
+    gravarAtomico(arq, '{"a":1}');
+    gravarAtomico(arq, '{"a":2}');
+    assert.equal(fs.readFileSync(arq, 'utf8'), '{"a":2}');
+    assert.deepEqual(fs.readdirSync(dir), ['directory.json']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
