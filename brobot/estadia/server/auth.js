@@ -4,6 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { gravarAtomico } = require('./arquivo');
 
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const TOKEN_TTL_TAC_MS = 30 * 24 * 60 * 60 * 1000; // motorista fica conectado no próprio celular
@@ -43,7 +44,7 @@ class Directory {
   }
 
   save() {
-    fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+    gravarAtomico(this.file, JSON.stringify(this.data, null, 2));
   }
 
   addOrg(org) {
