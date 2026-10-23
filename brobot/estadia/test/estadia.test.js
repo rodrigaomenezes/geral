@@ -691,3 +691,25 @@ test('Cadastros e links são gravados de uma vez (sem arquivo pela metade nem te
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('Índice por operação devolve o mesmo que varrer o log, também depois de reabrir e de reiniciar', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'estadia-'));
+  try {
+    const varrer = (s, id) => s.events.filter((e) => e.opId === id);
+    let s = new EventStore(dir);
+    s.append({ opId: 'A', type: 'OPERACAO_CRIADA', payload: {} });
+    s.append({ opId: 'B', type: 'OPERACAO_CRIADA', payload: {} });
+    s.append({ opId: 'A', type: 'CHEGADA', payload: {} });
+    s.append({ type: 'CADASTRO', payload: {} });
+    s.forOp('A').reverse(); // quem chama mexe na cópia, não no índice
+    assert.deepEqual(s.forOp('A'), varrer(s, 'A'));
+    assert.deepEqual(s.opIds(), ['A', 'B']);
+    s = new EventStore(dir); // reabre do arquivo
+    assert.deepEqual(s.forOp('A').map((e) => e.type), ['OPERACAO_CRIADA', 'CHEGADA']);
+    assert.deepEqual(s.opIds(), ['A', 'B']);
+    s.reset();
+    assert.deepEqual([s.forOp('A'), s.opIds()], [[], []]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
