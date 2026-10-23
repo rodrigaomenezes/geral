@@ -96,15 +96,16 @@ próprio `CLAUDE.md`, `ARCHITECTURE.md` e `DECISIONS.md`. A política vale para 
 3. **Reinício da demonstração ligado por padrão** (`ESTADIA_DEMO_RESET` só desliga com `0`) → num ambiente com
    cliente real, um administrador apaga toda a prova com um clique → definir `ESTADIA_DEMO_RESET=0` em todo ambiente
    real; quando o primeiro cliente real entrar, inverter o padrão (desligado em produção).
-4. **Cada consulta varre o log inteiro, e a lista não tem paginação** (`GET /api/operations` monta o estado de todas
-   as operações; `store.forOp` filtra todos os eventos a cada uma) →
-   custo cresce com operações × eventos e a tela fica lenta com volume real → medir o tempo de `GET /api/operations`
-   com uma base de teste grande; passando de ~300 ms, manter um índice `opId → eventos` no `append` (sem banco novo).
+4. **[Corrigida em parte] Cada consulta varria o log inteiro** (`store.forOp` filtrava todos os eventos a cada
+   operação da lista) → medido: 1.428 operações / 26 mil eventos = 1,25 s; 5.508 / 102 mil = 16,7 s → agora há um
+   índice `opId → eventos` mantido no `append`: 0,11 s e 0,42 s, mesmo resultado. **Fica:** a lista
+   (`GET /api/operations`) não tem paginação; quando passar de ~2.000 operações por organização, paginar (mudança de
+   contrato com o front, com decisão registrada).
 5. **`server/server.js` com 1.200 linhas e todas as rotas numa função** → toda mudança mexe no mesmo arquivo e
    aumenta o risco de efeito colateral → ao mexer numa área, extrair as rotas dela para `server/rotas/<area>.js`,
    sem framework novo.
-6. **`render.yaml` com dados em `/tmp`** → publicar pelo Render perde tudo a cada reinício → a publicação oficial é
-   o Railway com Volume em `/data`; apagar o `render.yaml` quando o dono confirmar que não é usado.
+6. **[Corrigida] `render.yaml` com dados em `/tmp`** → publicar pelo Render perderia tudo a cada reinício →
+   removido; a publicação oficial é o Railway com Volume em `/data`.
 7. **Sem versão de formato nos cadastros e nos eventos** → uma mudança incompatível futura não tem caminho de
    atualização → na primeira mudança assim, gravar `versaoEsquema` em `directory.json` e um atualizador no boot,
    com cópia antes (sem apagar nada).

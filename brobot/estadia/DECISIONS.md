@@ -27,3 +27,9 @@ recria dados marcados como demonstração (`directory.json.demonstracao`), e cad
 gravados de forma atômica (`server/arquivo.js`).
 **Por quê:** o boot recriava a demonstração quando não achava a empresa de exemplo, o que numa base real apagaria
 toda a prova; gravação direta por cima podia deixar o cadastro pela metade num reinício.
+
+# T-006 — Índice por operação no log, medido
+**Decisão:** o `EventStore` mantém `opId → eventos` e a lista de operações em memória, atualizados no `append`.
+Sem banco novo nem cache separado: o índice é derivado do log e remontado ao abrir.
+**Por quê:** medido em base de teste — 1.428 operações (26 mil eventos): 1,25 s → 0,11 s; 5.508 operações
+(102 mil eventos): 16,7 s → 0,42 s em `GET /api/operations`, mesmo resultado.
