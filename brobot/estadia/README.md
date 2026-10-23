@@ -177,6 +177,8 @@ A demonstração traz um histórico fictício de viagens (desde 01/10/2026, iní
 
 ## Arquitetura
 
+Detalhes em `ARCHITECTURE.md`, decisões técnicas em `DECISIONS.md`; regras de engenharia em `../../docs/POLITICA_ENGENHARIA.md`.
+
 ```
 brobot/estadia/
 ├── server/
@@ -212,7 +214,7 @@ Os dados ficam em `data/` (ou no caminho de `ESTADIA_DATA`):
 | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_VERIFY_TOKEN` | API oficial do WhatsApp (Cloud API). Com elas, a administração escolhe o plano de cada transportadora (manual ou API) em **Administração → WhatsApp por transportadora**. Webhook: `/api/whatsapp/webhook` |
 | `WHATSAPP_MODE` | `manual` (padrão sem API), `api` (padrão quando a API está configurada) ou `simulado` (demonstração com o celular do destino simulado) |
 | `ESTADIA_SECRET` | Chave de assinatura das sessões |
-| `ESTADIA_DEMO_RESET` | `0` desativa o reinício da demonstração e a simulação de deslocamento |
+| `ESTADIA_DEMO_RESET` | `0` desativa o reinício da demonstração e a simulação de deslocamento. **Obrigatório `0` em ambiente com cliente real.** O boot só recria sozinho dados marcados como demonstração |
 | `ESTADIA_LINK_TTL_HORAS` | Validade dos links de confirmação (padrão 24) |
 | `ESTADIA_BASE_URL` | Endereço público usado nos links (opcional; por padrão vem do próprio acesso) |
 
