@@ -204,3 +204,17 @@ main { padding: 8px 16px 24px; max-width: 640px; margin: 0 auto; }
 /* Sua IA */
 .sugestao.destaque-ia { background: var(--mar); color: var(--fundo); border-color: transparent; }
 #minha-ia-modelo { margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9rem; }
+
+/* Qualquer lugar e GPS */
+.linha-gps { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--linha); }
+.linha-gps .dica { margin: 0; flex: 1; min-width: 0; }
+.btn.pequeno { min-height: 38px; font-size: .85rem; padding: 0 12px; flex: none; }
+.linha-busca { display: flex; gap: 8px; }
+.linha-busca .campo { margin: 0; min-width: 0; }
+.resultados-busca { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.resultado { width: 100%; text-align: left; background: var(--superficie-2); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.resultado strong { display: block; }
+.resultado span { font-size: .82rem; color: var(--tinta-2); }
+.busca .btn.grande { margin-top: 12px; }
+#agora-fonte { color: var(--tinta-2); }
+.destino .gerado { font-size: .75rem; font-weight: 700; color: var(--verde); text-transform: uppercase; letter-spacing: .06em; }

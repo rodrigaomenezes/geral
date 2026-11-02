@@ -93,18 +93,35 @@ function ir(tela) {
   window.scrollTo({ top: 0 });
 }
 
-/** Mostra onde a pessoa está ao abrir o Passeio, sem ligar o acompanhamento (que só começa em "Começar a caminhar"). */
+function estadoGps(t) { $('#estado-gps').textContent = t; }
+
+/** Mostra onde a pessoa está ao abrir o Passeio, sem ligar o acompanhamento (que só começa em "Começar a caminhar").
+ *  `forcar` = toque no botão: lê de novo na hora (e, no iPhone, o toque garante o pedido de permissão). */
 let ultimaLocalizacao = 0;
-function localizarAgora() {
-  if (!app.pacote || app.passeioAtivo || app.prefs.simulacao || Date.now() - ultimaLocalizacao < 30000) return;
+function localizarAgora(forcar = false) {
+  if (app.passeioAtivo) return;
+  if (app.prefs.simulacao) { estadoGps('Simulação ligada: o GPS real está desligado.'); return; }
+  if (!forcar && Date.now() - ultimaLocalizacao < 30000) return;
   ultimaLocalizacao = Date.now();
   $('#selo-pos').textContent = 'buscando GPS';
+  estadoGps('Procurando você...');
   localizarUmaVez((p) => {
     if (app.passeioAtivo || app.prefs.simulacao) return;
     app.pos = p;
+    estadoGps(`Localização encontrada (precisão de ${Math.round(p.precisao || 0)} m).`);
     atualizarSelos(); renderPerto();
-  }, (msg, codigo) => { atualizarSelos(); alertaFaixa(msg, codigo === 1 ? 15000 : 8000); });
+  }, (msg, codigo) => {
+    estadoGps(codigo === 1 ? 'Localização bloqueada (veja o aviso no topo).' : codigo === 3 ? 'O GPS demorou. Toque para tentar de novo.' : 'Não consegui ler o GPS.');
+    atualizarSelos(); alertaFaixa(msg, codigo === 1 ? 15000 : 8000);
+  });
 }
+$('#btn-localizar').addEventListener('click', () => localizarAgora(true));
+$('#btn-sair-simulacao').addEventListener('click', () => {
+  const ativo = app.passeioAtivo; if (ativo) encerrarPasseio({ resumo: false });
+  app.prefs.simulacao = false; gravar('prefs', app.prefs); aplicarPrefs();
+  desligarSimulacao(); atualizarSelos(); renderPerto();
+  localizarAgora(true);
+});
 
 /** Longe de todos os pontos (ex.: testando fora de Salvador): explica e oferece a simulação. */
 function renderDistanciaDestino() {
@@ -114,7 +131,7 @@ function renderDistanciaDestino() {
   if (!maisPerto || maisPerto.distancia < 2000) { c.hidden = true; return; }
   const km = maisPerto.distancia / 1000;
   const dist = km < 100 ? `${km.toFixed(1).replace('.', ',')} km` : `${Math.round(km).toLocaleString('pt-BR')} km`;
-  $('#longe-texto').textContent = `O GPS encontrou você, a ${dist} de ${app.pacote.cidade}. Os avisos começam quando você estiver perto dos pontos. Para testar daqui, ligue a simulação de caminhada.`;
+  $('#longe-texto').textContent = `O GPS encontrou você, a ${dist} de ${app.pacote.cidade}. Quer o guia daqui? Ou ligue a simulação para testar ${app.pacote.cidade}.`;
   c.hidden = false;
 }
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-ir]'); if (b) ir(b.dataset.ir); });
@@ -149,24 +166,86 @@ async function baixarDestinoUnico() {
   } catch { /* segue sem destino; a pessoa escolhe em Viagem */ }
 }
 
+// ---------- Qualquer lugar (G-017) ----------
+/** Guarda um destino gerado no aparelho, lembra em "meus lugares" e passa a usá-lo. */
+function usarDestinoGerado(p) {
+  if (!gravar(`pacote.${p.id}`, p)) throw new Error('Sem espaço no aparelho para guardar este destino.');
+  const meus = ler('meusLugares', []).filter((x) => x.id !== p.id);
+  meus.unshift({ id: p.id, nome: p.nome, pontos: p.pois.length, bytes: JSON.stringify(p).length, gerado: true, em: Date.now() });
+  gravar('meusLugares', meus.slice(0, 10));
+  ativarPacote(p);
+  app.pos = app.pos && !app.pos.simulada ? app.pos : null;
+  ir('passeio');
+  alertaFaixa(`Pronto: ${p.pois.length} pontos em ${p.cidade}, guardados para usar também sem internet.`, 8000);
+}
+
+async function gerarDestino({ lat, lng, nome }, botao) {
+  if (!online()) { alertaFaixa('Para montar um destino novo é preciso internet.'); return; }
+  const texto = botao ? botao.textContent : '';
+  if (botao) { botao.disabled = true; botao.textContent = 'Montando o roteiro...'; }
+  try {
+    const q = new URLSearchParams({ lat: String(lat), lng: String(lng), ...(nome ? { nome } : {}) });
+    usarDestinoGerado(await api(`/api/perto?${q}`, null, 60000));
+  } catch (e) {
+    alertaFaixa(e.message || 'Não consegui montar o roteiro agora.', 10000);
+  } finally { if (botao) { botao.disabled = false; botao.textContent = texto; } }
+}
+
+/** Lê o GPS (com o toque da pessoa) e monta o guia ao redor. */
+function guiaDeOndeEstou(botao) {
+  estadoGps('Procurando você...');
+  localizarUmaVez((p) => {
+    app.pos = p; atualizarSelos(); estadoGps(`Encontrado (precisão de ${Math.round(p.precisao || 0)} m).`);
+    gerarDestino({ lat: p.lat, lng: p.lng }, botao);
+  }, (msg, codigo) => { estadoGps(codigo === 1 ? 'Localização bloqueada.' : 'Não consegui ler o GPS.'); alertaFaixa(msg, 15000); });
+}
+$('#btn-guia-aqui').addEventListener('click', (e) => guiaDeOndeEstou(e.currentTarget));
+$('#btn-guia-aqui-viagem').addEventListener('click', (e) => guiaDeOndeEstou(e.currentTarget));
+
+$('#form-busca').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = $('#entrada-busca').value.trim();
+  const ul = $('#resultados-busca');
+  if (q.length < 2) return;
+  if (!online()) { alertaFaixa('Para buscar um lugar novo é preciso internet.'); return; }
+  $('#entrada-busca').blur();
+  ul.replaceChildren(el('li', { class: 'carregando' }, 'Buscando...'));
+  try {
+    const lista = await api(`/api/lugares?${new URLSearchParams({ q })}`, null, 20000);
+    ul.replaceChildren(...(lista.length ? lista.map((l) => {
+      const b = el('button', { class: 'resultado', type: 'button', onclick: () => gerarDestino(l, b) }, el('strong', {}, l.nome), el('span', {}, l.detalhe));
+      return el('li', {}, b);
+    }) : [el('li', { class: 'dica' }, 'Não encontrei esse lugar. Tente o nome da cidade.')]));
+  } catch (er) { ul.replaceChildren(el('li', { class: 'dica' }, er.message || 'Não consegui buscar agora.')); }
+});
+
 async function renderDestinos() {
   const ul = $('#lista-destinos');
   let lista = ler('destinos', []);
   if (online()) {
     try { lista = await api('/api/pacotes', null, 10000); gravar('destinos', lista); } catch { /* usa a lista guardada */ }
   }
+  // Destinos gerados (qualquer lugar) que a pessoa já usou: ficam no aparelho e funcionam sem internet.
+  const meus = ler('meusLugares', []).filter((m) => pacoteSalvo(m.id));
+  lista = [...meus, ...lista.filter((d) => !meus.some((m) => m.id === d.id))];
   ul.replaceChildren(...(lista.length ? lista : []).map((d) => {
     const salvo = pacoteSalvo(d.id);
     const ativo = app.pacote && app.pacote.id === d.id;
     const btn = el('button', { class: `btn ${salvo ? '' : 'primario'}`, onclick: async () => {
       btn.disabled = true; btn.textContent = 'Baixando...';
-      try { const p = salvo && !online() ? salvo : await baixarPacote(d.id); ativarPacote(p); ir('passeio'); }
+      try { const p = d.gerado || (salvo && !online()) ? salvo : await baixarPacote(d.id); ativarPacote(p); ir('passeio'); }
       catch (e) { btn.disabled = false; btn.textContent = 'Tentar de novo'; alertaFaixa(e.message || 'Não foi possível baixar.'); }
-    } }, salvo ? (ativo ? 'Atualizar e usar' : 'Usar este destino') : `Baixar para usar offline · ${Math.max(1, Math.round(d.bytes / 1024))} KB`);
+    } }, salvo ? (ativo && !d.gerado ? 'Atualizar e usar' : ativo ? 'Em uso' : 'Usar este destino') : `Baixar para usar offline · ${Math.max(1, Math.round(d.bytes / 1024))} KB`);
+    const remover = d.gerado ? el('button', { class: 'btn', onclick: () => {
+      gravar(`pacote.${d.id}`, null); gravar('meusLugares', ler('meusLugares', []).filter((m) => m.id !== d.id));
+      if (ativo) { app.pacote = null; gravar('pacoteAtivo', null); $('#passeio').hidden = true; $('#sem-pacote').hidden = false; }
+      renderDestinos();
+    } }, 'Remover') : null;
     return el('li', { class: `destino ${ativo ? 'ativo' : ''}` },
+      d.gerado ? el('p', { class: 'gerado' }, 'Montado na hora · Wikipédia') : null,
       el('h4', {}, d.nome),
       el('p', { class: 'dica' }, `${d.pontos} pontos · ${salvo ? 'disponível offline' : 'ainda não baixado'}`),
-      el('div', { class: 'acoes' }, btn));
+      el('div', { class: 'acoes' }, btn, remover));
   }));
   if (!lista.length) ul.replaceChildren(el('li', { class: 'dica' }, online() ? 'Nenhum destino disponível.' : 'Sem internet e sem destinos baixados.'));
 }
@@ -312,6 +391,7 @@ function mostrarAlerta(alerta) {
   $('#agora-curiosidades').replaceChildren(...(alerta.tipo === 'chegada' ? (poi.curiosidades || []).slice(0, 2) : []).map((x) => el('li', {}, x)));
   $('#agora-mais').hidden = !poi;
   $('#agora-perguntar').hidden = !poi && !app.emFoco;
+  mostrarFonte(poi);
   falar(alerta.tipo === 'chegada' ? `${poi.nome}. ${texto}` : alerta.tipo === 'a-caminho' ? texto : `${ROTULO_ALERTA[alerta.tipo]}. ${texto}`);
   if (navigator.vibrate) navigator.vibrate(VIBRACAO[alerta.tipo] || [100]);
   const curto = alerta.tipo === 'chegada' ? (poi.teaser || poi.narrativa.curto) : alerta.texto;
@@ -336,6 +416,13 @@ plat.aoAbrirAlerta((id) => {
   $('#agora-mais').hidden = true;
 });
 
+/** Atribuição do texto (Wikipédia, CC BY-SA) quando o ponto veio de um destino montado na hora. */
+function mostrarFonte(poi) {
+  const a = $('#agora-fonte');
+  if (poi && poi.fonte) { a.hidden = false; a.href = poi.fonte.url; a.textContent = `Fonte: ${poi.fonte.nome} (CC BY-SA)`; }
+  else a.hidden = true;
+}
+
 function mostrarAgora(poi, falarJa) {
   const c = $('#cartao-agora');
   c.hidden = false;
@@ -347,6 +434,7 @@ function mostrarAgora(poi, falarJa) {
   $('#agora-texto').textContent = t;
   $('#agora-curiosidades').replaceChildren(...(poi.curiosidades || []).slice(0, 2).map((x) => el('li', {}, x)));
   $('#agora-mais').hidden = false; $('#agora-perguntar').hidden = false;
+  mostrarFonte(poi);
   if (falarJa) falar(t, true);
   renderPerto();
 }

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { carregarPacotes, resumo } from './pacotes.js';
 import { conversar, explicarFoto, criarCliente, MODELO, SEM_DESTINO } from './guia.js';
 import { clienteOpenRouter, chaveValida, modeloValido, MODELO_PADRAO_USUARIO } from './openrouter.js';
+import { criarDescoberta, ErroDescoberta } from './descoberta.js';
 import { posicaoValida, NIVEIS } from '../public/js/nucleo.js';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,7 +82,7 @@ export function validarFeedback(b, pacotes) {
   return { id, pacoteId: b.pacoteId, poiId: texto(b.poiId, 64) || null, tipo: b.tipo, motor: texto(b.motor, 10), resposta: texto(b.resposta, 1500), comentario: texto(b.comentario, 500) };
 }
 
-export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), pastaDados = process.env.GUIA_DADOS || join(RAIZ, 'dados'), cliente, limitador = criarLimitador(), log = console, fetchIA = fetch } = {}) {
+export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), pastaDados = process.env.GUIA_DADOS || join(RAIZ, 'dados'), cliente, limitador = criarLimitador(), log = console, fetchIA = fetch, descoberta = criarDescoberta() } = {}) {
   const pacotes = carregarPacotes(pastaPacotes);
   const ia = cliente === undefined ? await criarCliente() : cliente;
   const feedbackVistos = new Set(); // idempotência: o app reenvia da fila e não pode duplicar
@@ -124,6 +125,26 @@ export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), past
       if (req.headers['if-none-match'] === reg.etag) { res.writeHead(304, { etag: reg.etag }); return res.end(); }
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', etag: reg.etag, 'cache-control': 'no-cache' });
       return res.end(reg.corpo);
+    }
+    // Qualquer lugar (G-017): busca por nome e destino gerado ao redor de uma coordenada.
+    if (req.method === 'GET' && (p === '/api/lugares' || p === '/api/perto')) {
+      if (!limitador(ip)) throw new ErroHttp(429, 'Muitas buscas em pouco tempo. Tente de novo em alguns minutos.');
+      try {
+        if (p === '/api/lugares') {
+          const q = texto(url.searchParams.get('q'), 80);
+          if (q.length < 2) throw new ErroHttp(400, 'Digite pelo menos 2 letras.');
+          return json(res, 200, await descoberta.buscarLugares(q));
+        }
+        const lugar = pos({ lat: url.searchParams.get('lat'), lng: url.searchParams.get('lng') });
+        if (!lugar) throw new ErroHttp(400, 'Coordenadas inválidas.');
+        const inicio = Date.now();
+        const pacote = await descoberta.gerarPacote({ ...lugar, nome: texto(url.searchParams.get('nome'), 80) || null });
+        log.info(JSON.stringify({ rota: p, pontos: pacote.pois.length, ms: Date.now() - inicio }));
+        return json(res, 200, pacote);
+      } catch (e) {
+        if (e instanceof ErroDescoberta) throw new ErroHttp(502, e.message);
+        throw e;
+      }
     }
     if (req.method === 'POST' && (p === '/api/conversa' || p === '/api/foto')) {
       if (!limitador(ip)) throw new ErroHttp(429, 'Muitas perguntas em pouco tempo. Tente de novo em alguns minutos.');
