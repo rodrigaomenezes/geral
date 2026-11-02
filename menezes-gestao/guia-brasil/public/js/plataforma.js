@@ -47,10 +47,11 @@ if (!nativo && typeof window !== 'undefined' && 'speechSynthesis' in window) { e
 export function falar(texto) {
   if (nativo) { try { nativo.falar(String(texto)); } catch { /* sem voz */ } return; }
   if (!('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(texto);
   u.lang = 'pt-BR'; if (vozPt) u.voice = vozPt; u.rate = 1.02;
-  speechSynthesis.speak(u);
+  // Safari descarta a fala pedida logo depois de cancel(): só cancela se houver algo tocando, e espera um instante.
+  if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(() => speechSynthesis.speak(u), 80); }
+  else speechSynthesis.speak(u);
 }
 export function pararFala() {
   if (nativo) { try { nativo.pararFala(); } catch { /* nada */ } return; }

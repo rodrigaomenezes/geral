@@ -103,3 +103,13 @@ existe, mas app hospedado precisa de aprovação da OpenAI; a assinatura do Clau
 para reaproveitar o guia.js sem duplicar o contexto e as regras.
 **Limite:** login com Google não funciona dentro da WebView do Android (o Google bloqueia); no app, use e-mail.
 O "Entrar com ChatGPT" entra como segundo provedor quando a OpenAI aprovar.
+
+# G-016 — O app não depende de um destino escolhido para funcionar
+**Decisão:** conversa e foto aceitam pedido sem `pacoteId` (o servidor usa um "sem destino" vazio: com IA responde
+pelo conhecimento geral e pela posição; sem IA orienta a escolher destino ou conectar a IA). Quando só existe um
+destino, o app baixa sozinho na primeira abertura. Ao abrir o Passeio o app lê o GPS uma vez para mostrar
+distâncias e, longe de todos os pontos (>2 km), explica e oferece a simulação. Erros de GPS mostram o caminho exato
+nos ajustes (iPhone: Sites do Safari). No iPhone, o primeiro toque em "Ouvir" avisa que o modo silencioso cala a voz.
+**Por quê:** no iPhone, o atalho da tela inicial tem armazenamento separado do Safari: o destino baixado no Safari
+não existia no atalho, e sem destino o app bloqueava conversa, foto e GPS sem dizer por quê ("nada funciona"). Os
+registros do servidor confirmaram: nenhuma pergunta chegava.

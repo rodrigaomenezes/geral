@@ -49,9 +49,12 @@ Validado ao subir o servidor (`validarPacote`); pacote inválido impede o boot. 
 | `GET /api/health` | — | `{ ok, ia, modelo, pacotes }` |
 | `GET /api/pacotes` | — | `[{ id, nome, cidade, pais, idioma, atualizadoEm, pontos, bytes, versao }]` |
 | `GET /api/pacotes/:id` | `If-None-Match` | pacote (ETag) ou 304 |
-| `POST /api/conversa` | `{ pacoteId, mensagem ≤600, pos?, poiId?, historico? ≤8, nivel? }` | `{ texto, poiId, motor:'ia'|'local', modelo?, confianca?, semResposta?, erroIa? }` |
-| `POST /api/foto` | `{ pacoteId, imagem: dataURL jpeg/png/webp ≤5 MB, pos?, direcao?, pergunta? }` | `{ identificado, poiId, titulo, explicacao, curiosidades[≤3], alternativas, motor, erroIa? }` |
+| `POST /api/conversa` | `{ pacoteId?, mensagem ≤600, pos?, poiId?, historico? ≤8, nivel? }` | `{ texto, poiId, motor:'ia'|'local', modelo?, confianca?, semResposta?, erroIa? }` |
+| `POST /api/foto` | `{ pacoteId?, imagem: dataURL jpeg/png/webp ≤5 MB, pos?, direcao?, pergunta? }` | `{ identificado, poiId, titulo, explicacao, curiosidades[≤3], alternativas, motor, erroIa? }` |
 | `POST /api/feedback` | `{ id (idempotência), pacoteId, tipo:'util'|'errado', poiId?, motor?, resposta?, comentario? }` | 204 |
+
+`pacoteId` é opcional em conversa e foto (G-016): sem ele, a IA responde pelo conhecimento geral e pela posição; um
+`pacoteId` que não existe continua 404.
 
 Erros: `{ erro }` com 400 (entrada), 404, 413 (tamanho), 429 (limite por IP: 40 chamadas de IA a cada 10 min).
 
