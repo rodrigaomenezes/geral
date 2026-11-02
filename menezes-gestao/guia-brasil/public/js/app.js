@@ -332,13 +332,14 @@ function avaliar(contexto) {
   caixa.append(el('button', { type: 'button', onclick: () => enviar('util') }, 'Útil'), el('button', { type: 'button', onclick: () => enviar('errado') }, 'Isso está errado'));
   return caixa;
 }
-const rotuloMotor = (r) => (r.motor === 'ia' ? 'Resposta da IA' : 'Resposta do conteúdo offline');
+const rotuloMotor = (r) => (r.motor === 'ia' ? 'Resposta da IA' : 'Resposta do conteúdo da viagem');
 
 // ---------- Conversa ----------
 function renderConversa() {
   const ol = $('#mensagens');
   if (!app.conversa.length) {
     ol.replaceChildren(el('li', { class: 'msg guia' }, `Olá! Sou seu guia${app.pacote ? ` em ${app.pacote.cidade}` : ''}. Pergunte o que quiser sobre o lugar onde você está, a história, a comida ou o que ver por perto.`));
+    renderSugestoes(true);
     return;
   }
   ol.replaceChildren(...app.conversa.map((m) => {
@@ -350,7 +351,30 @@ function renderConversa() {
     }
     return li;
   }));
-  ol.lastElementChild?.scrollIntoView({ block: 'end' });
+  renderSugestoes(!!app.conversa.at(-1)?.semResposta);
+  rolarAteFim();
+}
+
+/** Leva a tela até a última mensagem. A caixa de digitação e as abas ficam por cima do fim da lista,
+ *  então rolamos a página até o fim (não basta scrollIntoView: a resposta ficava escondida no iPhone). */
+function rolarAteFim() {
+  requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
+}
+
+/** Perguntas que o guia sabe responder com o conteúdo da viagem: do ponto em foco primeiro, depois as gerais. */
+function sugestoesDePerguntas(max = 3) {
+  if (!app.pacote) return [];
+  const feitas = new Set(app.conversa.filter((m) => m.papel === 'usuario').map((m) => m.texto.trim().toLowerCase()));
+  const doFoco = app.emFoco ? (app.emFoco.perguntas || []).map((f) => f.p) : [];
+  const gerais = (app.pacote.perguntasGerais || []).map((f) => f.p);
+  const dosPontos = app.pacote.pois.map((poi) => (poi.perguntas || [])[0]?.p).filter(Boolean);
+  return [...new Set([...doFoco, ...gerais, ...dosPontos])].filter((q) => !feitas.has(q.toLowerCase())).slice(0, max);
+}
+function renderSugestoes(mostrar) {
+  const lista = mostrar ? sugestoesDePerguntas() : [];
+  const caixa = $('#sugestoes');
+  caixa.hidden = !lista.length;
+  caixa.replaceChildren(...lista.map((q) => el('button', { type: 'button', class: 'sugestao', onclick: () => perguntar(q) }, q)));
 }
 function addMensagem(m) {
   app.conversa.push(m);
@@ -382,7 +406,7 @@ async function perguntar(texto) {
       atualizarFila();
     }
   }
-  addMensagem({ papel: 'guia', texto: r.texto, motor: r.motor, poiId: r.poiId || null });
+  addMensagem({ papel: 'guia', texto: r.texto, motor: r.motor, poiId: r.poiId || null, semResposta: !!r.semResposta });
   if (app.prefs.voz && document.visibilityState === 'visible') falar(r.texto);
 }
 $('#form-conversa').addEventListener('submit', (e) => {
@@ -599,3 +623,6 @@ async function iniciar() {
   }
 }
 iniciar();
+
+// iPhone: ao abrir o teclado a tela encolhe; mantém a última mensagem à vista.
+$('#entrada-conversa').addEventListener('focus', () => setTimeout(rolarAteFim, 300));

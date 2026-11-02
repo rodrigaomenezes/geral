@@ -57,6 +57,9 @@ test('conversa sem IA responde pelo conteúdo do pacote', async () => {
   assert.match(r.corpo.texto, /Tomé de Sousa/);
   const nao = await s.chamar('/api/conversa', { pacoteId: 'salvador-centro-historico', mensagem: 'previsão do tempo amanhã' });
   assert.equal(nao.corpo.semResposta, true);
+  // online e sem IA: não pode culpar a internet
+  assert.doesNotMatch(nao.corpo.texto, /internet/i);
+  assert.match(nao.corpo.texto, /conteúdo desta viagem/);
 });
 
 test('entradas inválidas são recusadas com mensagem clara', async () => {
@@ -116,6 +119,8 @@ test('com IA: usa o modelo, envia o contexto do pacote e cai para o local se a I
     assert.equal(queda.corpo.motor, 'local');
     assert.match(queda.corpo.texto, /1873/);
     assert.match(queda.corpo.erroIa, /timeout/);
+    const quedaSem = await ia.chamar('/api/conversa', { pacoteId: 'salvador-centro-historico', mensagem: 'previsão do tempo amanhã' });
+    assert.match(quedaSem.corpo.texto, /Não consegui consultar a IA/);
   } finally { ia.fechar(); }
 });
 
