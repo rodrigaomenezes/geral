@@ -20,6 +20,8 @@ Celular (PWA)                                      Servidor (Node, sem framework
 | `public/js/sensores.js` | GPS, simulação de caminhada, bússola | Decidir o que narrar |
 | `public/js/estado.js` | Preferências, pacote baixado, conversa, fila de pendências (localStorage, com queda para memória) | Regras |
 | `public/js/app.js` | Telas, tela acesa (Wake Lock), chamadas à API, fila, configuração dos avisos | Regras (chama o núcleo) |
+| `public/js/minhaia.js` | "Sua IA": login OAuth PKCE na OpenRouter, guarda a conexão no aparelho, cabeçalhos | Chamar a IA |
+| `server/openrouter.js` | Cliente da OpenRouter com a chave da pessoa, no mesmo formato que o guia.js usa | Guardar ou registrar a chave |
 | `public/js/plataforma.js` | O que muda entre navegador e app Android: voz, notificações, segundo plano, GPS nativo | Regras |
 | `android/` | APK: WebView do app + serviço de GPS em primeiro plano, voz e notificação nativas (ponte `GuiaNativo`) | Regras (entrega posições ao JavaScript) |
 | `public/sw.js` | Guarda a casca do app para abrir offline | Guardar POST, pacotes |
@@ -52,6 +54,11 @@ Validado ao subir o servidor (`validarPacote`); pacote inválido impede o boot. 
 | `POST /api/feedback` | `{ id (idempotência), pacoteId, tipo:'util'|'errado', poiId?, motor?, resposta?, comentario? }` | 204 |
 
 Erros: `{ erro }` com 400 (entrada), 404, 413 (tamanho), 429 (limite por IP: 40 chamadas de IA a cada 10 min).
+
+**Sua IA (G-015):** `POST /api/conversa` e `/api/foto` aceitam os cabeçalhos opcionais `x-guia-ia-chave` (chave da
+OpenRouter da pessoa, `sk-or-…`) e `x-guia-ia-modelo`. Com eles a resposta traz `provedor: 'openrouter'`; com
+chave malformada, 400; se a OpenRouter recusar, `iaUsuario: 'invalida'` (401/403) ou `'sem-creditos'` (402), com a
+resposta do conteúdo local. A chave nunca é gravada nem registrada.
 
 ## Companheiro de caminhada
 
@@ -99,6 +106,6 @@ No navegador, `plataforma.js` faz o mesmo com Web Speech e notificações do ser
 estiver viva).
 
 ## Dados guardados
-- **No aparelho:** preferências, pacote, conversa (últimas 60), estado do companheiro, trajeto (até 600 pontos), fila (até 20 itens, 4 fotos).
+- **No aparelho:** conexão da "Sua IA" (chave da OpenRouter da pessoa), preferências, pacote, conversa (últimas 60), estado do companheiro, trajeto (até 600 pontos), fila (até 20 itens, 4 fotos).
   A rota do usuário não sai do aparelho; o servidor só recebe a posição junto da pergunta ou foto.
 - **No servidor:** só `feedback.jsonl` (append). Fotos e perguntas não são gravadas.

@@ -88,3 +88,18 @@ Capacitor) com monitoramento de regiões do CoreLocation (até 20 regiões por v
 e notificações locais, reaproveitando o mesmo núcleo.
 **Por quê:** o iOS não permite GPS contínuo em segundo plano para páginas web; regiões monitoradas são o caminho que
 gasta menos bateria e funciona até com o app fechado.
+
+# G-015 — "Sua IA": a pessoa conecta a própria conta (OpenRouter, login OAuth com PKCE)
+**Decisão:** em Viagem, *Conectar minha IA* leva ao login da OpenRouter (PKCE S256, `state` contra falsificação);
+na volta, o app troca o código por uma chave da conta da pessoa e guarda **só no aparelho**. Conversa e foto mandam
+essa chave por cabeçalho (`x-guia-ia-chave`, `x-guia-ia-modelo`); o servidor monta o mesmo contexto do guia e chama
+a OpenRouter com ela, sem gravar nem registrar a chave. Ordem de uso: IA da pessoa > IA do servidor > conteúdo local.
+Erro 401 desconecta e avisa; 402 avisa falta de créditos; em qualquer erro a resposta cai no conteúdo local (G-005).
+Modelo padrão `openrouter/auto`, trocável na tela. No Android o login abre dentro do app (openrouter.ai liberado
+na WebView).
+**Por quê:** a pessoa pediu para usar a própria IA sem chave. Em nov/2026: "Entrar com ChatGPT" (plano Plus/Pro)
+existe, mas app hospedado precisa de aprovação da OpenAI; a assinatura do Claude é proibida em apps de terceiros
+(Anthropic, fev/2026); a OpenRouter é a única aberta a qualquer app hoje. O servidor (e não o navegador) chama a IA
+para reaproveitar o guia.js sem duplicar o contexto e as regras.
+**Limite:** login com Google não funciona dentro da WebView do Android (o Google bloqueia); no app, use e-mail.
+O "Entrar com ChatGPT" entra como segundo provedor quando a OpenAI aprovar.
