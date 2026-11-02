@@ -212,7 +212,8 @@ const arredondarM = (m) => (m < 100 ? Math.round(m / 10) * 10 : Math.round(m / 5
  * estado = { narrados:{poiId:ms}, anunciados:{poiId:ms}, avisos:{avisoId:ms}, ultimaNarracao:ms, ultimoImportante:ms }
  * Devolve { tipo, id, titulo, texto, poi?, aviso?, distancia }.
  */
-export function proximoAlerta({ pacote, pos, rumoCaminhada = null, estado = {}, frequencia = 'normal', agora = Date.now(), raioPadraoM = 70 }) {
+export function proximoAlerta({ pacote, pos, rumoCaminhada = null, estado = {}, frequencia = 'normal', agora = Date.now(), raioPadraoM = 70,
+  tipos = PRIORIDADE, maxPorHora = null }) {
   if (!posicaoValida(pos)) return null;
   if (Number.isFinite(pos.precisao) && pos.precisao > PRECISAO_MAX_M) return null;
   const narrados = estado.narrados || {};
@@ -251,9 +252,18 @@ export function proximoAlerta({ pacote, pos, rumoCaminhada = null, estado = {}, 
     }
   }
 
-  if (!candidatos.length) return null;
-  candidatos.sort((a, b) => PRIORIDADE.indexOf(a.tipo) - PRIORIDADE.indexOf(b.tipo) || a.distancia - b.distancia);
-  return candidatos[0];
+  // Preferências da pessoa: tipos desligados somem; o limite por hora não vale para avisos importantes.
+  const ligados = new Set(tipos);
+  const noLimite = Number.isFinite(maxPorHora) && maxPorHora > 0 && alertasNaUltimaHora(estado, agora) >= maxPorHora;
+  const validos = candidatos.filter((c) => ligados.has(c.tipo) && (!noLimite || c.tipo === 'importante'));
+  if (!validos.length) return null;
+  validos.sort((a, b) => PRIORIDADE.indexOf(a.tipo) - PRIORIDADE.indexOf(b.tipo) || a.distancia - b.distancia);
+  return validos[0];
+}
+
+/** Quantos alertas não importantes foram dados na última hora. */
+export function alertasNaUltimaHora(estado = {}, agora = Date.now()) {
+  return (estado.historico || []).filter((h) => agora - h.t < 3600000 && h.tipo !== 'importante').length;
 }
 
 export const ROTULO_ALERTA = { importante: 'Importante', chegada: 'Você chegou', 'a-caminho': 'Logo à frente', dica: 'Dica', novidade: 'Novidade' };
@@ -261,8 +271,10 @@ export const ROTULO_ALERTA = { importante: 'Importante', chegada: 'Você chegou'
 /** Estado novo depois de dar um alerta (não altera o original). */
 export function registrarAlerta(estado = {}, alerta, agora = Date.now()) {
   const novo = { narrados: { ...(estado.narrados || {}) }, anunciados: { ...(estado.anunciados || {}) }, avisos: { ...(estado.avisos || {}) },
-    ultimaNarracao: estado.ultimaNarracao || 0, ultimoImportante: estado.ultimoImportante || 0 };
+    ultimaNarracao: estado.ultimaNarracao || 0, ultimoImportante: estado.ultimoImportante || 0,
+    historico: (estado.historico || []).filter((h) => agora - h.t < 3600000) };
   if (!alerta) return novo;
+  novo.historico = [...novo.historico, { t: agora, tipo: alerta.tipo }].slice(-50);
   if (alerta.tipo === 'chegada') novo.narrados[alerta.id] = agora;
   else if (alerta.tipo === 'a-caminho') novo.anunciados[alerta.id] = agora;
   else novo.avisos[alerta.id] = agora;

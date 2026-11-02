@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   anexarAoTrajeto, rumoDaCaminhada, ladoRelativo, proximoAlerta, registrarAlerta, resumoCaminhada, validarPacote,
-  rumo, distanciaM, INTERVALO_FREQUENCIA_MS, INTERVALO_IMPORTANTE_MS,
+  rumo, distanciaM, INTERVALO_FREQUENCIA_MS, INTERVALO_IMPORTANTE_MS, alertasNaUltimaHora,
 } from '../public/js/nucleo.js';
 
 const pacote = JSON.parse(readFileSync(new URL('../pacotes/salvador-centro-historico.json', import.meta.url), 'utf8'));
@@ -173,4 +173,27 @@ test('pacote real: avisos e chamadas válidos; trecho Mercado → Elevador narra
   // nenhum alerta repetido
   assert.equal(new Set(alertas).size, alertas.length);
   assert.ok(distanciaM(de, para) > 100 && Number.isFinite(rumo(de, para)));
+});
+
+test('preferências: tipos desligados não aparecem e o limite por hora poupa só o importante', () => {
+  const pos = { lat: 0, lng: 0.0006 };
+  // "Logo à frente" desligado: nada a anunciar ali
+  assert.equal(proximoAlerta({ pacote: base, pos, rumoCaminhada: 0, agora: T0, tipos: ['chegada', 'importante'] }), null);
+  // na área da ladeira, com o importante desligado, cai para o próximo tipo ligado
+  const semImportante = proximoAlerta({ pacote: base, pos: { lat: 0, lng: 0 }, rumoCaminhada: 0, agora: T0, tipos: ['a-caminho'] });
+  assert.equal(semImportante.tipo, 'a-caminho');
+
+  // limite de 2 por hora: depois de 2 alertas comuns, só o importante passa
+  let estado = {};
+  estado = registrarAlerta(estado, { tipo: 'chegada', id: 'x' }, T0);
+  estado = registrarAlerta(estado, { tipo: 'dica', id: 'y' }, T0 + 1000);
+  const depois = T0 + INTERVALO_FREQUENCIA_MS.normal + 2000;
+  assert.equal(alertasNaUltimaHora(estado, depois), 2);
+  assert.equal(proximoAlerta({ pacote: base, pos, rumoCaminhada: 0, estado, agora: depois, maxPorHora: 2 }), null);
+  assert.equal(proximoAlerta({ pacote: base, pos: { lat: 0, lng: 0 }, rumoCaminhada: 0, estado, agora: depois, maxPorHora: 2 }).tipo, 'importante');
+  // uma hora depois o limite libera
+  assert.equal(proximoAlerta({ pacote: base, pos, rumoCaminhada: 0, estado, agora: T0 + 3600001 + INTERVALO_FREQUENCIA_MS.normal, maxPorHora: 2 }).tipo, 'a-caminho');
+  // o histórico guarda só a última hora
+  const velho = registrarAlerta(estado, { tipo: 'chegada', id: 'z' }, T0 + 2 * 3600000);
+  assert.equal(velho.historico.length, 1);
 });
