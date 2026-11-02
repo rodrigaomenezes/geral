@@ -1,6 +1,6 @@
 # Projetos de clientes (Menezes Gestão) — regras do repositório
 
-Cada projeto fica na pasta do cliente (hoje: `brobot/estadia`, o Estadia BR) e tem o próprio `CLAUDE.md`,
+Cada projeto fica na pasta do cliente (hoje: `brobot/estadia`, o Estadia BR, e `menezes-gestao/guia-brasil`, o GuIA Brasil) e tem o próprio `CLAUDE.md`,
 `ARCHITECTURE.md` e `DECISIONS.md`. Interface e documentação em português do Brasil.
 
 ## Política de engenharia (permanente — `docs/POLITICA_ENGENHARIA.md`)
