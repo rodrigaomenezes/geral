@@ -43,32 +43,13 @@ export function proximos(pois, pos, limite = Infinity) {
 }
 
 /** Intervalo mínimo entre duas narrações automáticas, por frequência escolhida pelo usuário. */
-export const INTERVALO_FREQUENCIA_MS = { pouco: 5 * 60000, normal: 90000, muito: 20000 };
+// Medido na rota de demonstração de Salvador (1,3 km, 11 pontos, passo de 1,3 m/s): com 90 s no "normal" o guia
+// atravessava 2 pontos calado e nunca dava as dicas; com 45 s cobre todos sem falar em cima de si mesmo.
+export const INTERVALO_FREQUENCIA_MS = { pouco: 4 * 60000, normal: 45000, muito: 15000 };
 /** Um mesmo ponto não é narrado de novo antes disso. */
 export const REPETICAO_MS = 6 * 3600000;
 /** Acima dessa imprecisão do GPS (m) não narramos: evita falar do lugar errado. */
 export const PRECISAO_MAX_M = 80;
-
-/**
- * Decide se algum ponto deve ser narrado agora.
- * estado = { narrados: {poiId: ms}, ultimaNarracao: ms }  (não é alterado; quem chama grava o resultado)
- * Devolve { poi, distancia } ou null.
- */
-export function decidirNarracao({ pois, pos, estado = {}, frequencia = 'normal', agora = Date.now(), raioPadraoM = 70 }) {
-  if (!posicaoValida(pos)) return null;
-  if (Number.isFinite(pos.precisao) && pos.precisao > PRECISAO_MAX_M) return null;
-  const intervalo = INTERVALO_FREQUENCIA_MS[frequencia] ?? INTERVALO_FREQUENCIA_MS.normal;
-  if (estado.ultimaNarracao && agora - estado.ultimaNarracao < intervalo) return null;
-  const narrados = estado.narrados || {};
-  for (const x of proximos(pois, pos)) {
-    const raio = x.poi.raioM || raioPadraoM;
-    if (x.distancia > raio) continue;
-    const quando = narrados[x.poi.id];
-    if (quando && agora - quando < REPETICAO_MS) continue;
-    return { poi: x.poi, distancia: Math.round(x.distancia) };
-  }
-  return null;
-}
 
 /**
  * Identificação de foto sem internet: o que está perto e na direção para onde a câmera aponta.
@@ -160,6 +141,154 @@ export function validarPacote(p) {
     for (const n of NIVEIS) if (!poi || !poi.narrativa || typeof poi.narrativa[n] !== 'string' || poi.narrativa[n].length < 20) erros.push(`${onde}: narrativa.${n} obrigatória`);
     if (poi && poi.perguntas && !Array.isArray(poi.perguntas)) erros.push(`${onde}: perguntas deve ser lista`);
     for (const f of (poi && Array.isArray(poi.perguntas) ? poi.perguntas : [])) if (!f.p || !f.r) erros.push(`${onde}: pergunta sem p ou r`);
+    if (poi && poi.teaser != null && (typeof poi.teaser !== 'string' || poi.teaser.length < 10)) erros.push(`${onde}: teaser deve ser texto`);
+  });
+  if (p.avisos != null && !Array.isArray(p.avisos)) erros.push('avisos deve ser lista');
+  (Array.isArray(p.avisos) ? p.avisos : []).forEach((a, i) => {
+    const onde = `avisos[${i}]${a && a.id ? ` (${a.id})` : ''}`;
+    if (!a || typeof a.id !== 'string' || !/^[a-z0-9-]+$/.test(a.id)) erros.push(`${onde}: id inválido`);
+    else if (ids.has(a.id)) erros.push(`${onde}: id repetido`);
+    else ids.add(a.id);
+    if (!a || !TIPOS_AVISO.includes(a.tipo)) erros.push(`${onde}: tipo deve ser ${TIPOS_AVISO.join(', ')}`);
+    if (!a || !posicaoValida(a)) erros.push(`${onde}: coordenada inválida`);
+    if (!a || typeof a.texto !== 'string' || a.texto.length < 10) erros.push(`${onde}: texto obrigatório`);
   });
   return erros;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Companheiro de caminhada: acompanha o trajeto e decide, sozinho, o que vale avisar agora.
+// Tudo puro: quem chama guarda o trajeto e o estado, e grava o resultado de registrarAlerta.
+// ---------------------------------------------------------------------------------------------------------------
+
+export const TIPOS_AVISO = ['importante', 'dica', 'novidade'];
+
+/** Ordem de prioridade quando há mais de um alerta possível no mesmo instante. */
+export const PRIORIDADE = ['importante', 'chegada', 'a-caminho', 'dica', 'novidade'];
+
+/** "Logo à frente": a partir de quantos metros anunciamos um ponto que ainda não chegou. */
+export const ANTECEDENCIA_M = 200;
+/** Cone de visão da caminhada: só anuncia o que está mais ou menos à frente (± graus). */
+export const CONE_FRENTE = 65;
+/** Avisos importantes furam a fila de frequência, mas não falam mais de uma vez a cada isso. */
+export const INTERVALO_IMPORTANTE_MS = 15000;
+/** Dicas e novidades são curtas e presas a um lugar: esperam só isso desde a última fala, não a frequência. */
+export const INTERVALO_AVISO_MS = 20000;
+
+/** Junta um ponto ao trajeto, ignorando ruído (GPS impreciso ou parado). Devolve um trajeto novo (máx. `max` pontos). */
+export function anexarAoTrajeto(trajeto, pos, agora = Date.now(), max = 600) {
+  if (!posicaoValida(pos)) return trajeto;
+  if (Number.isFinite(pos.precisao) && pos.precisao > 50) return trajeto;
+  const ultimo = trajeto.at(-1);
+  if (ultimo && distanciaM(ultimo, pos) < 4) return trajeto;
+  const novo = [...trajeto, { lat: pos.lat, lng: pos.lng, t: agora }];
+  return novo.length > max ? novo.slice(-max) : novo;
+}
+
+/** Direção em que a pessoa está andando (graus), olhando os últimos ~`janelaM` metros; null se ainda não deu para saber. */
+export function rumoDaCaminhada(trajeto, janelaM = 40) {
+  if (trajeto.length < 2) return null;
+  const fim = trajeto.at(-1);
+  for (let i = trajeto.length - 2; i >= 0; i -= 1) {
+    if (distanciaM(trajeto[i], fim) >= janelaM) return rumo(trajeto[i], fim);
+  }
+  // Andou menos que a janela: serve se já deu pelo menos 15 m (abaixo disso é ruído do GPS).
+  return distanciaM(trajeto[0], fim) >= 15 ? rumo(trajeto[0], fim) : null;
+}
+
+/** "à frente", "à direita", "à esquerda" ou "atrás de você", a partir do rumo da caminhada. */
+export function ladoRelativo(rumoCaminhada, rumoAlvo) {
+  if (!Number.isFinite(rumoCaminhada)) return null;
+  const d = ((rumoAlvo - rumoCaminhada + 540) % 360) - 180; // -180..180, positivo = direita
+  if (Math.abs(d) <= 25) return 'à frente';
+  if (Math.abs(d) >= 140) return 'atrás de você';
+  return d > 0 ? 'à direita' : 'à esquerda';
+}
+
+const arredondarM = (m) => (m < 100 ? Math.round(m / 10) * 10 : Math.round(m / 50) * 50);
+
+/**
+ * Decide o próximo alerta do companheiro, ou null.
+ * estado = { narrados:{poiId:ms}, anunciados:{poiId:ms}, avisos:{avisoId:ms}, ultimaNarracao:ms, ultimoImportante:ms }
+ * Devolve { tipo, id, titulo, texto, poi?, aviso?, distancia }.
+ */
+export function proximoAlerta({ pacote, pos, rumoCaminhada = null, estado = {}, frequencia = 'normal', agora = Date.now(), raioPadraoM = 70,
+  tipos = PRIORIDADE, maxPorHora = null }) {
+  if (!posicaoValida(pos)) return null;
+  if (Number.isFinite(pos.precisao) && pos.precisao > PRECISAO_MAX_M) return null;
+  const narrados = estado.narrados || {};
+  const anunciados = estado.anunciados || {};
+  const dados = estado.avisos || {};
+  const intervalo = INTERVALO_FREQUENCIA_MS[frequencia] ?? INTERVALO_FREQUENCIA_MS.normal;
+  const livre = !estado.ultimaNarracao || agora - estado.ultimaNarracao >= intervalo;
+  const candidatos = [];
+
+  for (const a of pacote.avisos || []) {
+    if (dados[a.id]) continue;
+    const d = distanciaM(pos, a);
+    if (d > (a.raioM || 60)) continue;
+    if (a.tipo === 'importante') {
+      if (estado.ultimoImportante && agora - estado.ultimoImportante < INTERVALO_IMPORTANTE_MS) continue;
+    } else if (estado.ultimaNarracao && agora - estado.ultimaNarracao < INTERVALO_AVISO_MS) continue;
+    candidatos.push({ tipo: a.tipo, id: a.id, titulo: a.titulo || ROTULO_ALERTA[a.tipo], texto: a.texto, aviso: a, distancia: Math.round(d) });
+  }
+
+  if (livre) {
+    for (const x of proximos(pacote.pois, pos, ANTECEDENCIA_M)) {
+      const raio = x.poi.raioM || raioPadraoM;
+      const jaOuvido = narrados[x.poi.id] && agora - narrados[x.poi.id] < REPETICAO_MS;
+      if (jaOuvido) continue;
+      if (x.distancia <= raio) {
+        candidatos.push({ tipo: 'chegada', id: x.poi.id, titulo: x.poi.nome, texto: null, poi: x.poi, distancia: Math.round(x.distancia) });
+        continue;
+      }
+      if (anunciados[x.poi.id] && agora - anunciados[x.poi.id] < REPETICAO_MS) continue;
+      const lado = ladoRelativo(rumoCaminhada, x.rumo);
+      if (!lado || lado === 'atrás de você') continue; // sem direção conhecida, não anuncia o que pode estar às costas
+      if (Math.abs(((x.rumo - rumoCaminhada + 540) % 360) - 180) > CONE_FRENTE) continue;
+      const chamada = x.poi.teaser || (x.poi.curiosidades || [])[0] || x.poi.narrativa.curto;
+      candidatos.push({ tipo: 'a-caminho', id: x.poi.id, titulo: x.poi.nome,
+        texto: `Daqui a uns ${arredondarM(x.distancia)} metros, ${lado}: ${x.poi.nome}. ${chamada}`, poi: x.poi, distancia: Math.round(x.distancia) });
+    }
+  }
+
+  // Preferências da pessoa: tipos desligados somem; o limite por hora não vale para avisos importantes.
+  const ligados = new Set(tipos);
+  const noLimite = Number.isFinite(maxPorHora) && maxPorHora > 0 && alertasNaUltimaHora(estado, agora) >= maxPorHora;
+  const validos = candidatos.filter((c) => ligados.has(c.tipo) && (!noLimite || c.tipo === 'importante'));
+  if (!validos.length) return null;
+  validos.sort((a, b) => PRIORIDADE.indexOf(a.tipo) - PRIORIDADE.indexOf(b.tipo) || a.distancia - b.distancia);
+  return validos[0];
+}
+
+/** Quantos alertas não importantes foram dados na última hora. */
+export function alertasNaUltimaHora(estado = {}, agora = Date.now()) {
+  return (estado.historico || []).filter((h) => agora - h.t < 3600000 && h.tipo !== 'importante').length;
+}
+
+export const ROTULO_ALERTA = { importante: 'Importante', chegada: 'Você chegou', 'a-caminho': 'Logo à frente', dica: 'Dica', novidade: 'Novidade' };
+
+/** Estado novo depois de dar um alerta (não altera o original). */
+export function registrarAlerta(estado = {}, alerta, agora = Date.now()) {
+  const novo = { narrados: { ...(estado.narrados || {}) }, anunciados: { ...(estado.anunciados || {}) }, avisos: { ...(estado.avisos || {}) },
+    ultimaNarracao: estado.ultimaNarracao || 0, ultimoImportante: estado.ultimoImportante || 0,
+    historico: (estado.historico || []).filter((h) => agora - h.t < 3600000) };
+  if (!alerta) return novo;
+  novo.historico = [...novo.historico, { t: agora, tipo: alerta.tipo }].slice(-50);
+  if (alerta.tipo === 'chegada') novo.narrados[alerta.id] = agora;
+  else if (alerta.tipo === 'a-caminho') novo.anunciados[alerta.id] = agora;
+  else novo.avisos[alerta.id] = agora;
+  if (alerta.tipo === 'importante') novo.ultimoImportante = agora;
+  else novo.ultimaNarracao = agora;
+  return novo;
+}
+
+/** Resumo da caminhada: distância (m), duração (ms) e quantos lugares a pessoa conheceu desde `inicio`. */
+export function resumoCaminhada(trajeto, estado = {}, inicio = 0) {
+  const pontos = trajeto.filter((p) => p.t >= inicio);
+  let metros = 0;
+  for (let i = 1; i < pontos.length; i += 1) metros += distanciaM(pontos[i - 1], pontos[i]);
+  const lugares = Object.values(estado.narrados || {}).filter((t) => t >= inicio).length;
+  const duracao = pontos.length > 1 ? pontos.at(-1).t - pontos[0].t : 0;
+  return { metros: Math.round(metros), duracao, lugares };
 }

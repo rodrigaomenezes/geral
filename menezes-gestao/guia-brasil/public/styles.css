@@ -170,3 +170,26 @@ main { padding: 8px 16px 24px; max-width: 640px; margin: 0 auto; }
 .abas button[aria-current="page"] { color: var(--mar); background: var(--superficie-2); }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Companheiro de caminhada */
+.companheiro .btn.grande { margin-top: 6px; }
+.placar { margin: 10px 0 0; font-weight: 700; color: var(--mar-2); font-variant-numeric: tabular-nums; }
+.destaque[data-tipo="importante"] { border-left-color: var(--alerta); }
+.destaque[data-tipo="importante"] .rotulo { color: var(--alerta); }
+.destaque[data-tipo="a-caminho"] { border-left-color: var(--mar-2); }
+.destaque[data-tipo="dica"], .destaque[data-tipo="novidade"] { border-left-color: var(--verde); }
+.destaque[data-tipo="dica"] .rotulo, .destaque[data-tipo="novidade"] .rotulo { color: var(--verde); }
+.resumo-lugares { margin: 4px 0 0; padding-left: 22px; }
+.resumo-lugares li { padding: 2px 0; }
+
+/* Avisos por tipo */
+.lista-avisos { display: grid; gap: 10px; margin-top: 4px; }
+.aviso-linha { display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid var(--linha); }
+.aviso-linha strong { font-size: .95rem; }
+.aviso-linha span { font-size: .82rem; color: var(--tinta-2); font-weight: 400; }
+.aviso-linha select { min-height: 42px; }
+.notificacoes { border-top: 1px solid var(--linha); padding-top: 10px; }
+.notificacoes .btn { margin-top: 8px; }
+/* Opções com texto longo não podem alargar a tela em 360 px */
+.preferencias > *, .lista-avisos > * { min-width: 0; }
+.preferencias select { width: 100%; max-width: 100%; text-overflow: ellipsis; }

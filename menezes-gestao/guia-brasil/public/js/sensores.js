@@ -42,7 +42,7 @@ export function simularCaminhada(pacote, aoMudar) {
     return alvo;
   }
   emitir();
-  return { avancar, parar, posicao: () => atual, proximo: () => rota[(indice + 1) % rota.length] };
+  return { avancar, parar, posicao: () => ({ ...atual, simulada: true }), proximo: () => rota[(indice + 1) % rota.length] };
 }
 
 /**

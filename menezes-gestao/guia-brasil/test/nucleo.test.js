@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  distanciaM, rumo, diferencaAngular, proximos, decidirNarracao, candidatosFoto, responderLocal, validarPacote,
+  distanciaM, rumo, diferencaAngular, proximos, proximoAlerta, candidatosFoto, responderLocal, validarPacote,
   INTERVALO_FREQUENCIA_MS, REPETICAO_MS,
 } from '../public/js/nucleo.js';
 
@@ -41,28 +41,25 @@ test('proximos ordena por distância e respeita o limite', () => {
   assert.deepEqual(proximos(pacote.pois, null), []);
 });
 
-test('narração: dispara perto, não repete, respeita frequência e precisão do GPS', () => {
+test('narração de chegada: dispara perto, não repete, respeita frequência e precisão do GPS', () => {
   const agora = 1_000_000_000;
   const pos = perto(poi('mercado-modelo'));
-  const r = decidirNarracao({ pois: pacote.pois, pos, agora });
-  assert.equal(r.poi.id, 'mercado-modelo');
+  const chegada = (estado, extra = {}) => proximoAlerta({ pacote, pos, estado, agora, ...extra });
+  assert.deepEqual([chegada({}).tipo, chegada({}).id], ['chegada', 'mercado-modelo']);
 
-  // já narrado há pouco: pula para o próximo dentro do raio ou nada
-  const estado = { narrados: { 'mercado-modelo': agora - 1000 }, ultimaNarracao: agora - INTERVALO_FREQUENCIA_MS.normal - 1 };
-  const r2 = decidirNarracao({ pois: pacote.pois, pos, estado, agora });
-  assert.ok(!r2 || r2.poi.id !== 'mercado-modelo');
-
+  // já narrado há pouco: não narra o mesmo ponto de novo
+  const r2 = chegada({ narrados: { 'mercado-modelo': agora - 1000 }, ultimaNarracao: agora - INTERVALO_FREQUENCIA_MS.normal - 1 });
+  assert.ok(!r2 || r2.id !== 'mercado-modelo');
   // depois de REPETICAO_MS pode narrar de novo
-  const estado3 = { narrados: { 'mercado-modelo': agora - REPETICAO_MS - 1 }, ultimaNarracao: 0 };
-  assert.equal(decidirNarracao({ pois: pacote.pois, pos, estado: estado3, agora }).poi.id, 'mercado-modelo');
+  assert.equal(chegada({ narrados: { 'mercado-modelo': agora - REPETICAO_MS - 1 } }).id, 'mercado-modelo');
 
-  // intervalo da frequência ainda não passou
-  assert.equal(decidirNarracao({ pois: pacote.pois, pos, estado: { ultimaNarracao: agora - 1000 }, agora }), null);
-  assert.ok(decidirNarracao({ pois: pacote.pois, pos, estado: { ultimaNarracao: agora - 25000 }, frequencia: 'muito', agora }));
+  // intervalo da frequência ainda não passou (o aviso de dica vizinho também espera)
+  assert.equal(chegada({ ultimaNarracao: agora - 1000 }), null);
+  assert.equal(chegada({ ultimaNarracao: agora - 16000 }, { frequencia: 'muito' }).tipo, 'chegada');
 
   // GPS impreciso ou longe de tudo: silêncio
-  assert.equal(decidirNarracao({ pois: pacote.pois, pos: { ...pos, precisao: 150 }, agora }), null);
-  assert.equal(decidirNarracao({ pois: pacote.pois, pos: { lat: -12.99, lng: -38.53 }, agora }), null);
+  assert.equal(proximoAlerta({ pacote, pos: { ...pos, precisao: 150 }, agora }), null);
+  assert.equal(proximoAlerta({ pacote, pos: { lat: -12.99, lng: -38.53 }, agora }), null);
 });
 
 test('foto offline: escolhe o ponto para onde a câmera aponta', () => {

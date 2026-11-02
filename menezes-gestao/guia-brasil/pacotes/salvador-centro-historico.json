@@ -7,14 +7,32 @@
   "idioma": "pt-BR",
   "atualizadoEm": "2026-11-02",
   "observacao": "Conteúdo de teste do MVP. Coordenadas aproximadas: conferir em campo antes de abrir para o público.",
-  "centro": { "lat": -12.9733, "lng": -38.5109 },
-  "rotaDemonstracao": ["mercado-modelo", "elevador-lacerda", "praca-tome-de-souza", "cruz-caida", "terreiro-de-jesus", "catedral-basilica", "museu-afro-brasileiro", "sao-francisco", "ordem-terceira", "rosario-dos-pretos", "largo-do-pelourinho"],
+  "centro": {
+    "lat": -12.9733,
+    "lng": -38.5109
+  },
+  "rotaDemonstracao": [
+    "mercado-modelo",
+    "elevador-lacerda",
+    "praca-tome-de-souza",
+    "cruz-caida",
+    "terreiro-de-jesus",
+    "catedral-basilica",
+    "museu-afro-brasileiro",
+    "sao-francisco",
+    "ordem-terceira",
+    "rosario-dos-pretos",
+    "largo-do-pelourinho"
+  ],
   "pois": [
     {
       "id": "mercado-modelo",
       "nome": "Mercado Modelo",
       "categoria": "mercado",
-      "lat": -12.97355, "lng": -38.51445, "raioM": 60,
+      "lat": -12.97355,
+      "lng": -38.51445,
+      "raioM": 60,
+      "teaser": "O prédio já foi a Alfândega do porto.",
       "narrativa": {
         "curto": "Você está no Mercado Modelo, na Cidade Baixa, o lugar clássico para comprar artesanato baiano.",
         "medio": "Você está no Mercado Modelo, na Cidade Baixa. O prédio é a antiga Alfândega de Salvador, do século XIX, e recebe o mercado desde 1971. Lá dentro há dezenas de lojas de artesanato, rendas, instrumentos e lembranças, e no fundo restaurantes com vista para a Baía de Todos-os-Santos.",
@@ -25,15 +43,37 @@
         "As fitinhas do Senhor do Bonfim vendidas aqui são amarradas no pulso com três nós, um para cada pedido."
       ],
       "perguntas": [
-        { "p": "O que comprar no Mercado Modelo?", "chaves": ["comprar", "lembranca", "artesanato", "presente", "souvenir"], "r": "Os itens mais procurados são fitas do Senhor do Bonfim, berimbaus, rendas, peças de madeira e cerâmica e obras de artistas locais. Vale pesquisar preço em mais de um box antes de comprar." },
-        { "p": "Qual a história do prédio?", "chaves": ["historia", "predio", "alfandega", "antigo"], "r": "O prédio foi a Alfândega de Salvador, construída no século XIX junto ao porto. O Mercado Modelo passou a funcionar nele em 1971." }
+        {
+          "p": "O que comprar no Mercado Modelo?",
+          "chaves": [
+            "comprar",
+            "lembranca",
+            "artesanato",
+            "presente",
+            "souvenir"
+          ],
+          "r": "Os itens mais procurados são fitas do Senhor do Bonfim, berimbaus, rendas, peças de madeira e cerâmica e obras de artistas locais. Vale pesquisar preço em mais de um box antes de comprar."
+        },
+        {
+          "p": "Qual a história do prédio?",
+          "chaves": [
+            "historia",
+            "predio",
+            "alfandega",
+            "antigo"
+          ],
+          "r": "O prédio foi a Alfândega de Salvador, construída no século XIX junto ao porto. O Mercado Modelo passou a funcionar nele em 1971."
+        }
       ]
     },
     {
       "id": "elevador-lacerda",
       "nome": "Elevador Lacerda",
       "categoria": "monumento",
-      "lat": -12.97395, "lng": -38.51315, "raioM": 60,
+      "lat": -12.97395,
+      "lng": -38.51315,
+      "raioM": 60,
+      "teaser": "Foi o primeiro elevador urbano do Brasil, de 1873.",
       "narrativa": {
         "curto": "À sua frente está o Elevador Lacerda, que liga a Cidade Baixa à Cidade Alta desde 1873.",
         "medio": "Este é o Elevador Lacerda, cartão-postal de Salvador. Ele foi inaugurado em 1873 e liga a Cidade Baixa, junto ao porto, à Cidade Alta, onde a cidade foi fundada. A viagem dura poucos segundos e vence cerca de 70 metros de desnível. A torre em estilo art déco que você vê hoje é de uma reforma da década de 1930.",
@@ -44,17 +84,57 @@
         "A passagem custa pouco e é usada todos os dias por moradores, não só por turistas."
       ],
       "perguntas": [
-        { "p": "Quando o elevador foi construído?", "chaves": ["quando", "ano", "construido", "inaugurado", "idade"], "r": "O Elevador Lacerda foi inaugurado em 1873. A torre art déco atual vem de uma reforma da década de 1930." },
-        { "p": "Qual a altura do elevador?", "chaves": ["altura", "alto", "metros", "desnivel"], "r": "Ele vence um desnível de cerca de 70 metros entre a Cidade Baixa e a Cidade Alta." },
-        { "p": "Por que tem esse nome?", "chaves": ["nome", "lacerda", "quem", "chama"], "r": "O nome homenageia o engenheiro Antônio de Lacerda, responsável pelo primeiro elevador, de 1873." },
-        { "p": "Que forte é aquele no mar?", "chaves": ["forte", "mar", "redondo", "marcelo"], "r": "É o Forte São Marcelo, uma fortificação circular do século XVII construída sobre um banco de areia para defender o porto." }
+        {
+          "p": "Quando o elevador foi construído?",
+          "chaves": [
+            "quando",
+            "ano",
+            "construido",
+            "inaugurado",
+            "idade"
+          ],
+          "r": "O Elevador Lacerda foi inaugurado em 1873. A torre art déco atual vem de uma reforma da década de 1930."
+        },
+        {
+          "p": "Qual a altura do elevador?",
+          "chaves": [
+            "altura",
+            "alto",
+            "metros",
+            "desnivel"
+          ],
+          "r": "Ele vence um desnível de cerca de 70 metros entre a Cidade Baixa e a Cidade Alta."
+        },
+        {
+          "p": "Por que tem esse nome?",
+          "chaves": [
+            "nome",
+            "lacerda",
+            "quem",
+            "chama"
+          ],
+          "r": "O nome homenageia o engenheiro Antônio de Lacerda, responsável pelo primeiro elevador, de 1873."
+        },
+        {
+          "p": "Que forte é aquele no mar?",
+          "chaves": [
+            "forte",
+            "mar",
+            "redondo",
+            "marcelo"
+          ],
+          "r": "É o Forte São Marcelo, uma fortificação circular do século XVII construída sobre um banco de areia para defender o porto."
+        }
       ]
     },
     {
       "id": "praca-tome-de-souza",
       "nome": "Praça Tomé de Souza",
       "categoria": "praca",
-      "lat": -12.97405, "lng": -38.51255, "raioM": 55,
+      "lat": -12.97405,
+      "lng": -38.51255,
+      "raioM": 55,
+      "teaser": "Foi aqui perto que Salvador nasceu, em 1549.",
       "narrativa": {
         "curto": "Você chegou à Praça Tomé de Souza, coração político de Salvador desde a fundação da cidade, em 1549.",
         "medio": "Esta é a Praça Tomé de Souza, também chamada Praça Municipal. Foi aqui perto que Tomé de Sousa, o primeiro governador-geral, fundou Salvador em 1549. A cidade foi a primeira capital do Brasil até 1763, quando a sede passou para o Rio de Janeiro. Em volta estão o Palácio Rio Branco, antiga sede do governo, e a Câmara Municipal.",
@@ -64,15 +144,37 @@
         "Salvador foi a primeira capital do Brasil, de 1549 a 1763."
       ],
       "perguntas": [
-        { "p": "Quem fundou Salvador?", "chaves": ["fundou", "fundacao", "fundador", "tome", "sousa"], "r": "Salvador foi fundada em 1549 por Tomé de Sousa, o primeiro governador-geral do Brasil." },
-        { "p": "Salvador foi capital do Brasil?", "chaves": ["capital", "primeira", "brasil", "ate"], "r": "Sim. Salvador foi a primeira capital do Brasil, de 1549 até 1763, quando a capital passou para o Rio de Janeiro." }
+        {
+          "p": "Quem fundou Salvador?",
+          "chaves": [
+            "fundou",
+            "fundacao",
+            "fundador",
+            "tome",
+            "sousa"
+          ],
+          "r": "Salvador foi fundada em 1549 por Tomé de Sousa, o primeiro governador-geral do Brasil."
+        },
+        {
+          "p": "Salvador foi capital do Brasil?",
+          "chaves": [
+            "capital",
+            "primeira",
+            "brasil",
+            "ate"
+          ],
+          "r": "Sim. Salvador foi a primeira capital do Brasil, de 1549 até 1763, quando a capital passou para o Rio de Janeiro."
+        }
       ]
     },
     {
       "id": "cruz-caida",
       "nome": "Praça da Sé e Cruz Caída",
       "categoria": "monumento",
-      "lat": -12.97445, "lng": -38.51175, "raioM": 50,
+      "lat": -12.97445,
+      "lng": -38.51175,
+      "raioM": 50,
+      "teaser": "Ali existia a primeira catedral do Brasil, demolida em 1933.",
       "narrativa": {
         "curto": "Aqui ficava a antiga Sé de Salvador. A escultura da Cruz Caída lembra a igreja demolida em 1933.",
         "medio": "Você está na Praça da Sé. Neste lugar ficava a antiga Sé, a primeira catedral do Brasil, demolida em 1933 para abrir espaço para os bondes. A escultura Cruz Caída, do artista baiano Mário Cravo Júnior, marca essa perda. Do mirante da praça se vê a Baía de Todos-os-Santos.",
@@ -82,15 +184,38 @@
         "Parte das fundações da antiga Sé ficou à mostra na praça."
       ],
       "perguntas": [
-        { "p": "Por que a cruz está caída?", "chaves": ["cruz", "caida", "escultura", "deitada"], "r": "A Cruz Caída, de Mário Cravo Júnior, é um memorial da antiga Sé de Salvador, demolida em 1933 neste lugar." },
-        { "p": "Por que demoliram a Sé?", "chaves": ["demoliram", "demolida", "demolicao", "se", "catedral", "antiga"], "r": "A antiga Sé foi demolida em 1933 para abrir caminho para a linha de bondes. A decisão é lembrada até hoje como uma grande perda para o patrimônio." }
+        {
+          "p": "Por que a cruz está caída?",
+          "chaves": [
+            "cruz",
+            "caida",
+            "escultura",
+            "deitada"
+          ],
+          "r": "A Cruz Caída, de Mário Cravo Júnior, é um memorial da antiga Sé de Salvador, demolida em 1933 neste lugar."
+        },
+        {
+          "p": "Por que demoliram a Sé?",
+          "chaves": [
+            "demoliram",
+            "demolida",
+            "demolicao",
+            "se",
+            "catedral",
+            "antiga"
+          ],
+          "r": "A antiga Sé foi demolida em 1933 para abrir caminho para a linha de bondes. A decisão é lembrada até hoje como uma grande perda para o patrimônio."
+        }
       ]
     },
     {
       "id": "terreiro-de-jesus",
       "nome": "Terreiro de Jesus",
       "categoria": "praca",
-      "lat": -12.97415, "lng": -38.51045, "raioM": 55,
+      "lat": -12.97415,
+      "lng": -38.51045,
+      "raioM": 55,
+      "teaser": "É a praça dos jesuítas, cercada de igrejas.",
       "narrativa": {
         "curto": "Você está no Terreiro de Jesus, a praça das igrejas, cercada pela Catedral e por antigos prédios dos jesuítas.",
         "medio": "Este é o Terreiro de Jesus, uma das praças mais bonitas do Centro Histórico. O nome vem dos jesuítas, que tinham aqui seu colégio e sua igreja, hoje a Catedral Basílica. Em volta estão também o prédio da antiga Faculdade de Medicina e outras igrejas. Aos fins de tarde é comum ver rodas de capoeira e apresentações de música.",
@@ -100,14 +225,26 @@
         "O Centro Histórico de Salvador é Patrimônio Mundial da UNESCO desde 1985."
       ],
       "perguntas": [
-        { "p": "Por que se chama Terreiro de Jesus?", "chaves": ["nome", "chama", "terreiro", "jesus"], "r": "O nome vem dos jesuítas, da Companhia de Jesus, que tinham aqui seu colégio e sua igreja, hoje a Catedral Basílica." }
+        {
+          "p": "Por que se chama Terreiro de Jesus?",
+          "chaves": [
+            "nome",
+            "chama",
+            "terreiro",
+            "jesus"
+          ],
+          "r": "O nome vem dos jesuítas, da Companhia de Jesus, que tinham aqui seu colégio e sua igreja, hoje a Catedral Basílica."
+        }
       ]
     },
     {
       "id": "catedral-basilica",
       "nome": "Catedral Basílica de Salvador",
       "categoria": "igreja",
-      "lat": -12.97445, "lng": -38.51005, "raioM": 45,
+      "lat": -12.97445,
+      "lng": -38.51005,
+      "raioM": 45,
+      "teaser": "A fachada é de pedra trazida de Portugal.",
       "narrativa": {
         "curto": "Esta é a Catedral Basílica, a antiga igreja dos jesuítas, construída no século XVII.",
         "medio": "Esta é a Catedral Basílica de Salvador, antiga igreja do Colégio dos Jesuítas, construída no século XVII com pedra trazida de Portugal. Ela virou catedral depois que a antiga Sé foi demolida, em 1933. Por dentro, destacam-se os altares dourados e a sacristia, com teto pintado. O padre Antônio Vieira, um dos grandes oradores da língua portuguesa, pregou aqui.",
@@ -118,15 +255,37 @@
         "O padre Antônio Vieira, autor de sermões famosos, pregou nesta igreja."
       ],
       "perguntas": [
-        { "p": "Quando a catedral foi construída?", "chaves": ["quando", "construida", "ano", "seculo", "idade"], "r": "A igreja atual foi construída pelos jesuítas no século XVII. Ela passou a ser a catedral em 1933, depois da demolição da antiga Sé." },
-        { "p": "De que é feita a fachada?", "chaves": ["fachada", "pedra", "feita", "material"], "r": "A fachada é de pedra lioz, um calcário trazido de Portugal." }
+        {
+          "p": "Quando a catedral foi construída?",
+          "chaves": [
+            "quando",
+            "construida",
+            "ano",
+            "seculo",
+            "idade"
+          ],
+          "r": "A igreja atual foi construída pelos jesuítas no século XVII. Ela passou a ser a catedral em 1933, depois da demolição da antiga Sé."
+        },
+        {
+          "p": "De que é feita a fachada?",
+          "chaves": [
+            "fachada",
+            "pedra",
+            "feita",
+            "material"
+          ],
+          "r": "A fachada é de pedra lioz, um calcário trazido de Portugal."
+        }
       ]
     },
     {
       "id": "museu-afro-brasileiro",
       "nome": "Museu Afro-Brasileiro (antiga Faculdade de Medicina)",
       "categoria": "museu",
-      "lat": -12.97375, "lng": -38.51065, "raioM": 40,
+      "lat": -12.97375,
+      "lng": -38.51065,
+      "raioM": 40,
+      "teaser": "O prédio abrigou a primeira faculdade de medicina do Brasil.",
       "narrativa": {
         "curto": "Neste prédio funcionou a primeira faculdade de medicina do Brasil, de 1808. Hoje ele abriga o Museu Afro-Brasileiro.",
         "medio": "Este prédio foi a sede da Faculdade de Medicina da Bahia, criada em 1808, a primeira escola de medicina do país. Hoje ele abriga o Museu Afro-Brasileiro, da Universidade Federal da Bahia. O destaque são os painéis de madeira entalhados por Carybé, que representam os orixás do candomblé.",
@@ -136,15 +295,37 @@
         "Carybé nasceu na Argentina, mas viveu em Salvador e se tornou um dos grandes artistas da cultura baiana."
       ],
       "perguntas": [
-        { "p": "O que tem no museu?", "chaves": ["museu", "acervo", "ver", "tem", "carybe", "orixas"], "r": "O Museu Afro-Brasileiro reúne peças sobre a cultura e as religiões de matriz africana. O destaque são os painéis de madeira de Carybé dedicados aos orixás." },
-        { "p": "Qual foi a primeira faculdade de medicina do Brasil?", "chaves": ["faculdade", "medicina", "primeira"], "r": "A Faculdade de Medicina da Bahia, criada em 1808, que funcionou neste prédio." }
+        {
+          "p": "O que tem no museu?",
+          "chaves": [
+            "museu",
+            "acervo",
+            "ver",
+            "tem",
+            "carybe",
+            "orixas"
+          ],
+          "r": "O Museu Afro-Brasileiro reúne peças sobre a cultura e as religiões de matriz africana. O destaque são os painéis de madeira de Carybé dedicados aos orixás."
+        },
+        {
+          "p": "Qual foi a primeira faculdade de medicina do Brasil?",
+          "chaves": [
+            "faculdade",
+            "medicina",
+            "primeira"
+          ],
+          "r": "A Faculdade de Medicina da Bahia, criada em 1808, que funcionou neste prédio."
+        }
       ]
     },
     {
       "id": "sao-francisco",
       "nome": "Igreja e Convento de São Francisco",
       "categoria": "igreja",
-      "lat": -12.97535, "lng": -38.50935, "raioM": 45,
+      "lat": -12.97535,
+      "lng": -38.50935,
+      "raioM": 45,
+      "teaser": "Por dentro, ela é quase toda coberta de ouro.",
       "narrativa": {
         "curto": "Esta é a Igreja de São Francisco, famosa pelo interior coberto de talha dourada.",
         "medio": "Esta é a Igreja e Convento de São Francisco, uma das joias do barroco no Brasil. Por fora ela é discreta, mas por dentro quase todas as paredes e o teto são cobertos de talha de madeira folheada a ouro, por isso é chamada de igreja de ouro. O claustro do convento tem painéis de azulejos portugueses azuis e brancos.",
@@ -155,15 +336,37 @@
         "Os azulejos do claustro vieram de Portugal."
       ],
       "perguntas": [
-        { "p": "Quanto ouro tem na igreja?", "chaves": ["ouro", "dourada", "quanto", "quilos"], "r": "A talha é de madeira folheada a ouro, ou seja, coberta com finas lâminas de ouro. Não tenho no pacote uma estimativa confiável da quantidade total." },
-        { "p": "Pode entrar na igreja?", "chaves": ["entrar", "visitar", "ingresso", "horario", "aberta"], "r": "A visitação costuma ser paga e com horário definido. Horários e preços mudam, então confira na entrada ou nos canais oficiais antes de ir." }
+        {
+          "p": "Quanto ouro tem na igreja?",
+          "chaves": [
+            "ouro",
+            "dourada",
+            "quanto",
+            "quilos"
+          ],
+          "r": "A talha é de madeira folheada a ouro, ou seja, coberta com finas lâminas de ouro. Não tenho no pacote uma estimativa confiável da quantidade total."
+        },
+        {
+          "p": "Pode entrar na igreja?",
+          "chaves": [
+            "entrar",
+            "visitar",
+            "ingresso",
+            "horario",
+            "aberta"
+          ],
+          "r": "A visitação costuma ser paga e com horário definido. Horários e preços mudam, então confira na entrada ou nos canais oficiais antes de ir."
+        }
       ]
     },
     {
       "id": "ordem-terceira",
       "nome": "Igreja da Ordem Terceira de São Francisco",
       "categoria": "igreja",
-      "lat": -12.97505, "lng": -38.50905, "raioM": 35,
+      "lat": -12.97505,
+      "lng": -38.50905,
+      "raioM": 35,
+      "teaser": "A fachada esculpida ficou escondida sob o reboco por décadas.",
       "narrativa": {
         "curto": "Ao lado está a Igreja da Ordem Terceira, com uma fachada toda esculpida que ficou escondida sob o reboco por muito tempo.",
         "medio": "Esta é a Igreja da Ordem Terceira de São Francisco. Sua fachada é toda esculpida em pedra, num estilo inspirado no barroco espanhol, raro no Brasil. Ela ficou escondida sob uma camada de reboco e só foi redescoberta em 1932, durante uma obra.",
@@ -173,14 +376,27 @@
         "A fachada esculpida passou décadas escondida debaixo do reboco."
       ],
       "perguntas": [
-        { "p": "Por que a fachada ficou escondida?", "chaves": ["fachada", "escondida", "reboco", "descoberta", "redescoberta"], "r": "A fachada esculpida foi coberta por reboco em algum momento do passado e só foi redescoberta em 1932, durante uma obra." }
+        {
+          "p": "Por que a fachada ficou escondida?",
+          "chaves": [
+            "fachada",
+            "escondida",
+            "reboco",
+            "descoberta",
+            "redescoberta"
+          ],
+          "r": "A fachada esculpida foi coberta por reboco em algum momento do passado e só foi redescoberta em 1932, durante uma obra."
+        }
       ]
     },
     {
       "id": "rosario-dos-pretos",
       "nome": "Igreja de Nossa Senhora do Rosário dos Pretos",
       "categoria": "igreja",
-      "lat": -12.97175, "lng": -38.50835, "raioM": 40,
+      "lat": -12.97175,
+      "lng": -38.50835,
+      "raioM": 40,
+      "teaser": "Foi construída por uma irmandade de negros escravizados e libertos.",
       "narrativa": {
         "curto": "Esta igreja azul foi construída pela irmandade de negros escravizados e libertos de Salvador.",
         "medio": "Esta é a Igreja de Nossa Senhora do Rosário dos Pretos, de fachada azul, no alto do Largo do Pelourinho. Ela foi construída ao longo do século XVIII pela irmandade de homens negros, escravizados e libertos, que juntaram recursos por décadas para erguê-la. É conhecida pela missa com tambores e cânticos afro-brasileiros.",
@@ -190,15 +406,37 @@
         "As irmandades negras também ajudavam seus membros a comprar a própria liberdade e garantiam um enterro digno."
       ],
       "perguntas": [
-        { "p": "Quem construiu essa igreja?", "chaves": ["quem", "construiu", "construida", "irmandade"], "r": "A Irmandade do Rosário dos Pretos, formada por pessoas negras escravizadas e libertas, construiu a igreja ao longo do século XVIII." },
-        { "p": "Tem missa com tambor?", "chaves": ["missa", "tambor", "tambores", "atabaque", "celebracao"], "r": "Sim, a igreja é conhecida pelas missas com tambores e cânticos afro-brasileiros. Os dias e horários podem mudar, então confira na própria igreja." }
+        {
+          "p": "Quem construiu essa igreja?",
+          "chaves": [
+            "quem",
+            "construiu",
+            "construida",
+            "irmandade"
+          ],
+          "r": "A Irmandade do Rosário dos Pretos, formada por pessoas negras escravizadas e libertas, construiu a igreja ao longo do século XVIII."
+        },
+        {
+          "p": "Tem missa com tambor?",
+          "chaves": [
+            "missa",
+            "tambor",
+            "tambores",
+            "atabaque",
+            "celebracao"
+          ],
+          "r": "Sim, a igreja é conhecida pelas missas com tambores e cânticos afro-brasileiros. Os dias e horários podem mudar, então confira na própria igreja."
+        }
       ]
     },
     {
       "id": "largo-do-pelourinho",
       "nome": "Largo do Pelourinho",
       "categoria": "praca",
-      "lat": -12.97145, "lng": -38.50795, "raioM": 55,
+      "lat": -12.97145,
+      "lng": -38.50795,
+      "raioM": 55,
+      "teaser": "Foi aqui que Michael Jackson gravou um clipe com o Olodum.",
       "narrativa": {
         "curto": "Você está no Largo do Pelourinho, a ladeira de casarões coloridos que dá nome a todo o bairro.",
         "medio": "Este é o Largo do Pelourinho, com seus casarões coloniais coloridos em ladeira. O nome vem do pelourinho, a coluna onde pessoas escravizadas eram castigadas em público, uma lembrança dura da história da cidade. Hoje o largo é cheio de música, e aqui fica a Fundação Casa de Jorge Amado. Em 1996, Michael Jackson gravou aqui o clipe de They Don't Care About Us com o Olodum.",
@@ -209,16 +447,122 @@
         "Pelourinho era a coluna de castigos públicos; o nome ficou para o bairro inteiro."
       ],
       "perguntas": [
-        { "p": "O que significa Pelourinho?", "chaves": ["significa", "nome", "pelourinho", "significado"], "r": "Pelourinho era uma coluna de pedra onde se aplicavam castigos públicos, sobretudo a pessoas escravizadas. O nome ficou para o largo e para o bairro." },
-        { "p": "Michael Jackson esteve aqui?", "chaves": ["michael", "jackson", "clipe", "olodum"], "r": "Sim. Em 1996 Michael Jackson gravou no Pelourinho cenas do clipe de They Don't Care About Us, com o grupo Olodum." },
-        { "p": "O que tem na casa de Jorge Amado?", "chaves": ["jorge", "amado", "fundacao", "casa", "escritor"], "r": "A Fundação Casa de Jorge Amado guarda acervo e exposições sobre o escritor baiano, autor de livros como Capitães da Areia e Dona Flor e Seus Dois Maridos." }
+        {
+          "p": "O que significa Pelourinho?",
+          "chaves": [
+            "significa",
+            "nome",
+            "pelourinho",
+            "significado"
+          ],
+          "r": "Pelourinho era uma coluna de pedra onde se aplicavam castigos públicos, sobretudo a pessoas escravizadas. O nome ficou para o largo e para o bairro."
+        },
+        {
+          "p": "Michael Jackson esteve aqui?",
+          "chaves": [
+            "michael",
+            "jackson",
+            "clipe",
+            "olodum"
+          ],
+          "r": "Sim. Em 1996 Michael Jackson gravou no Pelourinho cenas do clipe de They Don't Care About Us, com o grupo Olodum."
+        },
+        {
+          "p": "O que tem na casa de Jorge Amado?",
+          "chaves": [
+            "jorge",
+            "amado",
+            "fundacao",
+            "casa",
+            "escritor"
+          ],
+          "r": "A Fundação Casa de Jorge Amado guarda acervo e exposições sobre o escritor baiano, autor de livros como Capitães da Areia e Dona Flor e Seus Dois Maridos."
+        }
       ]
     }
   ],
   "perguntasGerais": [
-    { "p": "O que é acarajé?", "chaves": ["acaraje", "comer", "comida", "baiana", "tipica"], "r": "O acarajé é um bolinho de feijão-fradinho frito no azeite de dendê, recheado com vatapá, caruru, camarão e salada. O ofício das baianas de acarajé é patrimônio cultural imaterial do Brasil, registrado pelo IPHAN." },
-    { "p": "O Centro Histórico é patrimônio da UNESCO?", "chaves": ["unesco", "patrimonio", "mundial", "tombado"], "r": "Sim. O Centro Histórico de Salvador foi reconhecido como Patrimônio Mundial pela UNESCO em 1985." },
-    { "p": "É seguro andar por aqui?", "chaves": ["seguro", "seguranca", "perigoso", "assalto", "noite"], "r": "Não tenho informação de segurança verificada e atualizada neste pacote. Prefira as ruas movimentadas, evite exibir objetos de valor e pergunte a moradores, à polícia turística ou ao seu hotel sobre a situação do dia." },
-    { "p": "Como subir para a Cidade Alta?", "chaves": ["subir", "cidade", "alta", "baixa", "descer", "chegar"], "r": "O jeito mais famoso é o Elevador Lacerda, que liga o Comércio, na Cidade Baixa, à Praça Tomé de Souza, na Cidade Alta, em poucos segundos." }
+    {
+      "p": "O que é acarajé?",
+      "chaves": [
+        "acaraje",
+        "comer",
+        "comida",
+        "baiana",
+        "tipica"
+      ],
+      "r": "O acarajé é um bolinho de feijão-fradinho frito no azeite de dendê, recheado com vatapá, caruru, camarão e salada. O ofício das baianas de acarajé é patrimônio cultural imaterial do Brasil, registrado pelo IPHAN."
+    },
+    {
+      "p": "O Centro Histórico é patrimônio da UNESCO?",
+      "chaves": [
+        "unesco",
+        "patrimonio",
+        "mundial",
+        "tombado"
+      ],
+      "r": "Sim. O Centro Histórico de Salvador foi reconhecido como Patrimônio Mundial pela UNESCO em 1985."
+    },
+    {
+      "p": "É seguro andar por aqui?",
+      "chaves": [
+        "seguro",
+        "seguranca",
+        "perigoso",
+        "assalto",
+        "noite"
+      ],
+      "r": "Não tenho informação de segurança verificada e atualizada neste pacote. Prefira as ruas movimentadas, evite exibir objetos de valor e pergunte a moradores, à polícia turística ou ao seu hotel sobre a situação do dia."
+    },
+    {
+      "p": "Como subir para a Cidade Alta?",
+      "chaves": [
+        "subir",
+        "cidade",
+        "alta",
+        "baixa",
+        "descer",
+        "chegar"
+      ],
+      "r": "O jeito mais famoso é o Elevador Lacerda, que liga o Comércio, na Cidade Baixa, à Praça Tomé de Souza, na Cidade Alta, em poucos segundos."
+    }
+  ],
+  "avisos": [
+    {
+      "id": "aviso-mirante-elevador",
+      "tipo": "importante",
+      "lat": -12.97398,
+      "lng": -38.51285,
+      "raioM": 35,
+      "titulo": "Atenção no mirante",
+      "texto": "Você está na beira da escarpa entre a Cidade Alta e a Cidade Baixa. Se estiver com crianças, segure a mão delas perto do guarda-corpo."
+    },
+    {
+      "id": "dica-subir-elevador",
+      "tipo": "dica",
+      "lat": -12.9737,
+      "lng": -38.514,
+      "raioM": 45,
+      "titulo": "Para subir",
+      "texto": "Para chegar à Cidade Alta sem enfrentar a ladeira, use o Elevador Lacerda, aqui do outro lado da rua."
+    },
+    {
+      "id": "novidade-centro-historico",
+      "tipo": "novidade",
+      "lat": -12.9744,
+      "lng": -38.5115,
+      "raioM": 45,
+      "titulo": "Centro Histórico",
+      "texto": "Você está entrando no coração do Centro Histórico de Salvador, Patrimônio Mundial da UNESCO desde 1985. Daqui até o Pelourinho são poucos minutos a pé."
+    },
+    {
+      "id": "dica-ladeiras-pelourinho",
+      "tipo": "dica",
+      "lat": -12.9723,
+      "lng": -38.5088,
+      "raioM": 45,
+      "titulo": "Calçamento de pedra",
+      "texto": "As ruas do Pelourinho são de pedra e em ladeira. Vá com calma, principalmente se o chão estiver molhado."
+    }
   ]
 }

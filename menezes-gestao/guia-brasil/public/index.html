@@ -32,13 +32,15 @@
       </div>
 
       <div id="passeio" hidden>
-        <div class="controle-passeio">
-          <button id="btn-passeio" class="btn primario grande" aria-pressed="false">Começar passeio</button>
-          <p id="dica-passeio" class="dica">O guia fala sozinho quando você chega perto de um ponto.</p>
+        <div class="cartao companheiro">
+          <p class="rotulo">Companheiro de caminhada</p>
+          <button id="btn-passeio" class="btn primario grande" aria-pressed="false">Começar a caminhar</button>
+          <p id="placar" class="placar" hidden aria-live="polite"></p>
+          <p id="dica-passeio" class="dica">Eu acompanho o seu trajeto e aviso sozinho quando houver algo interessante por perto.</p>
         </div>
 
         <article id="cartao-agora" class="cartao destaque" hidden aria-live="polite">
-          <p class="rotulo">Você está perto de</p>
+          <p class="rotulo" id="agora-rotulo">Você está perto de</p>
           <h2 id="agora-nome"></h2>
           <p id="agora-texto"></p>
           <ul id="agora-curiosidades" class="curiosidades"></ul>
@@ -47,6 +49,12 @@
             <button class="btn" id="agora-mais">Contar mais</button>
             <button class="btn" id="agora-perguntar">Perguntar</button>
           </div>
+        </article>
+
+        <article id="cartao-resumo" class="cartao" hidden>
+          <p class="rotulo">Caminhada encerrada</p>
+          <p id="resumo-texto"></p>
+          <ol id="resumo-lugares" class="resumo-lugares"></ol>
         </article>
 
         <div id="simulacao" class="cartao simulacao" hidden>
@@ -91,15 +99,33 @@
       <h3 class="secao">Destinos</h3>
       <ul id="lista-destinos" class="lista-destinos"></ul>
 
-      <h3 class="secao">Preferências</h3>
+      <h3 class="secao">Avisos do companheiro</h3>
       <div class="cartao preferencias">
-        <label>Frequência das narrações
+        <label>Frequência
           <select id="pref-frequencia">
-            <option value="pouco">Pouca</option>
-            <option value="normal">Normal</option>
-            <option value="muito">Muita</option>
+            <option value="pouco">Pouca: no máximo um aviso a cada 4 min</option>
+            <option value="normal">Normal: até um aviso a cada 45 s</option>
+            <option value="muito">Muita: até um aviso a cada 15 s</option>
           </select>
         </label>
+        <label>Limite por hora
+          <select id="pref-limite">
+            <option value="">Sem limite</option>
+            <option value="4">No máximo 4 por hora</option>
+            <option value="8">No máximo 8 por hora</option>
+            <option value="15">No máximo 15 por hora</option>
+          </select>
+        </label>
+        <p class="dica">Avisos importantes não entram no limite.</p>
+        <div id="lista-avisos" class="lista-avisos"></div>
+        <div class="notificacoes">
+          <p id="estado-notificacoes" class="dica"></p>
+          <button class="btn" id="btn-notificacoes" hidden>Permitir notificações</button>
+        </div>
+      </div>
+
+      <h3 class="secao">Preferências</h3>
+      <div class="cartao preferencias">
         <label>Nível de detalhe
           <select id="pref-nivel">
             <option value="curto">Curto</option>
@@ -108,6 +134,7 @@
           </select>
         </label>
         <label class="linha"><input type="checkbox" id="pref-voz"> Narrar em voz alta</label>
+        <label class="linha"><input type="checkbox" id="pref-auto"> Começar o companheiro ao abrir o app</label>
         <label class="linha"><input type="checkbox" id="pref-simulacao"> Simular caminhada (para testar fora do destino)</label>
       </div>
 
