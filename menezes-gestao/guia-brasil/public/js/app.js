@@ -3,6 +3,7 @@ import { proximos, responderLocal, candidatosFoto, VERSAO_PACOTE, anexarAoTrajet
 import { acompanharGps, simularCaminhada, criarBussola } from './sensores.js';
 import { ler, gravar, apagarTudo, PREFS_PADRAO, filaAdicionar, filaRemover, novoId } from './estado.js';
 import * as plat from './plataforma.js';
+import * as minhaIa from './minhaia.js';
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, attrs = {}, ...filhos) => {
@@ -42,18 +43,28 @@ async function api(caminho, corpo, ms = 30000) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), ms);
   try {
-    const r = await fetch(caminho, corpo ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo), signal: ctl.signal } : { signal: ctl.signal });
+    // Conversa e foto levam a conexão com a IA da pessoa, se ela conectou (a chave fica só no aparelho).
+    const extra = caminho === '/api/conversa' || caminho === '/api/foto' ? minhaIa.cabecalhos() : {};
+    const r = await fetch(caminho, corpo ? { method: 'POST', headers: { 'content-type': 'application/json', ...extra }, body: JSON.stringify(corpo), signal: ctl.signal } : { signal: ctl.signal });
     if (r.status === 204) return null;
     const dados = await r.json().catch(() => ({}));
     if (!r.ok) { const e = new Error(dados.erro || `Erro ${r.status}`); e.status = r.status; throw e; }
+    avisarSobreMinhaIa(dados);
     return dados;
   } finally { clearTimeout(t); }
 }
 const falhaDeRede = (e) => !e.status; // sem status = não chegou ao servidor
 
+/** A OpenRouter recusou a conexão da pessoa (401) ou ela está sem créditos (402): avisa e, se inválida, desconecta. */
+function avisarSobreMinhaIa(r) {
+  if (!r || !r.iaUsuario) return;
+  if (r.iaUsuario === 'invalida') { minhaIa.desconectar(); renderMinhaIa(); alertaFaixa('A conexão com a sua IA expirou. Conecte de novo em Viagem.'); }
+  if (r.iaUsuario === 'sem-creditos') alertaFaixa('Sua conta OpenRouter está sem créditos. Respondi com o conteúdo da viagem.');
+}
+
 function atualizarSelos() {
   const rede = $('#selo-rede');
-  rede.textContent = online() ? (app.servidorIa ? 'online · IA' : 'online') : 'offline';
+  rede.textContent = online() ? (app.servidorIa || minhaIa.conexao() ? 'online · IA' : 'online') : 'offline';
   rede.className = `selo ${online() ? 'ok' : 'aviso'}`;
   const p = $('#selo-pos');
   if (!app.pos) { p.textContent = app.passeioAtivo ? 'buscando GPS' : 'sem GPS'; p.className = 'selo'; }
@@ -332,7 +343,10 @@ function avaliar(contexto) {
   caixa.append(el('button', { type: 'button', onclick: () => enviar('util') }, 'Útil'), el('button', { type: 'button', onclick: () => enviar('errado') }, 'Isso está errado'));
   return caixa;
 }
-const rotuloMotor = (r) => (r.motor === 'ia' ? 'Resposta da IA' : 'Resposta do conteúdo da viagem');
+const rotuloMotor = (r) => {
+  if (r.motor !== 'ia') return 'Resposta do conteúdo da viagem';
+  return r.provedor === 'openrouter' ? `Resposta da sua IA${r.modelo ? ` (${r.modelo})` : ''}` : 'Resposta da IA';
+};
 
 // ---------- Conversa ----------
 function renderConversa() {
@@ -375,6 +389,11 @@ function renderSugestoes(mostrar) {
   const caixa = $('#sugestoes');
   caixa.hidden = !lista.length;
   caixa.replaceChildren(...lista.map((q) => el('button', { type: 'button', class: 'sugestao', onclick: () => perguntar(q) }, q)));
+  // Sem IA nenhuma, a saída para perguntas livres é conectar a IA da própria pessoa.
+  if (mostrar && !app.servidorIa && !minhaIa.conexao()) {
+    caixa.hidden = false;
+    caixa.append(el('button', { type: 'button', class: 'sugestao destaque-ia', onclick: () => { ir('viagem'); $('#cartao-minha-ia').scrollIntoView({ block: 'center' }); } }, 'Conectar minha IA para perguntas livres'));
+  }
 }
 function addMensagem(m) {
   app.conversa.push(m);
@@ -406,7 +425,7 @@ async function perguntar(texto) {
       atualizarFila();
     }
   }
-  addMensagem({ papel: 'guia', texto: r.texto, motor: r.motor, poiId: r.poiId || null, semResposta: !!r.semResposta });
+  addMensagem({ papel: 'guia', texto: r.texto, motor: r.motor, provedor: r.provedor, modelo: r.modelo, poiId: r.poiId || null, semResposta: !!r.semResposta });
   if (app.prefs.voz && document.visibilityState === 'visible') falar(r.texto);
 }
 $('#form-conversa').addEventListener('submit', (e) => {
@@ -490,6 +509,7 @@ $('#entrada-foto').addEventListener('change', async (e) => {
 
 // ---------- Fila de pendências ----------
 function atualizarFila() {
+  if (Date.now() < (alertaFaixa.ate || 0)) return; // um aviso está na tela: a fila volta a aparecer quando ele sair
   const fila = ler('fila', []).filter((f) => f.tipo !== 'feedback');
   const faixa = $('#faixa-fila');
   faixa.hidden = !fila.length;
@@ -523,7 +543,8 @@ async function processarFila() {
 function alertaFaixa(msg) {
   const f = $('#faixa-fila');
   f.hidden = false; f.textContent = msg;
-  clearTimeout(alertaFaixa.t); alertaFaixa.t = setTimeout(atualizarFila, 6000);
+  alertaFaixa.ate = Date.now() + 6000;
+  clearTimeout(alertaFaixa.t); alertaFaixa.t = setTimeout(atualizarFila, 6050);
 }
 
 // ---------- Preferências ----------
@@ -600,12 +621,55 @@ window.addEventListener('online', () => { atualizarSelos(); processarFila(); });
 window.addEventListener('offline', atualizarSelos);
 setInterval(renderPerto, 4000); // atualiza as setas com a bússola
 
+// ---------- Sua IA (OpenRouter) ----------
+function renderMinhaIa() {
+  const c = minhaIa.conexao();
+  $('#minha-ia-status').textContent = c
+    ? `Conectada à sua conta OpenRouter. O uso é cobrado dos seus créditos; a conexão fica só neste aparelho.`
+    : app.servidorIa
+      ? 'O app já tem IA. Se preferir usar a sua (e escolher o modelo), conecte sua conta OpenRouter.'
+      : 'Sem IA, o guia responde só sobre o conteúdo da viagem. Conecte sua conta OpenRouter para perguntas livres e para explicar qualquer foto: você entra lá, autoriza e pronto, sem copiar chave. O uso é cobrado dos seus créditos.';
+  $('#btn-conectar-ia').hidden = !!c;
+  $('#btn-desconectar-ia').hidden = !c;
+  $('#minha-ia-modelo-rotulo').hidden = !c;
+  if (c) $('#minha-ia-modelo').value = c.modelo || minhaIa.MODELO_PADRAO;
+  atualizarSelos();
+}
+$('#btn-conectar-ia').addEventListener('click', async () => {
+  if (!online()) { alertaFaixa('Para conectar sua IA é preciso internet.'); return; }
+  const destino = `${location.origin}${location.pathname}`;
+  location.href = await minhaIa.urlDeLogin(destino);
+});
+$('#btn-desconectar-ia').addEventListener('click', () => { minhaIa.desconectar(); renderMinhaIa(); alertaFaixa('Sua IA foi desconectada deste aparelho.'); });
+$('#minha-ia-modelo').addEventListener('change', (e) => {
+  const v = e.target.value.trim() || minhaIa.MODELO_PADRAO;
+  if (!minhaIa.definirModelo(v)) { alertaFaixa('Nome de modelo inválido. Ex.: openrouter/auto'); renderMinhaIa(); return; }
+  alertaFaixa(`Modelo da sua IA: ${v}`);
+});
+
+/** Volta do login da OpenRouter (?code=…): troca o código pela conexão e limpa o endereço. */
+async function concluirLoginSeVoltou() {
+  const params = new URLSearchParams(location.search);
+  if (!minhaIa.ehRetornoDeLogin(params)) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    await minhaIa.concluirLogin(params);
+    alertaFaixa('Pronto! Sua IA está conectada. Pergunte o que quiser na Conversa.');
+  } catch (e) {
+    alertaFaixa(e.message);
+  }
+  ir('viagem');
+  renderMinhaIa();
+}
+
 async function iniciar() {
   aplicarPrefs();
+  renderMinhaIa();
   const salvo = ler('pacoteAtivo', null);
   const p = salvo && pacoteSalvo(salvo);
   if (p) ativarPacote(p); else { $('#sem-pacote').hidden = false; }
   atualizarFila(); atualizarSelos();
+  await concluirLoginSeVoltou(); // depois da faixa da fila, para o aviso de conexão não ser apagado
   // Modo companheiro ao abrir: começa a acompanhar o trajeto sem precisar de toque (a voz pode pedir um toque no iPhone).
   if (p && app.prefs.auto) iniciarPasseio();
   // Aberto pelo toque numa notificação com o app fechado.
@@ -616,6 +680,7 @@ async function iniciar() {
     try {
       const h = await api('/api/health', null, 8000);
       app.servidorIa = h.ia;
+      renderMinhaIa();
       $('#sobre').textContent = `GuIA Brasil · MVP de teste · ${h.ia ? 'IA ligada' : 'IA desligada no servidor (respostas do conteúdo curado)'}`;
     } catch { /* offline de fato */ }
     atualizarSelos();

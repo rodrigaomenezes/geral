@@ -2,8 +2,8 @@
 <!-- App Android do GuIA Brasil (piloto). targetSdk 28: ver decisão G-013 no DECISIONS.md. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="br.com.menezesgestao.guiabrasil"
-    android:versionCode="1"
-    android:versionName="0.3-piloto">
+    android:versionCode="2"
+    android:versionName="0.4-piloto">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="28" />
 

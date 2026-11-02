@@ -1,7 +1,7 @@
 // Service worker: guarda a "casca" do app para abrir sem internet. Os pacotes de viagem ficam no
 // armazenamento do app (estado.js), não aqui. Perguntas e fotos (POST) nunca são guardadas pelo SW.
-const VERSAO = 'guia-v3';
-const CASCA = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'js/app.js', 'js/nucleo.js', 'js/sensores.js', 'js/estado.js', 'js/plataforma.js', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
+const VERSAO = 'guia-v4';
+const CASCA = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'js/app.js', 'js/nucleo.js', 'js/sensores.js', 'js/estado.js', 'js/plataforma.js', 'js/minhaia.js', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(CASCA)).then(() => self.skipWaiting()));

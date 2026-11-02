@@ -13,12 +13,17 @@ vídeo (RF04), diário (RF08), roteiros (RF09), contas e pagamento (RF11), afili
 cd menezes-gestao/guia-brasil
 npm install        # só instala o pacote opcional da IA
 npm start          # http://localhost:3000
-npm test           # 24 testes (núcleo, companheiro e servidor)
+npm test           # 30 testes (núcleo, companheiro, servidor e Sua IA)
 ```
 
 Sem chave de IA o app funciona no **modo local**: narração, perguntas frequentes e identificação de foto por GPS
 e bússola, com o conteúdo curado do pacote. Para ligar a IA (conversa aberta e visão de qualquer foto), crie a
 variável de ambiente **`ANTHROPIC_API_KEY`** no servidor — nunca coloque a chave no código ou no chat.
+
+**Sua IA, sem chave:** em *Viagem → Sua IA*, a pessoa toca *Conectar minha IA (OpenRouter)*, entra na conta dela
+e autoriza. A partir daí a conversa e a foto usam a IA dela, cobrada dos créditos dela, e a conexão fica só no
+aparelho. Dá para trocar o modelo (padrão `openrouter/auto`) e desconectar. No app Android, entre com e-mail: o
+login com Google não funciona dentro de apps.
 
 | Variável | Para quê | Padrão |
 |---|---|---|
@@ -64,7 +69,8 @@ Use sempre a mesma chave de assinatura (`GUIA_KEYSTORE`/`GUIA_KEYPASS`) para o A
    avisa e notifica, só avisa com o app aberto ou fica desligado, além da frequência e de um limite por hora.
    Fora de Salvador: marque **Simular caminhada** e use *Andar até o próximo ponto* (11 pontos, do Mercado Modelo
    ao Pelourinho).
-3. **Conversa**: pergunte por texto ou voz ("quem fundou Salvador?", "o que é acarajé?").
+3. **Conversa**: pergunte por texto ou voz ("quem fundou Salvador?", "o que é acarajé?"). Para perguntas livres,
+   conecte sua IA em *Viagem → Sua IA*.
 4. **Foto**: fotografe qualquer coisa. Com IA, ela explica o que for; sem IA, reconhece os pontos do pacote pela
    posição e direção da câmera.
 5. **Offline**: ative o modo avião. O app abre, narra, responde o que está no pacote e guarda o resto; ao voltar
