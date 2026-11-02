@@ -18,3 +18,13 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: menezes-gestao/guia-brasil/android
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq aapt dalvik-exchange apksigner zipalign android-sdk-platform-23
+      - run: ./build.sh
