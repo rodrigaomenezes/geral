@@ -1,15 +1,37 @@
 // Sensores do aparelho: GPS (ou simulação de caminhada) e bússola. Tudo opcional: sem permissão, o app segue
 // funcionando com a lista de pontos e a conversa.
 
-/** Acompanha a posição real. `aoMudar({lat,lng,precisao})`, `aoErro(msg)`. Devolve função para parar. */
+export const ehIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+/** Mensagem para a pessoa conforme o erro do GPS, com o caminho certo nos ajustes do aparelho. */
+export function mensagemGps(codigo) {
+  if (codigo === 1) {
+    return ehIOS()
+      ? 'A localização está bloqueada. No iPhone: Ajustes › Privacidade e Segurança › Serviços de Localização › Sites do Safari › "Durante o Uso", com "Localização Precisa" ligada. Depois feche e abra o app.'
+      : 'A localização está bloqueada. Permita a localização para este site nas configurações do navegador (cadeado ao lado do endereço) e recarregue.';
+  }
+  if (codigo === 3) return 'O GPS demorou para responder. Vá para um lugar aberto, longe de prédios altos, e tente de novo.';
+  return 'Não foi possível obter a sua localização agora. Confira se a localização do aparelho está ligada.';
+}
+
+const posicaoDe = (p) => ({ lat: p.coords.latitude, lng: p.coords.longitude, precisao: p.coords.accuracy });
+
+/** Acompanha a posição real. `aoMudar({lat,lng,precisao})`, `aoErro(msg, codigo)`. Devolve função para parar. */
 export function acompanharGps(aoMudar, aoErro) {
-  if (!('geolocation' in navigator)) { aoErro('Este aparelho não informa a localização.'); return () => {}; }
+  if (!('geolocation' in navigator)) { aoErro('Este aparelho não informa a localização.', 0); return () => {}; }
   const id = navigator.geolocation.watchPosition(
-    (p) => aoMudar({ lat: p.coords.latitude, lng: p.coords.longitude, precisao: p.coords.accuracy }),
-    (e) => aoErro(e.code === 1 ? 'Permissão de localização negada.' : 'Não foi possível obter a localização.'),
+    (p) => aoMudar(posicaoDe(p)),
+    (e) => aoErro(mensagemGps(e.code), e.code),
     { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 },
   );
   return () => navigator.geolocation.clearWatch(id);
+}
+
+/** Uma leitura só (para mostrar distâncias ao abrir o Passeio, sem ligar o acompanhamento). */
+export function localizarUmaVez(aoOk, aoErro) {
+  if (!('geolocation' in navigator)) { aoErro('Este aparelho não informa a localização.', 0); return; }
+  navigator.geolocation.getCurrentPosition((p) => aoOk(posicaoDe(p)), (e) => aoErro(mensagemGps(e.code), e.code),
+    { enableHighAccuracy: true, maximumAge: 60000, timeout: 20000 });
 }
 
 /**

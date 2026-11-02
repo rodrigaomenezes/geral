@@ -1,6 +1,6 @@
 // Interface do GuIA Brasil. Regras ficam em nucleo.js; aqui só tela, sensores, voz e rede.
 import { proximos, responderLocal, candidatosFoto, VERSAO_PACOTE, anexarAoTrajeto, rumoDaCaminhada, proximoAlerta, registrarAlerta, resumoCaminhada, ROTULO_ALERTA } from './nucleo.js';
-import { acompanharGps, simularCaminhada, criarBussola } from './sensores.js';
+import { acompanharGps, localizarUmaVez, simularCaminhada, criarBussola, ehIOS } from './sensores.js';
 import { ler, gravar, apagarTudo, PREFS_PADRAO, filaAdicionar, filaRemover, novoId } from './estado.js';
 import * as plat from './plataforma.js';
 import * as minhaIa from './minhaia.js';
@@ -76,6 +76,11 @@ function atualizarSelos() {
 function falar(texto, forcar = false) {
   if (!app.prefs.voz && !forcar) return;
   plat.falar(texto);
+  // No iPhone a voz de sites fica muda com o modo silencioso: avisa uma vez quando a pessoa toca em "Ouvir".
+  if (forcar && ehIOS() && !plat.ehAppNativo() && !ler('dicaSilencioso', false)) {
+    gravar('dicaSilencioso', true);
+    alertaFaixa('Sem som? No iPhone a voz do app fica muda com o modo silencioso ligado (chave na lateral). Desligue o silencioso e aumente o volume.', 12000);
+  }
 }
 
 // ---------- Navegação ----------
@@ -84,7 +89,33 @@ function ir(tela) {
   document.querySelectorAll('.abas button').forEach((b) => (b.dataset.ir === tela ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')));
   if (tela === 'conversa') { renderConversa(); setTimeout(() => $('#entrada-conversa').focus({ preventScroll: true }), 50); }
   if (tela === 'viagem') renderDestinos();
+  if (tela === 'passeio') localizarAgora();
   window.scrollTo({ top: 0 });
+}
+
+/** Mostra onde a pessoa está ao abrir o Passeio, sem ligar o acompanhamento (que só começa em "Começar a caminhar"). */
+let ultimaLocalizacao = 0;
+function localizarAgora() {
+  if (!app.pacote || app.passeioAtivo || app.prefs.simulacao || Date.now() - ultimaLocalizacao < 30000) return;
+  ultimaLocalizacao = Date.now();
+  $('#selo-pos').textContent = 'buscando GPS';
+  localizarUmaVez((p) => {
+    if (app.passeioAtivo || app.prefs.simulacao) return;
+    app.pos = p;
+    atualizarSelos(); renderPerto();
+  }, (msg, codigo) => { atualizarSelos(); alertaFaixa(msg, codigo === 1 ? 15000 : 8000); });
+}
+
+/** Longe de todos os pontos (ex.: testando fora de Salvador): explica e oferece a simulação. */
+function renderDistanciaDestino() {
+  const c = $('#cartao-longe');
+  if (!app.pacote || !app.pos || app.pos.simulada || app.prefs.simulacao) { c.hidden = true; return; }
+  const [maisPerto] = proximos(app.pacote.pois, app.pos);
+  if (!maisPerto || maisPerto.distancia < 2000) { c.hidden = true; return; }
+  const km = maisPerto.distancia / 1000;
+  const dist = km < 100 ? `${km.toFixed(1).replace('.', ',')} km` : `${Math.round(km).toLocaleString('pt-BR')} km`;
+  $('#longe-texto').textContent = `O GPS encontrou você, a ${dist} de ${app.pacote.cidade}. Os avisos começam quando você estiver perto dos pontos. Para testar daqui, ligue a simulação de caminhada.`;
+  c.hidden = false;
 }
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-ir]'); if (b) ir(b.dataset.ir); });
 
@@ -105,6 +136,17 @@ async function baixarPacote(id) {
   const p = await api(`/api/pacotes/${id}`);
   if (!gravar(`pacote.${id}`, p)) throw new Error('Sem espaço no aparelho para guardar o pacote.');
   return p;
+}
+
+/** Sem destino e com um só disponível: baixa sozinho (no iPhone o atalho da tela inicial não vê o que o Safari baixou). */
+async function baixarDestinoUnico() {
+  try {
+    const lista = await api('/api/pacotes', null, 10000);
+    if (lista.length !== 1) return;
+    ativarPacote(await baixarPacote(lista[0].id));
+    alertaFaixa(`Baixei o destino ${lista[0].nome} para usar também sem internet.`);
+    if (!$('#tela-passeio').hidden) localizarAgora();
+  } catch { /* segue sem destino; a pessoa escolhe em Viagem */ }
 }
 
 async function renderDestinos() {
@@ -153,7 +195,7 @@ function iniciarPasseio() {
   if (!app.prefs.simulacao) {
     // No app Android o GPS vem do serviço nativo (segue com a tela bloqueada); no navegador, da página.
     app.pararGps = plat.acompanharGpsNativo(aoMudarPosicao, () => { if (app.passeioAtivo) encerrarPasseio(); })
-      || acompanharGps(aoMudarPosicao, (msg) => { alertaFaixa(`${msg} Você pode ativar a simulação em Viagem.`); });
+      || acompanharGps(aoMudarPosicao, (msg, codigo) => { alertaFaixa(codigo === 1 ? msg : `${msg} Você pode ativar a simulação em Viagem.`, 15000); });
   } else if (app.simulador) aoMudarPosicao(app.simulador.posicao());
   const b = $('#btn-passeio'); b.textContent = 'Encerrar caminhada'; b.classList.add('ligado'); b.setAttribute('aria-pressed', 'true');
   $('#dica-passeio').textContent = app.prefs.simulacao
@@ -218,6 +260,11 @@ function desligarSimulacao() {
   $('#simulacao').hidden = true;
   if (app.pos && app.pos.simulada) app.pos = null;
 }
+$('#btn-ligar-simulacao').addEventListener('click', () => {
+  app.prefs.simulacao = true; gravar('prefs', app.prefs); aplicarPrefs();
+  ligarSimulacao(); app.pos = null; atualizarSelos(); renderPerto();
+  $('#simulacao').scrollIntoView({ block: 'center', behavior: 'smooth' });
+});
 $('#btn-avancar').addEventListener('click', () => {
   if (!app.passeioAtivo) iniciarPasseio();
   const alvo = app.simulador.avancar();
@@ -317,6 +364,7 @@ function renderPerto() {
   if (!app.pacote) return;
   const narrados = lerEstado().narrados || {};
   const lista = app.pos ? proximos(app.pacote.pois, app.pos) : app.pacote.pois.map((poi) => ({ poi, distancia: null, rumo: null }));
+  renderDistanciaDestino();
   // Seta relativa a quem segura o celular: bússola; sem bússola, a direção em que está andando.
   const dir = bussola.direcao() ?? app.rumoCaminhada ?? 0;
   $('#lista-perto').replaceChildren(...lista.slice(0, 12).map(({ poi, distancia, rumo: r }) => {
@@ -403,10 +451,10 @@ function addMensagem(m) {
 }
 
 async function perguntar(texto) {
-  if (!app.pacote) { addMensagem({ papel: 'guia', texto: 'Escolha um destino em Viagem para eu poder te guiar.' }); return; }
+  // Sem destino a conversa segue: com IA (do servidor ou da pessoa) a resposta vem pelo conhecimento geral e pela posição.
   const historico = app.conversa.filter((m) => !m.pendente).slice(-8).map(({ papel, texto: t }) => ({ papel, texto: t }));
   addMensagem({ papel: 'usuario', texto });
-  const corpo = { pacoteId: app.pacote.id, mensagem: texto, pos: app.pos, poiId: app.emFoco?.id, historico, nivel: app.prefs.nivel };
+  const corpo = { pacoteId: app.pacote?.id, mensagem: texto, pos: app.pos, poiId: app.emFoco?.id, historico, nivel: app.prefs.nivel };
   const pensando = { papel: 'guia', texto: 'Pensando...', pendente: true, temporario: true };
   addMensagem(pensando);
   let r;
@@ -416,11 +464,11 @@ async function perguntar(texto) {
   }
   app.conversa = app.conversa.filter((m) => !m.temporario);
   if (!r) { // offline: responde com o pacote e, se não souber, guarda para quando a internet voltar
-    const local = responderLocal(app.pacote, texto, app.emFoco?.id);
+    const local = app.pacote ? responderLocal(app.pacote, texto, app.emFoco?.id) : null;
     if (local) r = { ...local, motor: 'local' };
     else {
       const id = novoId();
-      filaAdicionar({ id, tipo: 'conversa', corpo, pacoteId: app.pacote.id });
+      filaAdicionar({ id, tipo: 'conversa', corpo, pacoteId: app.pacote?.id });
       r = { texto: 'Estou sem internet e não tenho essa resposta no conteúdo baixado. Guardei sua pergunta e respondo assim que a conexão voltar.', motor: 'local', pendenteId: id };
       atualizarFila();
     }
@@ -471,9 +519,9 @@ function renderResultadoFoto(r) {
     (r.alternativas || []).length ? el('p', { class: 'dica' }, `Pode ser também: ${r.alternativas.map((a) => a.nome).join(', ')}.`) : null,
     el('div', { class: 'acoes' },
       el('button', { class: 'btn', onclick: () => falar(`${r.titulo}. ${r.explicacao}`, true) }, 'Ouvir'),
-      el('button', { class: 'btn', onclick: () => { const poi = app.pacote.pois.find((p) => p.id === r.poiId); if (poi) app.emFoco = poi; ir('conversa'); } }, 'Perguntar sobre isso')),
+      el('button', { class: 'btn', onclick: () => { const poi = app.pacote?.pois.find((p) => p.id === r.poiId); if (poi) app.emFoco = poi; ir('conversa'); } }, 'Perguntar sobre isso')),
     el('div', { class: 'motor' }, rotuloMotor(r)),
-    avaliar({ poiId: r.poiId, motor: r.motor, resposta: `${r.titulo}: ${r.explicacao}` }),
+    app.pacote ? avaliar({ poiId: r.poiId, motor: r.motor, resposta: `${r.titulo}: ${r.explicacao}` }) : null,
   );
   if (r.identificado) falar(`${r.titulo}. ${r.explicacao}`);
 }
@@ -482,24 +530,24 @@ $('#entrada-foto').addEventListener('change', async (e) => {
   const arquivo = e.target.files && e.target.files[0];
   e.target.value = '';
   if (!arquivo) return;
-  if (!app.pacote) { alertaFaixa('Escolha um destino em Viagem primeiro.'); return; }
+  if (!app.pacote && !online()) { alertaFaixa('Sem internet, a foto só é reconhecida com um destino baixado em Viagem.'); return; }
   const art = $('#resultado-foto');
   art.hidden = false; art.replaceChildren(el('p', { class: 'carregando' }, 'Olhando a sua foto...'));
   let imagem;
   try { imagem = await reduzirFoto(arquivo); } catch (er) { art.replaceChildren(el('p', {}, er.message)); return; }
   $('#previa').hidden = false; $('#previa-img').src = imagem;
-  const corpo = { pacoteId: app.pacote.id, imagem, pos: app.pos, direcao: bussola.direcao(), pergunta: $('#pergunta-foto').value.trim() };
+  const corpo = { pacoteId: app.pacote?.id, imagem, pos: app.pos, direcao: bussola.direcao(), pergunta: $('#pergunta-foto').value.trim() };
   let r;
   if (online()) {
     try { r = await api('/api/foto', corpo, 60000); }
     catch (er) { if (!falhaDeRede(er)) { art.replaceChildren(el('p', {}, er.message)); return; } }
   }
   if (!r) { // offline: posição + bússola contra os pontos do pacote
-    const [melhor, ...outros] = app.pos ? candidatosFoto({ pois: app.pacote.pois, pos: app.pos, direcao: corpo.direcao }) : [];
+    const [melhor, ...outros] = app.pos && app.pacote ? candidatosFoto({ pois: app.pacote.pois, pos: app.pos, direcao: corpo.direcao }) : [];
     if (melhor && melhor.confianca >= 0.45) {
       r = { identificado: true, poiId: melhor.poi.id, titulo: melhor.poi.nome, explicacao: textoNivel(melhor.poi), curiosidades: melhor.poi.curiosidades || [], alternativas: outros.map((c) => ({ nome: c.poi.nome })), motor: 'local' };
     } else {
-      const guardou = filaAdicionar({ id: novoId(), tipo: 'foto', corpo, pacoteId: app.pacote.id });
+      const guardou = filaAdicionar({ id: novoId(), tipo: 'foto', corpo, pacoteId: app.pacote?.id });
       r = { identificado: false, titulo: 'Não identifiquei sem internet', explicacao: guardou ? 'Sem conexão eu reconheço só os pontos turísticos desta viagem, pela sua posição e direção da câmera. Guardei a foto e explico quando a internet voltar.' : 'Sem conexão eu reconheço só os pontos turísticos desta viagem. A fila de fotos está cheia: tente de novo quando tiver internet.', curiosidades: [], motor: 'local' };
       atualizarFila();
     }
@@ -540,11 +588,11 @@ async function processarFila() {
   if (ler('fila', []).length === 0 && document.querySelector('#tela-conversa').hidden === false) renderConversa();
 }
 
-function alertaFaixa(msg) {
+function alertaFaixa(msg, duracaoMs = 6000) {
   const f = $('#faixa-fila');
   f.hidden = false; f.textContent = msg;
-  alertaFaixa.ate = Date.now() + 6000;
-  clearTimeout(alertaFaixa.t); alertaFaixa.t = setTimeout(atualizarFila, 6050);
+  alertaFaixa.ate = Date.now() + duracaoMs;
+  clearTimeout(alertaFaixa.t); alertaFaixa.t = setTimeout(atualizarFila, duracaoMs + 50);
 }
 
 // ---------- Preferências ----------
@@ -667,7 +715,7 @@ async function iniciar() {
   renderMinhaIa();
   const salvo = ler('pacoteAtivo', null);
   const p = salvo && pacoteSalvo(salvo);
-  if (p) ativarPacote(p); else { $('#sem-pacote').hidden = false; }
+  if (p) { ativarPacote(p); localizarAgora(); } else { $('#sem-pacote').hidden = false; }
   atualizarFila(); atualizarSelos();
   await concluirLoginSeVoltou(); // depois da faixa da fila, para o aviso de conexão não ser apagado
   // Modo companheiro ao abrir: começa a acompanhar o trajeto sem precisar de toque (a voz pode pedir um toque no iPhone).
@@ -681,6 +729,7 @@ async function iniciar() {
       const h = await api('/api/health', null, 8000);
       app.servidorIa = h.ia;
       renderMinhaIa();
+      if (!app.pacote) await baixarDestinoUnico();
       $('#sobre').textContent = `GuIA Brasil · MVP de teste · ${h.ia ? 'IA ligada' : 'IA desligada no servidor (respostas do conteúdo curado)'}`;
     } catch { /* offline de fato */ }
     atualizarSelos();
