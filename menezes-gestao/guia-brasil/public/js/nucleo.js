@@ -142,6 +142,7 @@ export function validarPacote(p) {
     if (poi && poi.perguntas && !Array.isArray(poi.perguntas)) erros.push(`${onde}: perguntas deve ser lista`);
     for (const f of (poi && Array.isArray(poi.perguntas) ? poi.perguntas : [])) if (!f.p || !f.r) erros.push(`${onde}: pergunta sem p ou r`);
     if (poi && poi.teaser != null && (typeof poi.teaser !== 'string' || poi.teaser.length < 10)) erros.push(`${onde}: teaser deve ser texto`);
+    if (poi && poi.fonte != null && (typeof poi.fonte !== 'object' || typeof poi.fonte.nome !== 'string' || !/^https:\/\//.test(poi.fonte.url || ''))) erros.push(`${onde}: fonte deve ter nome e url https`);
   });
   if (p.avisos != null && !Array.isArray(p.avisos)) erros.push('avisos deve ser lista');
   (Array.isArray(p.avisos) ? p.avisos : []).forEach((a, i) => {
