@@ -1,0 +1,20 @@
+name: GuIA Brasil · testes
+
+on:
+  push:
+    paths: ['menezes-gestao/guia-brasil/**', '.github/workflows/guia-brasil.yml']
+  pull_request:
+    paths: ['menezes-gestao/guia-brasil/**', '.github/workflows/guia-brasil.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: menezes-gestao/guia-brasil
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test

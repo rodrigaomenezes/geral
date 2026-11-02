@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0b3d4f"/>
+  <path d="M256 92c-70 0-126 55-126 124 0 92 126 204 126 204s126-112 126-204c0-69-56-124-126-124Z" fill="#f6f3ec"/>
+  <rect x="172" y="160" width="168" height="112" rx="26" fill="#f2b705"/>
+  <text x="256" y="246" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="88" font-weight="900" fill="#3a2c00">IA</text>
+</svg>
