@@ -7,6 +7,7 @@ Celular (PWA)                                      Servidor (Node, sem framework
 │ sensores.js GPS, bússola, sim │── POST conversa ▶│ guia.js     IA ou motor local │──▶ Claude (opcional)
 │ estado.js   localStorage      │── POST foto ───▶ │ server.js   rotas, limites    │
 │ nucleo.js   REGRAS (comum)  ◀─┼── mesmo arquivo ─┼▶ nucleo.js                   │
+│ plataforma.js voz/notificação │                  │                               │
 │ sw.js       casca offline     │── POST feedback ▶│ dados/feedback.jsonl          │
 └───────────────────────────────┘                  └───────────────────────────────┘
 ```
@@ -18,7 +19,9 @@ Celular (PWA)                                      Servidor (Node, sem framework
 | `public/js/nucleo.js` | Regras puras: distância, rumo, quem está perto, foto offline, resposta local, validação do pacote e o **companheiro de caminhada** (trajeto, direção, próximo alerta, resumo) | Rede, DOM, armazenamento |
 | `public/js/sensores.js` | GPS, simulação de caminhada, bússola | Decidir o que narrar |
 | `public/js/estado.js` | Preferências, pacote baixado, conversa, fila de pendências (localStorage, com queda para memória) | Regras |
-| `public/js/app.js` | Telas, voz, tela acesa (Wake Lock), chamadas à API, fila | Regras (chama o núcleo) |
+| `public/js/app.js` | Telas, tela acesa (Wake Lock), chamadas à API, fila, configuração dos avisos | Regras (chama o núcleo) |
+| `public/js/plataforma.js` | O que muda entre navegador e app Android: voz, notificações, segundo plano, GPS nativo | Regras |
+| `android/` | APK: WebView do app + serviço de GPS em primeiro plano, voz e notificação nativas (ponte `GuiaNativo`) | Regras (entrega posições ao JavaScript) |
 | `public/sw.js` | Guarda a casca do app para abrir offline | Guardar POST, pacotes |
 | `server/pacotes.js` | Carrega e valida pacotes, ETag | — |
 | `server/guia.js` | Conversa e foto: motor `ia` (Claude) com queda para `local` | HTTP |
@@ -66,6 +69,34 @@ GPS / simulação ──▶ anexarAoTrajeto ──▶ rumoDaCaminhada ──▶ 
 | Dica / Novidade | Dentro do raio de um aviso `dica` ou `novidade` | 20 s desde a última fala |
 
 O app não decide nada enquanto ainda está falando. Estado por pacote em `companheiro.<pacoteId>` no aparelho.
+
+Preferências (G-012): modo por tipo (`notificar` · `app` · `off`) e limite opcional por hora (importante fica fora).
+Em segundo plano, só os tipos em `notificar` entram em `proximoAlerta`.
+
+## Segundo plano e ponte Android (G-013)
+
+```
+GuiaServico (GPS, tela bloqueada) ──posição──▶ window.guiaReceberPosicao ──▶ nucleo.proximoAlerta
+                                                                              │
+GuiaNativo.notificar ◀── app fora da tela ◀── plataforma.notificar ◀──────────┘
+GuiaNativo.falar (TextToSpeech)  ·  toque na notificação ──▶ window.guiaAbrirAlerta(id)
+```
+
+| Ponte `GuiaNativo` (Java → JS chama) | Para quê |
+|---|---|
+| `emPrimeiroPlano()` | Se a tela do app está na frente (a WebView não sabe sozinha) |
+| `iniciarAcompanhamento()` / `pararAcompanhamento()` | Liga/desliga o serviço de GPS em primeiro plano |
+| `falar(texto)` / `pararFala()` / `falando()` | Voz do sistema (a WebView não tem Web Speech) |
+| `notificar(json {id,tipo,titulo,texto})` | Notificação nativa; ignorada se o app estiver na frente |
+
+| Funções que o Java chama no JS | Quando |
+|---|---|
+| `guiaReceberPosicao({lat,lng,precisao})` | Cada posição do serviço |
+| `guiaAbrirAlerta(id)` | Toque numa notificação |
+| `guiaAcompanhamentoEncerrado()` | "Encerrar caminhada" na notificação fixa, ou GPS negado |
+
+No navegador, `plataforma.js` faz o mesmo com Web Speech e notificações do service worker (só enquanto a página
+estiver viva).
 
 ## Dados guardados
 - **No aparelho:** preferências, pacote, conversa (últimas 60), estado do companheiro, trajeto (até 600 pontos), fila (até 20 itens, 4 fotos).

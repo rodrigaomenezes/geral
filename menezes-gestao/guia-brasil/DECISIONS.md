@@ -59,3 +59,32 @@ a falar do que ficou para trás.
 **Decisão:** ao começar a caminhar o app pede para manter a tela acesa e pede de novo ao voltar a ficar visível.
 **Por quê:** num PWA o GPS e a voz param quando a tela apaga. Custo: bateria. A versão nativa (G-002) troca isso por
 geofencing em segundo plano.
+
+# G-012 — Avisos configuráveis por tipo, com regra própria para o segundo plano
+**Decisão:** cada tipo (importante, você chegou, logo à frente, dicas, novidades) tem um modo: *avisar e notificar*,
+*só com o app aberto* ou *desligado*. Em segundo plano o núcleo só considera os tipos em *notificar*. Há um limite
+opcional por hora (4, 8 ou 15) que não vale para avisos importantes. Padrão: importante e chegada notificam; o resto
+só com o app aberto.
+**Por quê:** a pessoa pediu para escolher o que recebe e com que frequência; o aviso de segurança não pode sumir por
+causa de um limite de quantidade. Um tipo "só no app" que fosse decidido em segundo plano seria gasto sem ser visto.
+
+# G-013 — App Android: WebView + serviço de GPS em primeiro plano que alimenta o núcleo em JavaScript
+**Decisão:** `android/` gera um APK que abre o app web e acrescenta a ponte `GuiaNativo`: um serviço em primeiro plano
+(notificação fixa "caminhando com você") mantém o GPS com a tela bloqueada e entrega cada posição ao JavaScript, que
+decide o alerta com o mesmo `nucleo.js`; voz pelo TextToSpeech e notificação nativa. A WebView não é pausada.
+Compilado como o Estadia (aapt + javac + dalvik-exchange) contra o `android.jar` da API 23, único disponível no
+build; APIs de Android 8+ (canais, serviço em primeiro plano) por reflexão e `targetSdkVersion 28`.
+**Por quê:** num navegador o GPS e o JavaScript congelam com a tela bloqueada (G-011); duplicar as regras em Java
+criaria dois comportamentos para manter. `targetSdk 28` dispensa o tipo de serviço exigido no Android 14 e instala
+direto no celular (piloto). **Antes da Play Store:** compilar com o SDK 34+ (Gradle ou Actions com Android SDK),
+`targetSdk` atual, `foregroundServiceType="location"` e pedido de notificação do Android 13.
+**Risco:** se o Android encerrar a tela do app (pouca memória), o serviço continua mas sem quem decida o alerta.
+Não foi testado num aparelho.
+
+# G-014 — iPhone: planejado como app nativo; até lá, o app web
+**Decisão:** sem Mac/Xcode e conta Apple Developer neste ambiente, o iPhone continua no app web (com notificações só
+enquanto o Safari mantiver o app ativo, iOS 16.4+ e app adicionado à tela inicial). Plano: casca nativa (Swift ou
+Capacitor) com monitoramento de regiões do CoreLocation (até 20 regiões por vez, renovadas conforme a pessoa anda)
+e notificações locais, reaproveitando o mesmo núcleo.
+**Por quê:** o iOS não permite GPS contínuo em segundo plano para páginas web; regiões monitoradas são o caminho que
+gasta menos bateria e funciona até com o app fechado.

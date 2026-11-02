@@ -13,7 +13,7 @@ vídeo (RF04), diário (RF08), roteiros (RF09), contas e pagamento (RF11), afili
 cd menezes-gestao/guia-brasil
 npm install        # só instala o pacote opcional da IA
 npm start          # http://localhost:3000
-npm test           # 23 testes (núcleo, companheiro e servidor)
+npm test           # 24 testes (núcleo, companheiro e servidor)
 ```
 
 Sem chave de IA o app funciona no **modo local**: narração, perguntas frequentes e identificação de foto por GPS
@@ -40,13 +40,28 @@ GPS, câmera, bússola e instalação como app exigem **HTTPS**. O caminho mais 
 3. Em *Variables*: crie `ANTHROPIC_API_KEY` (opcional) e adicione um **Volume** em `/data` para guardar as avaliações.
 4. *Generate Domain* (porta 8080) e abra o endereço no celular. No Chrome (Android) ou Safari (iPhone): *Adicionar à tela inicial*.
 
+### App Android (segundo plano)
+
+Para receber os avisos com a tela bloqueada, instale o APK:
+
+```bash
+cd menezes-gestao/guia-brasil/android && ./build.sh   # dist/GuIA-Brasil-piloto.apk
+```
+
+No celular: abra o arquivo `.apk`, permita *instalar apps desta fonte*, abra o GuIA Brasil e permita localização
+e notificações. Ao tocar *Começar a caminhar* aparece a notificação fixa "GuIA Brasil está caminhando com você":
+a partir daí os avisos marcados para notificar chegam com a tela bloqueada. Se o celular tiver economia de bateria
+agressiva (Xiaomi, Samsung, Motorola), coloque o GuIA Brasil como *sem restrição* de bateria.
+Use sempre a mesma chave de assinatura (`GUIA_KEYSTORE`/`GUIA_KEYPASS`) para o Android aceitar as atualizações.
+
 ### Roteiro de teste
 
 1. **Viagem** → *Baixar para usar offline* no pacote de Salvador.
 2. **Companheiro de caminhada** (aba Passeio): toque *Começar a caminhar* e siga andando. O guia acompanha o trajeto
    e avisa sozinho: *Você chegou* (narra o ponto), *Logo à frente* (ponto a até 200 m na direção em que você anda),
    *Importante*, *Dica* e *Novidade*. Ao encerrar, mostra o resumo: distância, tempo e lugares conhecidos.
-   Em Viagem dá para marcar *Começar o companheiro ao abrir o app*.
+   Em Viagem dá para marcar *Começar o companheiro ao abrir o app* e escolher, **por tipo de aviso**, se ele
+   avisa e notifica, só avisa com o app aberto ou fica desligado, além da frequência e de um limite por hora.
    Fora de Salvador: marque **Simular caminhada** e use *Andar até o próximo ponto* (11 pontos, do Mercado Modelo
    ao Pelourinho).
 3. **Conversa**: pergunte por texto ou voz ("quem fundou Salvador?", "o que é acarajé?").
@@ -59,8 +74,10 @@ GPS, câmera, bússola e instalação como app exigem **HTTPS**. O caminho mais 
 ## Limitações conhecidas deste MVP
 
 - **Coordenadas aproximadas** no pacote de Salvador: conferir em campo antes de abrir ao público (Fase 0).
-- O companheiro precisa do app aberto: a tela fica acesa durante a caminhada (Wake Lock). Com a tela bloqueada,
-  o navegador para o GPS e a voz; avisar no bolso exige o app nativo.
+- **No navegador** o companheiro precisa do app aberto (a tela fica acesa); com a tela bloqueada o navegador para
+  o GPS e a voz. **No app Android** funciona com a tela bloqueada. **No iPhone** só o app web por enquanto (G-014).
+- App Android de piloto: `targetSdk 28` e instalação direta; para a Play Store precisa do build com SDK atual (G-013).
+  Não foi testado em aparelho.
 - Sem mapa desenhado: a tela mostra a lista por distância com seta de direção (mapa offline entra com MapLibre).
 - IA local no aparelho ainda não usada: offline, a conversa responde só o que está no pacote (decisão G-004).
 - Voz e ditado dependem do navegador; o ditado não existe no Firefox nem em alguns Androids.
