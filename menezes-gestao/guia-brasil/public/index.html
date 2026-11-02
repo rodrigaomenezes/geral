@@ -100,6 +100,18 @@
       <h3 class="secao">Destinos</h3>
       <ul id="lista-destinos" class="lista-destinos"></ul>
 
+      <h3 class="secao">Sua IA</h3>
+      <div class="cartao preferencias" id="cartao-minha-ia">
+        <p id="minha-ia-status" class="dica"></p>
+        <label id="minha-ia-modelo-rotulo" hidden>Modelo
+          <input id="minha-ia-modelo" class="campo" type="text" maxlength="100" autocomplete="off" spellcheck="false" placeholder="openrouter/auto">
+        </label>
+        <div class="acoes">
+          <button class="btn primario" id="btn-conectar-ia">Conectar minha IA (OpenRouter)</button>
+          <button class="btn" id="btn-desconectar-ia" hidden>Desconectar</button>
+        </div>
+      </div>
+
       <h3 class="secao">Avisos do companheiro</h3>
       <div class="cartao preferencias">
         <label>Frequência
