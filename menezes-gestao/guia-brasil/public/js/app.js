@@ -2,6 +2,7 @@
 import { proximos, responderLocal, candidatosFoto, VERSAO_PACOTE, anexarAoTrajeto, rumoDaCaminhada, proximoAlerta, registrarAlerta, resumoCaminhada, ROTULO_ALERTA } from './nucleo.js';
 import { acompanharGps, simularCaminhada, criarBussola } from './sensores.js';
 import { ler, gravar, apagarTudo, PREFS_PADRAO, filaAdicionar, filaRemover, novoId } from './estado.js';
+import * as plat from './plataforma.js';
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, attrs = {}, ...filhos) => {
@@ -13,8 +14,13 @@ const el = (tag, attrs = {}, ...filhos) => {
   return e;
 };
 
+function carregarPrefs() {
+  const salvas = ler('prefs', {});
+  return { ...PREFS_PADRAO, ...salvas, avisos: { ...plat.AVISOS_PADRAO, ...(salvas.avisos || {}) } };
+}
+
 const app = {
-  prefs: { ...PREFS_PADRAO, ...ler('prefs', {}) },
+  prefs: carregarPrefs(),
   pacote: null,
   pos: null,
   passeioAtivo: false,
@@ -56,18 +62,9 @@ function atualizarSelos() {
 }
 
 // ---------- Voz ----------
-let vozPt = null;
-function escolherVoz() {
-  const vozes = (window.speechSynthesis && speechSynthesis.getVoices()) || [];
-  vozPt = vozes.find((v) => v.lang === 'pt-BR') || vozes.find((v) => v.lang && v.lang.startsWith('pt')) || null;
-}
-if ('speechSynthesis' in window) { escolherVoz(); speechSynthesis.addEventListener?.('voiceschanged', escolherVoz); }
 function falar(texto, forcar = false) {
-  if (!('speechSynthesis' in window) || (!app.prefs.voz && !forcar)) return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(texto);
-  u.lang = 'pt-BR'; if (vozPt) u.voice = vozPt; u.rate = 1.02;
-  speechSynthesis.speak(u);
+  if (!app.prefs.voz && !forcar) return;
+  plat.falar(texto);
 }
 
 // ---------- Navegação ----------
@@ -140,10 +137,12 @@ function iniciarPasseio() {
   app.inicioCaminhada = Date.now();
   app.trajeto = [];
   bussola.pedirPermissao();
-  if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance('')); // libera a voz no iOS (precisa de toque)
+  plat.liberarVoz(); // iPhone: a voz só funciona depois de um toque
   manterTelaAcesa();
   if (!app.prefs.simulacao) {
-    app.pararGps = acompanharGps(aoMudarPosicao, (msg) => { alertaFaixa(`${msg} Você pode ativar a simulação em Viagem.`); });
+    // No app Android o GPS vem do serviço nativo (segue com a tela bloqueada); no navegador, da página.
+    app.pararGps = plat.acompanharGpsNativo(aoMudarPosicao, () => { if (app.passeioAtivo) encerrarPasseio(); })
+      || acompanharGps(aoMudarPosicao, (msg) => { alertaFaixa(`${msg} Você pode ativar a simulação em Viagem.`); });
   } else if (app.simulador) aoMudarPosicao(app.simulador.posicao());
   const b = $('#btn-passeio'); b.textContent = 'Encerrar caminhada'; b.classList.add('ligado'); b.setAttribute('aria-pressed', 'true');
   $('#dica-passeio').textContent = app.prefs.simulacao
@@ -160,7 +159,7 @@ function encerrarPasseio({ resumo = true } = {}) {
   const estava = app.passeioAtivo;
   app.passeioAtivo = false;
   if (app.pararGps) app.pararGps(); app.pararGps = null;
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  plat.pararFala();
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   clearInterval(placarTimer);
   const b = $('#btn-passeio'); b.textContent = 'Começar a caminhar'; b.classList.remove('ligado'); b.setAttribute('aria-pressed', 'false');
@@ -214,7 +213,6 @@ $('#btn-avancar').addEventListener('click', () => {
   $('#sim-onde').textContent = `Caminhando até ${alvo.nome}... depois: ${app.simulador.proximo().nome}`;
 });
 
-const falando = () => 'speechSynthesis' in window && (speechSynthesis.speaking || speechSynthesis.pending);
 
 function aoMudarPosicao(p) {
   if (p.simulada && !app.prefs.simulacao) return;
@@ -227,9 +225,11 @@ function aoMudarPosicao(p) {
     atualizarPlacar();
   }
   renderPerto();
-  if (!app.passeioAtivo || !app.pacote || falando()) return; // não fala por cima de si mesmo
+  if (!app.passeioAtivo || !app.pacote || plat.falando()) return; // não fala por cima de si mesmo
   const estado = lerEstado();
-  const alerta = proximoAlerta({ pacote: app.pacote, pos: p, rumoCaminhada: app.rumoCaminhada, estado, frequencia: app.prefs.frequencia });
+  // Em segundo plano só valem os tipos marcados para notificar; o limite por hora poupa só o importante.
+  const alerta = proximoAlerta({ pacote: app.pacote, pos: p, rumoCaminhada: app.rumoCaminhada, estado, frequencia: app.prefs.frequencia,
+    tipos: plat.tiposAtivos(app.prefs.avisos), maxPorHora: app.prefs.maxPorHora });
   if (!alerta) return;
   gravar(chaveEstado(), registrarAlerta(estado, alerta));
   mostrarAlerta(alerta);
@@ -256,8 +256,27 @@ function mostrarAlerta(alerta) {
   $('#agora-perguntar').hidden = !poi && !app.emFoco;
   falar(alerta.tipo === 'chegada' ? `${poi.nome}. ${texto}` : alerta.tipo === 'a-caminho' ? texto : `${ROTULO_ALERTA[alerta.tipo]}. ${texto}`);
   if (navigator.vibrate) navigator.vibrate(VIBRACAO[alerta.tipo] || [100]);
+  const curto = alerta.tipo === 'chegada' ? (poi.teaser || poi.narrativa.curto) : alerta.texto;
+  plat.notificar({ ...alerta, textoCurto: curto }, app.prefs.avisos[alerta.tipo]);
   renderPerto();
 }
+
+/** Toque numa notificação: abre o Passeio com o ponto ou o aviso dela. */
+plat.aoAbrirAlerta((id) => {
+  if (!app.pacote) return;
+  ir('passeio');
+  const poi = app.pacote.pois.find((x) => x.id === id);
+  if (poi) { mostrarAgora(poi, false); return; }
+  const aviso = (app.pacote.avisos || []).find((x) => x.id === id);
+  if (!aviso) return;
+  const c = $('#cartao-agora');
+  c.hidden = false; c.dataset.tipo = aviso.tipo;
+  $('#agora-rotulo').textContent = ROTULO_ALERTA[aviso.tipo];
+  $('#agora-nome').textContent = aviso.titulo || ROTULO_ALERTA[aviso.tipo];
+  $('#agora-texto').textContent = aviso.texto;
+  $('#agora-curiosidades').replaceChildren();
+  $('#agora-mais').hidden = true;
+});
 
 function mostrarAgora(poi, falarJa) {
   const c = $('#cartao-agora');
@@ -484,7 +503,46 @@ function alertaFaixa(msg) {
 }
 
 // ---------- Preferências ----------
+function renderAvisos() {
+  $('#lista-avisos').replaceChildren(...plat.TIPOS_CONFIGURAVEIS.map(({ tipo, nome, exemplo }) => {
+    const sel = el('select', { id: `aviso-${tipo}`, 'aria-label': `Como avisar: ${nome}`, onchange: (e) => {
+      app.prefs.avisos = { ...app.prefs.avisos, [tipo]: e.target.value };
+      gravar('prefs', app.prefs);
+      if (e.target.value === 'notificar') pedirNotificacoesSePreciso();
+    } }, Object.entries(plat.MODOS).map(([v, rotulo]) => el('option', { value: v }, rotulo)));
+    sel.value = app.prefs.avisos[tipo];
+    return el('label', { class: 'aviso-linha' }, el('strong', {}, nome, ' ', el('span', {}, `· ${exemplo}`)), sel);
+  }));
+  renderEstadoNotificacoes();
+}
+
+function renderEstadoNotificacoes() {
+  const estado = plat.estadoNotificacoes();
+  const algumNotifica = Object.values(app.prefs.avisos).includes('notificar');
+  const txt = plat.ehAppNativo()
+    ? 'App Android: os avisos marcados para notificar chegam mesmo com a tela bloqueada, enquanto a caminhada estiver ativa.'
+    : {
+      concedida: 'Notificações permitidas. No navegador elas chegam quando você troca de app, enquanto ele mantiver a página ativa; com a tela bloqueada, só no app Android.',
+      perguntar: 'Para receber notificações quando sair do app, permita as notificações.',
+      negada: 'As notificações estão bloqueadas nas configurações do navegador para este site.',
+      indisponivel: 'Este navegador não oferece notificações. Os avisos aparecem com o app aberto.',
+    }[estado];
+  $('#estado-notificacoes').textContent = algumNotifica ? txt : 'Nenhum tipo está marcado para notificar.';
+  $('#btn-notificacoes').hidden = !(algumNotifica && estado === 'perguntar');
+}
+async function pedirNotificacoesSePreciso() {
+  if (plat.estadoNotificacoes() === 'perguntar') await plat.pedirNotificacoes();
+  renderEstadoNotificacoes();
+}
+$('#btn-notificacoes').addEventListener('click', pedirNotificacoesSePreciso);
+$('#pref-limite').addEventListener('change', (e) => {
+  app.prefs.maxPorHora = e.target.value ? Number(e.target.value) : null;
+  gravar('prefs', app.prefs);
+});
+
 function aplicarPrefs() {
+  $('#pref-limite').value = app.prefs.maxPorHora ? String(app.prefs.maxPorHora) : '';
+  renderAvisos();
   $('#pref-frequencia').value = app.prefs.frequencia;
   $('#pref-nivel').value = app.prefs.nivel;
   $('#pref-voz').checked = app.prefs.voz;
@@ -501,12 +559,12 @@ for (const [id, chave, tipo] of [['#pref-frequencia', 'frequencia'], ['#pref-niv
       if (ativo) iniciarPasseio();
       atualizarSelos(); renderPerto();
     }
-    if (chave === 'voz' && !app.prefs.voz && 'speechSynthesis' in window) speechSynthesis.cancel();
+    if (chave === 'voz' && !app.prefs.voz) plat.pararFala();
   });
 }
 $('#btn-apagar').addEventListener('click', () => {
   encerrarPasseio({ resumo: false }); apagarTudo();
-  app.prefs = { ...PREFS_PADRAO }; app.conversa = []; app.pacote = null; app.emFoco = null; app.pos = null; app.trajeto = []; app.rumoCaminhada = null;
+  app.prefs = carregarPrefs(); app.conversa = []; app.pacote = null; app.emFoco = null; app.pos = null; app.trajeto = []; app.rumoCaminhada = null;
   aplicarPrefs(); desligarSimulacao();
   $('#cartao-agora').hidden = true; $('#cartao-resumo').hidden = true; $('#passeio').hidden = true; $('#sem-pacote').hidden = false;
   atualizarFila(); atualizarSelos(); renderDestinos();
@@ -526,6 +584,9 @@ async function iniciar() {
   atualizarFila(); atualizarSelos();
   // Modo companheiro ao abrir: começa a acompanhar o trajeto sem precisar de toque (a voz pode pedir um toque no iPhone).
   if (p && app.prefs.auto) iniciarPasseio();
+  // Aberto pelo toque numa notificação com o app fechado.
+  const alertaUrl = new URLSearchParams(location.search).get('alerta');
+  if (p && alertaUrl && window.guiaAbrirAlerta) window.guiaAbrirAlerta(alertaUrl);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (online()) {
     try {

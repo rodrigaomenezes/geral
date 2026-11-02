@@ -99,15 +99,33 @@
       <h3 class="secao">Destinos</h3>
       <ul id="lista-destinos" class="lista-destinos"></ul>
 
-      <h3 class="secao">Preferências</h3>
+      <h3 class="secao">Avisos do companheiro</h3>
       <div class="cartao preferencias">
-        <label>Frequência das narrações
+        <label>Frequência
           <select id="pref-frequencia">
-            <option value="pouco">Pouca (só o essencial)</option>
-            <option value="normal">Normal</option>
-            <option value="muito">Muita</option>
+            <option value="pouco">Pouca: no máximo um aviso a cada 4 min</option>
+            <option value="normal">Normal: até um aviso a cada 45 s</option>
+            <option value="muito">Muita: até um aviso a cada 15 s</option>
           </select>
         </label>
+        <label>Limite por hora
+          <select id="pref-limite">
+            <option value="">Sem limite</option>
+            <option value="4">No máximo 4 por hora</option>
+            <option value="8">No máximo 8 por hora</option>
+            <option value="15">No máximo 15 por hora</option>
+          </select>
+        </label>
+        <p class="dica">Avisos importantes não entram no limite.</p>
+        <div id="lista-avisos" class="lista-avisos"></div>
+        <div class="notificacoes">
+          <p id="estado-notificacoes" class="dica"></p>
+          <button class="btn" id="btn-notificacoes" hidden>Permitir notificações</button>
+        </div>
+      </div>
+
+      <h3 class="secao">Preferências</h3>
+      <div class="cartao preferencias">
         <label>Nível de detalhe
           <select id="pref-nivel">
             <option value="curto">Curto</option>

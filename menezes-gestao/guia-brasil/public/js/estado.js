@@ -20,7 +20,7 @@ export function apagarTudo() {
   try { Object.keys(localStorage).filter((k) => k.startsWith(PREFIXO)).forEach((k) => localStorage.removeItem(k)); } catch { /* nada a fazer */ }
 }
 
-export const PREFS_PADRAO = { frequencia: 'normal', nivel: 'medio', voz: true, simulacao: false, auto: false };
+export const PREFS_PADRAO = { frequencia: 'normal', nivel: 'medio', voz: true, simulacao: false, auto: false, maxPorHora: null };
 
 /** Fila do que só a internet resolve. Fotos ocupam espaço: guardamos no máximo MAX_FOTOS. */
 export const MAX_FILA = 20;
