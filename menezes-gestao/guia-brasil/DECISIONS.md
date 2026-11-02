@@ -41,3 +41,21 @@ usuário e plano; com mais de uma réplica, precisa de armazenamento compartilha
 **Decisão:** cada avaliação tem um id; o servidor ignora id repetido durante a vida do processo.
 **Por quê:** a fila reenvia ao reconectar e não pode duplicar. Limitação: após reinício o conjunto de ids zera;
 com banco de dados, virar chave única.
+
+# G-009 — Companheiro de caminhada no núcleo, com prioridade fixa e intervalos medidos
+**Decisão:** o modo Passeio vira o companheiro: `proximoAlerta` escolhe um alerta por vez na ordem importante >
+chegada > logo à frente > dica > novidade. Avisos importantes furam a frequência; dicas e novidades esperam 20 s.
+Frequência normal caiu de 90 s para 45 s (pouca: 4 min; muita: 15 s). `decidirNarracao` foi removida.
+**Por quê:** simulando a rota de Salvador a 1,3 m/s, com 90 s o guia atravessava 2 pontos calado e nunca dava as
+dicas; com estes valores cobre 11 de 11 pontos e 4 de 4 avisos sem repetir (teste `rota de Salvador no modo normal`).
+
+# G-010 — "Logo à frente" só com direção conhecida
+**Decisão:** a direção vem do próprio trajeto (últimos 40 m), não da bússola; sem pelo menos 15 m andados, o
+companheiro não anuncia nada à distância.
+**Por quê:** a bússola mostra para onde o celular aponta, não para onde a pessoa anda; anunciar sem direção levaria
+a falar do que ficou para trás.
+
+# G-011 — Tela acesa durante a caminhada (Wake Lock)
+**Decisão:** ao começar a caminhar o app pede para manter a tela acesa e pede de novo ao voltar a ficar visível.
+**Por quê:** num PWA o GPS e a voz param quando a tela apaga. Custo: bateria. A versão nativa (G-002) troca isso por
+geofencing em segundo plano.
