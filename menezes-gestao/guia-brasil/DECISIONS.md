@@ -113,3 +113,16 @@ nos ajustes (iPhone: Sites do Safari). No iPhone, o primeiro toque em "Ouvir" av
 **Por quê:** no iPhone, o atalho da tela inicial tem armazenamento separado do Safari: o destino baixado no Safari
 não existia no atalho, e sem destino o app bloqueava conversa, foto e GPS sem dizer por quê ("nada funciona"). Os
 registros do servidor confirmaram: nenhuma pergunta chegava.
+
+# G-017 — Qualquer lugar: destino montado na hora com Wikipédia e OpenStreetMap
+**Decisão:** em Viagem a pessoa busca uma cidade ou lugar (OpenStreetMap/Nominatim) ou toca *Guia de onde estou*
+(GPS). O servidor monta um pacote no formato de sempre (`validarPacote`) com até 30 artigos da Wikipédia em português
+que têm coordenadas num raio de 10 km, o resumo de cada um em três níveis e a fonte (link do artigo, CC BY-SA, exibido
+no cartão). O app guarda em "meus lugares" (até 10) e usa como qualquer destino: narração, companheiro, offline.
+Cache em memória por 24 h; chamadas ao Nominatim espaçadas em ≥1 s e identificadas (User-Agent), como pede a
+política de uso. No Passeio, *Usar minha localização* lê o GPS com o toque da pessoa e mostra o resultado; o cartão
+da simulação tem *Usar meu GPS de verdade*.
+**Por quê:** só havia Salvador; o app não servia em nenhum outro lugar. Curar conteúdo cidade a cidade não escala no
+teste; a Wikipédia dá texto verificável com licença que permite reuso com atribuição.
+**Limites:** sem curadoria (pode entrar rua ou escola com artigo); sem avisos de segurança; Nominatim público não é
+para volume alto (com muitos usuários, trocar por serviço pago ou próprio, com decisão nova).

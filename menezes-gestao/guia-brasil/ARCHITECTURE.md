@@ -26,6 +26,7 @@ Celular (PWA)                                      Servidor (Node, sem framework
 | `android/` | APK: WebView do app + serviço de GPS em primeiro plano, voz e notificação nativas (ponte `GuiaNativo`) | Regras (entrega posições ao JavaScript) |
 | `public/sw.js` | Guarda a casca do app para abrir offline | Guardar POST, pacotes |
 | `server/pacotes.js` | Carrega e valida pacotes, ETag | — |
+| `server/descoberta.js` | Busca de lugares (Nominatim) e destino gerado ao redor de uma coordenada (Wikipédia), com cache | Curadoria |
 | `server/guia.js` | Conversa e foto: motor `ia` (Claude) com queda para `local` | HTTP |
 | `server/server.js` | Rotas, validação de entrada, limite por IP, arquivos estáticos | Regras de guia |
 
@@ -36,7 +37,7 @@ e os testes cobrem os dois de uma vez.
 
 ### Pacote de viagem (`pacotes/*.json`, `versao: 1`)
 `{ versao, id, nome, cidade, pais, idioma, atualizadoEm, centro:{lat,lng}, rotaDemonstracao:[poiId], pois:[…], perguntasGerais:[{p,r,chaves}] }`
-POI: `{ id (a-z0-9-), nome, categoria, lat, lng, raioM, teaser?, narrativa:{curto,medio,longo}, curiosidades:[], perguntas:[{p,r,chaves}] }`.
+POI: `{ id (a-z0-9-), nome, categoria, lat, lng, raioM, teaser?, fonte?:{nome,url https}, narrativa:{curto,medio,longo}, curiosidades:[], perguntas:[{p,r,chaves}] }`.
 `teaser` = chamada de uma frase usada no "Logo à frente" (sem ele, usa a primeira curiosidade).
 Aviso (opcional, `avisos:[…]`): `{ id, tipo:'importante'|'dica'|'novidade', titulo?, lat, lng, raioM, texto }`. Ids de avisos e
 pontos não podem se repetir. Campos opcionais: pacotes antigos continuam válidos sem mudar a `versao`.
@@ -51,6 +52,8 @@ Validado ao subir o servidor (`validarPacote`); pacote inválido impede o boot. 
 | `GET /api/pacotes/:id` | `If-None-Match` | pacote (ETag) ou 304 |
 | `POST /api/conversa` | `{ pacoteId?, mensagem ≤600, pos?, poiId?, historico? ≤8, nivel? }` | `{ texto, poiId, motor:'ia'|'local', modelo?, confianca?, semResposta?, erroIa? }` |
 | `POST /api/foto` | `{ pacoteId?, imagem: dataURL jpeg/png/webp ≤5 MB, pos?, direcao?, pergunta? }` | `{ identificado, poiId, titulo, explicacao, curiosidades[≤3], alternativas, motor, erroIa? }` |
+| `GET /api/lugares?q=` | nome (2–80) | `[{ nome, detalhe, lat, lng }]` (até 6) |
+| `GET /api/perto?lat=&lng=&nome?` | coordenada | pacote gerado (`gerado: true`, pontos com `fonte`) ou 502 com motivo |
 | `POST /api/feedback` | `{ id (idempotência), pacoteId, tipo:'util'|'errado', poiId?, motor?, resposta?, comentario? }` | 204 |
 
 `pacoteId` é opcional em conversa e foto (G-016): sem ele, a IA responde pelo conhecimento geral e pela posição; um
