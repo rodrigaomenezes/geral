@@ -57,10 +57,15 @@ function contexto(pacote, pos, poiId) {
 
 const NIVEL = { curto: 'Responda em no máximo 2 frases.', medio: 'Responda em 2 a 4 frases.', longo: 'Pode responder com até 2 parágrafos curtos.' };
 
-function respostaLocalConversa(pacote, mensagem, poiId) {
+const SEM_RESPOSTA = {
+  semIa: 'Ainda não sei responder isso. Por enquanto respondo só sobre o conteúdo desta viagem: os pontos turísticos, a história e a comida típica. Experimente uma das sugestões abaixo.',
+  iaFalhou: 'Não consegui consultar a IA agora e essa resposta não está no conteúdo desta viagem. Tente de novo em instantes.',
+};
+
+function respostaLocalConversa(pacote, mensagem, poiId, motivo = 'semIa') {
   const r = responderLocal(pacote, mensagem, poiId);
   if (r) return { texto: r.texto, poiId: r.poiId, motor: 'local', confianca: r.confianca };
-  return { texto: 'Ainda não tenho essa resposta no conteúdo desta viagem. Quando houver internet, posso pesquisar com mais detalhe.', poiId: null, motor: 'local', confianca: 0, semResposta: true };
+  return { texto: SEM_RESPOSTA[motivo], poiId: null, motor: 'local', confianca: 0, semResposta: true };
 }
 
 /** Conversa: { pacote, mensagem, pos, poiId, historico:[{papel:'usuario'|'guia', texto}], nivel } */
@@ -91,7 +96,7 @@ export async function conversar(entrada, cliente) {
     if (!texto) throw new Error('Resposta vazia da IA.');
     return { texto, poiId: poiId || null, motor: 'ia', modelo: resp.model };
   } catch (e) {
-    return { ...respostaLocalConversa(pacote, mensagem, poiId), erroIa: String(e?.message || e).slice(0, 160) };
+    return { ...respostaLocalConversa(pacote, mensagem, poiId, 'iaFalhou'), erroIa: String(e?.message || e).slice(0, 160) };
   }
 }
 

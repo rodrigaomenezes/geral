@@ -193,3 +193,10 @@ main { padding: 8px 16px 24px; max-width: 640px; margin: 0 auto; }
 /* Opções com texto longo não podem alargar a tela em 360 px */
 .preferencias > *, .lista-avisos > * { min-width: 0; }
 .preferencias select { width: 100%; max-width: 100%; text-overflow: ellipsis; }
+
+/* Conversa: sugestões de perguntas e respiro acima da caixa de digitação */
+.mensagens { padding-bottom: 12px; }
+.msg { scroll-margin-bottom: calc(170px + env(safe-area-inset-bottom)); }
+.sugestoes { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 8px; }
+.sugestao { border: 1px solid var(--linha); background: var(--superficie); color: var(--mar-2); font-weight: 600; font-size: .88rem;
+  border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; text-align: left; }
