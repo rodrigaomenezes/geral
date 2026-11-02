@@ -29,6 +29,8 @@ import org.json.JSONObject;
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     static final String URL_INICIAL = "https://geral-production.up.railway.app/";
     static final String HOST = "geral-production.up.railway.app";
+    /** Login da "Sua IA" (OpenRouter, decisão G-015): precisa abrir DENTRO do app para a volta cair na mesma tela. */
+    static final String HOST_LOGIN_IA = "openrouter.ai";
     static final int REQ_ARQUIVO = 1, REQ_GPS_WEB = 2, REQ_GPS_CAMINHADA = 3;
     static MainActivity atual;
     static boolean visivel = false;
@@ -56,7 +58,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         s.setDatabaseEnabled(true);
         s.setGeolocationEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setUserAgentString(s.getUserAgentString() + " GuIABrasilApp/0.3");
+        s.setUserAgentString(s.getUserAgentString() + " GuIABrasilApp/0.4");
         prioridadeAlta(web);
 
         web.setWebViewClient(new WebViewClient() {
@@ -119,7 +121,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     /** Links de fora do app (mapas, sites) abrem no app correspondente. */
     boolean abrirFora(Uri u) {
         String esquema = u.getScheme() == null ? "" : u.getScheme();
-        if ((esquema.equals("https") || esquema.equals("http")) && HOST.equals(u.getHost())) return false;
+        String host = u.getHost() == null ? "" : u.getHost();
+        boolean doApp = HOST.equals(host) || HOST_LOGIN_IA.equals(host) || host.endsWith("." + HOST_LOGIN_IA);
+        if ((esquema.equals("https") || esquema.equals("http")) && doApp) return false;
         try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { /* sem app para o link */ }
         return true;
     }
