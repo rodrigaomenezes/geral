@@ -55,6 +55,14 @@ function contexto(pacote, pos, poiId) {
   return `CONTEÚDO DO PACOTE "${pacote.nome}"${posicaoValida(pos) ? ` · posição do viajante: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : ' · posição desconhecida'}\n\n${linhas.join('\n\n')}`;
 }
 
+/** Erro da IA para a resposta. Com a IA da pessoa, 401/402 viram um aviso que o app sabe mostrar. */
+function erroDaIa(e, cliente) {
+  const out = { erroIa: String(e?.message || e).slice(0, 160) };
+  if (cliente && cliente.provedor === 'openrouter' && (e?.status === 401 || e?.status === 403)) out.iaUsuario = 'invalida';
+  if (cliente && cliente.provedor === 'openrouter' && e?.status === 402) out.iaUsuario = 'sem-creditos';
+  return out;
+}
+
 const NIVEL = { curto: 'Responda em no máximo 2 frases.', medio: 'Responda em 2 a 4 frases.', longo: 'Pode responder com até 2 parágrafos curtos.' };
 
 const SEM_RESPOSTA = {
@@ -94,9 +102,9 @@ export async function conversar(entrada, cliente) {
     if (resp.stop_reason === 'refusal') throw new Error('A IA não respondeu a esta pergunta.');
     const texto = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
     if (!texto) throw new Error('Resposta vazia da IA.');
-    return { texto, poiId: poiId || null, motor: 'ia', modelo: resp.model };
+    return { texto, poiId: poiId || null, motor: 'ia', modelo: resp.model, provedor: cliente.provedor || 'servidor' };
   } catch (e) {
-    return { ...respostaLocalConversa(pacote, mensagem, poiId, 'iaFalhou'), erroIa: String(e?.message || e).slice(0, 160) };
+    return { ...respostaLocalConversa(pacote, mensagem, poiId, 'iaFalhou'), ...erroDaIa(e, cliente) };
   }
 }
 
@@ -133,8 +141,8 @@ export async function explicarFoto(entrada, cliente) {
     const poiValido = pacote.pois.some((p) => p.id === r.poiId) ? r.poiId : null;
     return { identificado: !!r.identificado, poiId: poiValido, titulo: String(r.titulo || '').slice(0, 120) || 'Foto analisada',
       explicacao: String(r.explicacao || '').slice(0, 1500), curiosidades: (r.curiosidades || []).slice(0, 3).map((c) => String(c).slice(0, 300)),
-      alternativas: [], motor: 'ia', modelo: resp.model };
+      alternativas: [], motor: 'ia', modelo: resp.model, provedor: cliente.provedor || 'servidor' };
   } catch (e) {
-    return { ...fotoLocal(pacote, pos, direcao), erroIa: String(e?.message || e).slice(0, 160) };
+    return { ...fotoLocal(pacote, pos, direcao), ...erroDaIa(e, cliente) };
   }
 }

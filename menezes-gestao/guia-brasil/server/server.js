@@ -5,6 +5,7 @@ import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { carregarPacotes, resumo } from './pacotes.js';
 import { conversar, explicarFoto, criarCliente, MODELO } from './guia.js';
+import { clienteOpenRouter, chaveValida, modeloValido, MODELO_PADRAO_USUARIO } from './openrouter.js';
 import { posicaoValida, NIVEIS } from '../public/js/nucleo.js';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -73,7 +74,7 @@ export function validarFeedback(b, pacotes) {
   return { id, pacoteId: b.pacoteId, poiId: texto(b.poiId, 64) || null, tipo: b.tipo, motor: texto(b.motor, 10), resposta: texto(b.resposta, 1500), comentario: texto(b.comentario, 500) };
 }
 
-export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), pastaDados = process.env.GUIA_DADOS || join(RAIZ, 'dados'), cliente, limitador = criarLimitador(), log = console } = {}) {
+export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), pastaDados = process.env.GUIA_DADOS || join(RAIZ, 'dados'), cliente, limitador = criarLimitador(), log = console, fetchIA = fetch } = {}) {
   const pacotes = carregarPacotes(pastaPacotes);
   const ia = cliente === undefined ? await criarCliente() : cliente;
   const feedbackVistos = new Set(); // idempotência: o app reenvia da fila e não pode duplicar
@@ -83,6 +84,15 @@ export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), past
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra });
     res.end(JSON.stringify(corpo));
   };
+
+  /** "Sua IA": a pessoa conectou a conta dela (OpenRouter) no app; a chave vem por cabeçalho a cada pedido. */
+  function iaDoPedido(req) {
+    const chave = req.headers['x-guia-ia-chave'];
+    if (!chave) return null;
+    if (!chaveValida(chave)) throw new ErroHttp(400, 'A conexão com a sua IA está inválida. Conecte de novo em Viagem.');
+    const modelo = req.headers['x-guia-ia-modelo'];
+    return clienteOpenRouter(chave, modeloValido(modelo) ? modelo : MODELO_PADRAO_USUARIO, { fetchImpl: fetchIA });
+  }
 
   async function estatico(req, res, caminho) {
     const rel = normalize(decodeURIComponent(caminho === '/' ? '/index.html' : caminho)).replace(/^([/\\])+/, '');
@@ -112,8 +122,10 @@ export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), past
       if (!limitador(ip)) throw new ErroHttp(429, 'Muitas perguntas em pouco tempo. Tente de novo em alguns minutos.');
       const corpo = await lerCorpo(req);
       const inicio = Date.now();
-      const r = p === '/api/conversa' ? await conversar(validarConversa(corpo, pacotes), ia) : await explicarFoto(validarFoto(corpo, pacotes), ia);
-      log.info(JSON.stringify({ rota: p, motor: r.motor, ms: Date.now() - inicio, erroIa: r.erroIa || undefined }));
+      const motorIa = iaDoPedido(req) || ia;
+      const r = p === '/api/conversa' ? await conversar(validarConversa(corpo, pacotes), motorIa) : await explicarFoto(validarFoto(corpo, pacotes), motorIa);
+      // Nunca registrar a chave da pessoa: só o provedor e o resultado.
+      log.info(JSON.stringify({ rota: p, motor: r.motor, provedor: r.provedor, ms: Date.now() - inicio, erroIa: r.erroIa || undefined }));
       return json(res, 200, r);
     }
     if (req.method === 'POST' && p === '/api/feedback') {
