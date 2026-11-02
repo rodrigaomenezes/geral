@@ -138,3 +138,24 @@ test('limitador barra excesso por IP e libera depois da janela', async () => {
     assert.equal((await s2.chamar('/api/conversa', corpo)).status, 429);
   } finally { s2.fechar(); }
 });
+
+test('sem destino escolhido: conversa e foto funcionam (com IA respondem; sem IA orientam)', async () => {
+  const semIa = await s.chamar('/api/conversa', { mensagem: 'o que tem para ver aqui perto?', pos: { lat: -20.3, lng: -40.3 } });
+  assert.equal(semIa.status, 200);
+  assert.equal(semIa.corpo.semResposta, true);
+  assert.match(semIa.corpo.texto, /escolha um destino em Viagem/);
+  const foto = await s.chamar('/api/foto', { imagem: FOTO });
+  assert.equal(foto.status, 200);
+  assert.equal(foto.corpo.identificado, false);
+  // destino informado e inexistente continua 404
+  assert.equal((await s.chamar('/api/conversa', { pacoteId: 'nao-existe', mensagem: 'oi' })).status, 404);
+
+  let pedido;
+  const cliente = { beta: { messages: { create: async (req) => { pedido = req; return { model: 'm', stop_reason: 'end_turn', content: [{ type: 'text', text: 'Perto de você há...' }] }; } } } };
+  const ia = await subir({ cliente });
+  try {
+    const r = await ia.chamar('/api/conversa', { mensagem: 'o que tem para ver aqui perto?', pos: { lat: -20.3, lng: -40.3 } });
+    assert.deepEqual([r.corpo.motor, r.corpo.texto], ['ia', 'Perto de você há...']);
+    assert.match(pedido.messages.at(-1).content, /SEM DESTINO BAIXADO · posição do viajante: -20\.30000, -40\.30000/);
+  } finally { ia.fechar(); }
+});

@@ -6,6 +6,9 @@ import { proximos, candidatosFoto, responderLocal, posicaoValida } from '../publ
 
 export const MODELO = process.env.GUIA_IA_MODELO || 'claude-opus-5-5';
 
+/** Quando a pessoa ainda não escolheu destino: sem pontos curados, a IA usa conhecimento geral e a posição. */
+export const SEM_DESTINO = Object.freeze({ id: null, nome: 'nenhum destino escolhido', semDestino: true, pois: [], perguntasGerais: [], avisos: [] });
+
 const SISTEMA = `Você é o GuIA Brasil, um guia turístico experiente, simpático e preciso, falando com um viajante pelo celular.
 Regras:
 - Responda no idioma do viajante, em tom de conversa de guia. Primeiro o essencial em 2 a 4 frases; aprofunde só se pedirem.
@@ -52,7 +55,9 @@ function contexto(pacote, pos, poiId) {
     ...(poi.curiosidades || []).map((c) => `Curiosidade: ${c}`),
     ...(poi.perguntas || []).map((f) => `P: ${f.p} R: ${f.r}`),
   ].join('\n'));
-  return `CONTEÚDO DO PACOTE "${pacote.nome}"${posicaoValida(pos) ? ` · posição do viajante: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : ' · posição desconhecida'}\n\n${linhas.join('\n\n')}`;
+  const onde = posicaoValida(pos) ? ` · posição do viajante: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : ' · posição desconhecida';
+  if (pacote.semDestino) return `SEM DESTINO BAIXADO${onde}. Não há conteúdo curado: responda com conhecimento geral consolidado e deixe claro quando não tiver certeza.`;
+  return `CONTEÚDO DO PACOTE "${pacote.nome}"${onde}\n\n${linhas.join('\n\n')}`;
 }
 
 /** Erro da IA para a resposta. Com a IA da pessoa, 401/402 viram um aviso que o app sabe mostrar. */
@@ -68,12 +73,13 @@ const NIVEL = { curto: 'Responda em no máximo 2 frases.', medio: 'Responda em 2
 const SEM_RESPOSTA = {
   semIa: 'Ainda não sei responder isso. Por enquanto respondo só sobre o conteúdo desta viagem: os pontos turísticos, a história e a comida típica. Experimente uma das sugestões abaixo.',
   iaFalhou: 'Não consegui consultar a IA agora e essa resposta não está no conteúdo desta viagem. Tente de novo em instantes.',
+  semDestino: 'Para eu responder sem IA, escolha um destino em Viagem: aí falo dos pontos turísticos, da história e da comida típica. Para perguntas livres sobre qualquer lugar, conecte sua IA em Viagem.',
 };
 
 function respostaLocalConversa(pacote, mensagem, poiId, motivo = 'semIa') {
   const r = responderLocal(pacote, mensagem, poiId);
   if (r) return { texto: r.texto, poiId: r.poiId, motor: 'local', confianca: r.confianca };
-  return { texto: SEM_RESPOSTA[motivo], poiId: null, motor: 'local', confianca: 0, semResposta: true };
+  return { texto: SEM_RESPOSTA[pacote.semDestino && motivo === 'semIa' ? 'semDestino' : motivo], poiId: null, motor: 'local', confianca: 0, semResposta: true };
 }
 
 /** Conversa: { pacote, mensagem, pos, poiId, historico:[{papel:'usuario'|'guia', texto}], nivel } */

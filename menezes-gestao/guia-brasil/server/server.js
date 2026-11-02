@@ -4,7 +4,7 @@ import { readFile, appendFile, mkdir } from 'node:fs/promises';
 import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { carregarPacotes, resumo } from './pacotes.js';
-import { conversar, explicarFoto, criarCliente, MODELO } from './guia.js';
+import { conversar, explicarFoto, criarCliente, MODELO, SEM_DESTINO } from './guia.js';
 import { clienteOpenRouter, chaveValida, modeloValido, MODELO_PADRAO_USUARIO } from './openrouter.js';
 import { posicaoValida, NIVEIS } from '../public/js/nucleo.js';
 
@@ -46,9 +46,17 @@ function lerCorpo(req) {
 const texto = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const pos = (p) => (p && posicaoValida({ lat: +p.lat, lng: +p.lng }) ? { lat: +p.lat, lng: +p.lng, precisao: Number.isFinite(+p.precisao) ? +p.precisao : undefined } : null);
 
-export function validarConversa(b, pacotes) {
+/** Destino é opcional na conversa e na foto: sem ele, a IA responde pelo conhecimento geral e pela posição.
+ *  Um destino informado que não existe continua sendo erro (404). */
+function pacoteDoPedido(b, pacotes) {
+  if (b.pacoteId == null || b.pacoteId === '') return { pacote: SEM_DESTINO };
   const reg = pacotes.get(b.pacoteId);
   if (!reg) throw new ErroHttp(404, 'Pacote não encontrado.');
+  return reg;
+}
+
+export function validarConversa(b, pacotes) {
+  const reg = pacoteDoPedido(b, pacotes);
   const mensagem = texto(b.mensagem, 600);
   if (!mensagem) throw new ErroHttp(400, 'Escreva uma pergunta.');
   const historico = Array.isArray(b.historico) ? b.historico.slice(-8).map((h) => ({ papel: h && h.papel === 'guia' ? 'guia' : 'usuario', texto: texto(h && h.texto, 1500) })).filter((h) => h.texto) : [];
@@ -57,8 +65,7 @@ export function validarConversa(b, pacotes) {
 }
 
 export function validarFoto(b, pacotes) {
-  const reg = pacotes.get(b.pacoteId);
-  if (!reg) throw new ErroHttp(404, 'Pacote não encontrado.');
+  const reg = pacoteDoPedido(b, pacotes);
   const m = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(typeof b.imagem === 'string' ? b.imagem : '');
   if (!m || !MIMES_IMAGEM.has(m[1])) throw new ErroHttp(400, 'Envie uma foto JPEG, PNG ou WebP.');
   if (m[2].length > LIMITE_IMAGEM_B64) throw new ErroHttp(413, 'Foto grande demais.');
