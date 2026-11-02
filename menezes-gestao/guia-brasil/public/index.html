@@ -37,12 +37,19 @@
           <button id="btn-passeio" class="btn primario grande" aria-pressed="false">Começar a caminhar</button>
           <p id="placar" class="placar" hidden aria-live="polite"></p>
           <p id="dica-passeio" class="dica">Eu acompanho o seu trajeto e aviso sozinho quando houver algo interessante por perto.</p>
+          <div class="linha-gps">
+            <p id="estado-gps" class="dica" aria-live="polite">Localização ainda não lida.</p>
+            <button class="btn pequeno" id="btn-localizar" type="button">Usar minha localização</button>
+          </div>
         </div>
 
         <article id="cartao-longe" class="cartao" hidden>
           <p class="rotulo">Longe dos pontos</p>
           <p id="longe-texto"></p>
-          <div class="acoes"><button class="btn" id="btn-ligar-simulacao">Ligar simulação</button></div>
+          <div class="acoes">
+            <button class="btn primario" id="btn-guia-aqui">Guia de onde estou</button>
+            <button class="btn" id="btn-ligar-simulacao">Ligar simulação</button>
+          </div>
         </article>
 
         <article id="cartao-agora" class="cartao destaque" hidden aria-live="polite">
@@ -50,6 +57,7 @@
           <h2 id="agora-nome"></h2>
           <p id="agora-texto"></p>
           <ul id="agora-curiosidades" class="curiosidades"></ul>
+          <p class="motor"><a id="agora-fonte" target="_blank" rel="noopener" hidden></a></p>
           <div class="acoes">
             <button class="btn" id="agora-ouvir">Ouvir</button>
             <button class="btn" id="agora-mais">Contar mais</button>
@@ -68,6 +76,7 @@
           <p class="dica">Você não está no destino: avance pela rota de demonstração para testar.</p>
           <button class="btn" id="btn-avancar">Andar até o próximo ponto</button>
           <p id="sim-onde" class="dica"></p>
+          <button class="btn" id="btn-sair-simulacao" type="button">Usar meu GPS de verdade</button>
         </div>
 
         <h3 class="secao">Por perto</h3>
@@ -103,6 +112,17 @@
 
     <!-- VIAGEM -->
     <section id="tela-viagem" class="tela" data-tela="viagem" hidden>
+      <h3 class="secao">Para onde você vai?</h3>
+      <div class="cartao busca">
+        <form id="form-busca" class="linha-busca" role="search">
+          <input id="entrada-busca" class="campo" type="search" maxlength="80" placeholder="Cidade ou lugar (ex.: Ouro Preto)" autocomplete="off" enterkeyhint="search">
+          <button class="btn primario" type="submit">Buscar</button>
+        </form>
+        <ul id="resultados-busca" class="resultados-busca"></ul>
+        <button class="btn grande" id="btn-guia-aqui-viagem" type="button">Guia de onde estou agora</button>
+        <p class="dica">Fora dos destinos curados, o guia monta o roteiro na hora com os artigos da Wikipédia sobre os lugares ao redor.</p>
+      </div>
+
       <h3 class="secao">Destinos</h3>
       <ul id="lista-destinos" class="lista-destinos"></ul>
 
