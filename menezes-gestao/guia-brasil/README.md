@@ -13,7 +13,7 @@ vídeo (RF04), diário (RF08), roteiros (RF09), contas e pagamento (RF11), afili
 cd menezes-gestao/guia-brasil
 npm install        # só instala o pacote opcional da IA
 npm start          # http://localhost:3000
-npm test           # 30 testes (núcleo, companheiro, servidor e Sua IA)
+npm test           # 31 testes (núcleo, companheiro, servidor e Sua IA)
 ```
 
 Sem chave de IA o app funciona no **modo local**: narração, perguntas frequentes e identificação de foto por GPS
@@ -86,7 +86,10 @@ Use sempre a mesma chave de assinatura (`GUIA_KEYSTORE`/`GUIA_KEYPASS`) para o A
   Não foi testado em aparelho.
 - Sem mapa desenhado: a tela mostra a lista por distância com seta de direção (mapa offline entra com MapLibre).
 - IA local no aparelho ainda não usada: offline, a conversa responde só o que está no pacote (decisão G-004).
-- Voz e ditado dependem do navegador; o ditado não existe no Firefox nem em alguns Androids.
+- Voz e ditado dependem do navegador; o ditado não existe no Firefox nem em alguns Androids. **No iPhone a voz
+  fica muda com o modo silencioso ligado** (o app avisa no primeiro "Ouvir").
+- No iPhone, o atalho da tela inicial guarda os dados separado do Safari: destino, conexão da IA e preferências
+  precisam ser feitos dentro do atalho (o destino único é baixado sozinho).
 - Sem contas, pagamento nem limite por usuário (só por IP).
 
 Arquitetura e decisões: [`ARCHITECTURE.md`](ARCHITECTURE.md) · [`DECISIONS.md`](DECISIONS.md).
