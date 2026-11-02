@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>GuIA Brasil</title>
+  <meta name="description" content="Seu guia turístico com IA: narra onde você está, explica fotos e conversa, até sem internet.">
+  <meta name="theme-color" content="#0b3d4f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topo">
+    <h1 class="marca" aria-label="GuIA Brasil">Gu<span class="ia">IA</span><small>Brasil</small></h1>
+    <div class="selos">
+      <span id="selo-rede" class="selo" title="Conexão">online</span>
+      <span id="selo-pos" class="selo" title="Localização">sem GPS</span>
+    </div>
+  </header>
+
+  <div id="faixa-fila" class="faixa" hidden></div>
+
+  <main>
+    <!-- PASSEIO -->
+    <section id="tela-passeio" class="tela" data-tela="passeio">
+      <div id="sem-pacote" class="vazio" hidden>
+        <p class="vazio-titulo">Escolha sua viagem para começar</p>
+        <p>Baixe o pacote do destino com Wi-Fi e use o guia mesmo sem internet.</p>
+        <button class="btn primario" data-ir="viagem">Escolher destino</button>
+      </div>
+
+      <div id="passeio" hidden>
+        <div class="controle-passeio">
+          <button id="btn-passeio" class="btn primario grande" aria-pressed="false">Começar passeio</button>
+          <p id="dica-passeio" class="dica">O guia fala sozinho quando você chega perto de um ponto.</p>
+        </div>
+
+        <article id="cartao-agora" class="cartao destaque" hidden aria-live="polite">
+          <p class="rotulo">Você está perto de</p>
+          <h2 id="agora-nome"></h2>
+          <p id="agora-texto"></p>
+          <ul id="agora-curiosidades" class="curiosidades"></ul>
+          <div class="acoes">
+            <button class="btn" id="agora-ouvir">Ouvir</button>
+            <button class="btn" id="agora-mais">Contar mais</button>
+            <button class="btn" id="agora-perguntar">Perguntar</button>
+          </div>
+        </article>
+
+        <div id="simulacao" class="cartao simulacao" hidden>
+          <p class="rotulo">Modo simulação</p>
+          <p class="dica">Você não está no destino: avance pela rota de demonstração para testar.</p>
+          <button class="btn" id="btn-avancar">Andar até o próximo ponto</button>
+          <p id="sim-onde" class="dica"></p>
+        </div>
+
+        <h3 class="secao">Por perto</h3>
+        <ul id="lista-perto" class="lista-pontos"></ul>
+      </div>
+    </section>
+
+    <!-- FOTO -->
+    <section id="tela-foto" class="tela" data-tela="foto" hidden>
+      <div class="cartao">
+        <p class="rotulo">O que é isso?</p>
+        <p class="dica">Fotografe um monumento, uma obra, um prato ou uma placa em outro idioma.</p>
+        <label class="btn primario grande" for="entrada-foto">Tirar foto</label>
+        <input id="entrada-foto" type="file" accept="image/*" capture="environment" hidden>
+        <input id="pergunta-foto" class="campo" type="text" maxlength="300" placeholder="Pergunta sobre a foto (opcional)">
+      </div>
+      <figure id="previa" class="previa" hidden><img id="previa-img" alt="Foto enviada"></figure>
+      <article id="resultado-foto" class="cartao" hidden aria-live="polite"></article>
+    </section>
+
+    <!-- CONVERSA -->
+    <section id="tela-conversa" class="tela" data-tela="conversa" hidden>
+      <ol id="mensagens" class="mensagens" aria-live="polite"></ol>
+      <form id="form-conversa" class="compositor">
+        <button type="button" id="btn-voz" class="btn redondo" aria-label="Falar a pergunta" title="Falar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2Z"/></svg>
+        </button>
+        <input id="entrada-conversa" class="campo" type="text" maxlength="600" placeholder="Pergunte ao seu guia..." autocomplete="off">
+        <button type="submit" class="btn primario">Enviar</button>
+      </form>
+    </section>
+
+    <!-- VIAGEM -->
+    <section id="tela-viagem" class="tela" data-tela="viagem" hidden>
+      <h3 class="secao">Destinos</h3>
+      <ul id="lista-destinos" class="lista-destinos"></ul>
+
+      <h3 class="secao">Preferências</h3>
+      <div class="cartao preferencias">
+        <label>Frequência das narrações
+          <select id="pref-frequencia">
+            <option value="pouco">Pouca</option>
+            <option value="normal">Normal</option>
+            <option value="muito">Muita</option>
+          </select>
+        </label>
+        <label>Nível de detalhe
+          <select id="pref-nivel">
+            <option value="curto">Curto</option>
+            <option value="medio">Médio</option>
+            <option value="longo">Aprofundado</option>
+          </select>
+        </label>
+        <label class="linha"><input type="checkbox" id="pref-voz"> Narrar em voz alta</label>
+        <label class="linha"><input type="checkbox" id="pref-simulacao"> Simular caminhada (para testar fora do destino)</label>
+      </div>
+
+      <h3 class="secao">Privacidade</h3>
+      <div class="cartao">
+        <p class="dica">Sua rota fica só neste aparelho. Fotos e perguntas vão ao servidor apenas para gerar a resposta.</p>
+        <button class="btn" id="btn-apagar">Apagar meus dados deste aparelho</button>
+      </div>
+      <p id="sobre" class="dica centro"></p>
+    </section>
+  </main>
+
+  <nav class="abas" aria-label="Navegação">
+    <button data-ir="passeio" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>Passeio</button>
+    <button data-ir="foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>Foto</button>
+    <button data-ir="conversa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2Z"/></svg>Conversa</button>
+    <button data-ir="viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5Z"/></svg>Viagem</button>
+  </nav>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
