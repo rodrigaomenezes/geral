@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { criarDescoberta, frases, pontoDeArtigo, categoriaTuristica, itensDoWikidata } from '../server/descoberta.js';
+import { criarDescoberta, frases, pontoDeArtigo, categoriaTuristica, itensDoWikidata, pontoDeItem, pontoValido } from '../server/descoberta.js';
 import { validarPacote, proximoAlerta } from '../public/js/nucleo.js';
 import { criarServidor } from '../server/server.js';
 
@@ -174,4 +174,14 @@ test('onde estou: nome do lugar no nível do prédio', async () => {
   assert.equal(o.lugar, 'Mercado de Arte Popular');
   assert.equal(o.cidade, 'Feira de Santana');
   assert.equal(o.texto, 'Mercado de Arte Popular · Centro · Feira de Santana');
+});
+
+test('item sem descrição nem artigo ainda vira texto válido; ponto ruim sai sozinho sem derrubar o destino', () => {
+  // Caso real em Ouro Preto: "Escola de Minas" (Q115617236) só com nome e tipo.
+  const p = pontoDeItem({ qid: 'Q115617236', nome: 'Escola de Minas', lat: -20.38, lng: -43.50, categoria: 'historico', descricao: '', tipos: ['património histórico'] });
+  assert.equal(p.narrativa.curto, 'Escola de Minas: património histórico.');
+  assert.ok(pontoValido(p));
+  const curto = pontoDeItem({ qid: 'Q1', nome: 'Sé', lat: 0, lng: 0, categoria: 'igreja', descricao: '', tipos: [] });
+  assert.ok(curto.narrativa.curto.length >= 20 && pontoValido(curto));
+  assert.equal(pontoValido({ ...p, narrativa: { curto: 'x', medio: 'x', longo: 'x' } }), false);
 });
