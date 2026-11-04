@@ -206,6 +206,7 @@ main { padding: 8px 16px 24px; max-width: 640px; margin: 0 auto; }
 #minha-ia-modelo { margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9rem; }
 
 /* Qualquer lugar e GPS */
+.onde-estou { margin: 10px 0 0; font-weight: 600; color: var(--tinta); overflow-wrap: anywhere; }
 .linha-gps { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--linha); }
 .linha-gps .dica { margin: 0; flex: 1; min-width: 0; }
 .btn.pequeno { min-height: 38px; font-size: .85rem; padding: 0 12px; flex: none; }
