@@ -13,7 +13,7 @@ vídeo (RF04), diário (RF08), roteiros (RF09), contas e pagamento (RF11), afili
 cd menezes-gestao/guia-brasil
 npm install        # só instala o pacote opcional da IA
 npm start          # http://localhost:3000
-npm test           # 35 testes (núcleo, companheiro, servidor, Sua IA e qualquer lugar)
+npm test           # 39 testes (núcleo, companheiro, servidor, Sua IA e qualquer lugar)
 ```
 
 Sem chave de IA o app funciona no **modo local**: narração, perguntas frequentes e identificação de foto por GPS
@@ -62,7 +62,9 @@ Use sempre a mesma chave de assinatura (`GUIA_KEYSTORE`/`GUIA_KEYPASS`) para o A
 ### Roteiro de teste
 
 1. **Viagem** → busque uma cidade (ex.: *Ouro Preto*) ou toque *Guia de onde estou agora*: o roteiro é montado na
-   hora com os artigos da Wikipédia ao redor e fica guardado para usar sem internet. Salvador é o destino curado.
+   hora com os pontos turísticos registrados no Wikidata e na Wikipédia (igrejas, museus, mercados, praças,
+   monumentos, patrimônio) e fica guardado para usar sem internet. O Passeio mostra onde você está ("Você está em
+   Mercado de Arte Popular · Centro · Feira de Santana"). Salvador é o destino curado.
 2. **Companheiro de caminhada** (aba Passeio): toque *Começar a caminhar* e siga andando. O guia acompanha o trajeto
    e avisa sozinho: *Você chegou* (narra o ponto), *Logo à frente* (ponto a até 200 m na direção em que você anda),
    *Importante*, *Dica* e *Novidade*. Ao encerrar, mostra o resumo: distância, tempo e lugares conhecidos.
