@@ -1,0 +1,106 @@
+// Casca do aplicativo: sessão, menu por permissão e rotas por hash (#/ocorrencias/123).
+import { h, trocar, aviso, carregando } from './dom.js';
+import { api, textoErro } from './api.js';
+import { telaLogin } from './telas/login.js';
+import { telaPainel } from './telas/painel.js';
+import { telaOcorrencias, telaOcorrencia } from './telas/ocorrencias.js';
+import { telaTarefas } from './telas/tarefas.js';
+import { telaContas, telaConta } from './telas/contas.js';
+import { telaRodadas, telaRodada } from './telas/rodadas.js';
+import { telaSupervisor } from './telas/supervisor.js';
+import { telaAuditoria } from './telas/auditoria.js';
+import { telaSimulador } from './telas/simulador.js';
+
+const MENU = [
+  { rota: 'painel', rotulo: 'Painel', perm: 'ocorrencia.ver' },
+  { rota: 'ocorrencias', rotulo: 'Ocorrências', perm: 'ocorrencia.ver' },
+  { rota: 'triagem', rotulo: 'Triagem', perm: 'ocorrencia.triar' },
+  { rota: 'tarefas', rotulo: 'Tarefas', perm: 'ocorrencia.ver' },
+  { rota: 'rodadas', rotulo: 'Rodadas', perm: 'rodada.ver' },
+  { rota: 'contas', rotulo: 'Carteira', perm: 'conta.ver' },
+  { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
+  { rota: 'auditoria', rotulo: 'Auditoria', perm: 'auditoria.ver' },
+  { rota: 'simulador', rotulo: 'Simulador', perm: 'demo.simular', demo: true },
+];
+
+const ROTAS = {
+  painel: telaPainel,
+  ocorrencias: (el, ctx, id) => (id ? telaOcorrencia(el, ctx, id) : telaOcorrencias(el, ctx)),
+  triagem: (el, ctx) => telaOcorrencias(el, ctx, { estado: 'triagem', titulo: 'Triagem' }),
+  tarefas: telaTarefas,
+  contas: (el, ctx, id) => (id ? telaConta(el, ctx, id) : telaContas(el, ctx)),
+  rodadas: (el, ctx, id) => (id ? telaRodada(el, ctx, id) : telaRodadas(el, ctx)),
+  supervisor: telaSupervisor,
+  auditoria: telaAuditoria,
+  simulador: telaSimulador,
+};
+
+const ctx = {
+  usuario: null,
+  catalogos: null,
+  equipes: null,
+  pode: (p) => !!ctx.usuario?.permissoes.includes(p),
+  ir: (rota) => { location.hash = `#/${rota}`; },
+  recarregar: () => rotear(),
+};
+
+const raiz = document.getElementById('app');
+
+function montarCasca() {
+  const itens = MENU.filter((m) => ctx.pode(m.perm) && (!m.demo || ctx.usuario.demo));
+  const nav = h('nav', { class: 'menu', id: 'menu', 'aria-label': 'Menu principal' },
+    itens.map((m) => h('a', { href: `#/${m.rota}`, dataset: { rota: m.rota } }, m.rotulo)));
+  const botaoMenu = h('button', { class: 'btn-menu', type: 'button', 'aria-label': 'Abrir menu', 'aria-expanded': 'false',
+    onclick: (e) => { const aberto = nav.classList.toggle('aberto'); e.currentTarget.setAttribute('aria-expanded', String(aberto)); } }, '☰');
+  const topo = h('header', { class: 'topo' },
+    botaoMenu,
+    h('a', { class: 'marca', href: '#/painel' }, h('img', { src: '/icon.svg', alt: '', width: 28, height: 28 }), h('span', {}, 'Sinapse'), h('small', {}, 'ERP Operacional Brobot')),
+    h('div', { class: 'quem' },
+      h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}`),
+    ),
+    h('button', { class: 'btn btn-fantasma', type: 'button', onclick: sair }, 'Sair'));
+  const conteudo = h('main', { id: 'conteudo', tabindex: '-1' });
+  trocar(raiz, topo, h('div', { class: 'corpo' }, nav, conteudo));
+  nav.addEventListener('click', () => { nav.classList.remove('aberto'); botaoMenu.setAttribute('aria-expanded', 'false'); });
+}
+
+async function sair() {
+  await api.post('/sessao/sair').catch(() => {});
+  ctx.usuario = null;
+  iniciar();
+}
+
+async function rotear() {
+  if (!ctx.usuario) return;
+  const [rota = 'painel', id] = location.hash.replace(/^#\/?/, '').split('/');
+  const fn = ROTAS[rota] || ROTAS.painel;
+  document.querySelectorAll('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === rota));
+  const el = document.getElementById('conteudo');
+  trocar(el, carregando());
+  try {
+    await fn(el, ctx, id ? decodeURIComponent(id) : undefined);
+    el.focus({ preventScroll: true });
+  } catch (e) {
+    trocar(el, h('div', { class: 'cartao erro' }, h('h2', {}, 'Não foi possível abrir esta tela'), h('p', {}, textoErro(e)),
+      h('button', { class: 'btn', onclick: () => rotear() }, 'Tentar de novo')));
+  }
+}
+
+async function iniciar() {
+  try {
+    const s = await api.get('/sessao');
+    ctx.usuario = s.usuario;
+    if (!ctx.usuario) { telaLogin(raiz, { demo: s.demo, aoEntrar: (u) => { ctx.usuario = u; iniciar(); } }); return; }
+    [ctx.catalogos, ctx.equipes] = await Promise.all([api.get('/catalogos'), api.get('/equipes')]);
+    montarCasca();
+    rotear();
+  } catch (e) {
+    trocar(raiz, h('div', { class: 'cartao erro centro' }, h('h2', {}, 'Sem conexão'), h('p', {}, textoErro(e)),
+      h('button', { class: 'btn', onclick: iniciar }, 'Tentar de novo')));
+  }
+}
+
+window.addEventListener('hashchange', rotear);
+window.addEventListener('sessao-expirada', () => { if (ctx.usuario) { ctx.usuario = null; aviso('Sua sessão terminou. Entre novamente.', 'erro'); iniciar(); } });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+iniciar();

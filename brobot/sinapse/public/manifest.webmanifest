@@ -1,0 +1,10 @@
+{
+  "name": "Sinapse · ERP Operacional Brobot",
+  "short_name": "Sinapse",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7f9",
+  "theme_color": "#0f2a3d",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
