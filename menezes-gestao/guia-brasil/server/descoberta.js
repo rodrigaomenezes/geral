@@ -95,12 +95,25 @@ export function categoriaTuristica(tipos = [], descricao = '', nome = '') {
   return null;
 }
 
+const ROTULOS = { igreja: 'igreja', museu: 'museu', mercado: 'mercado', praca: 'praça', monumento: 'monumento', cultura: 'cultura', historico: 'patrimônio histórico', natureza: 'natureza' };
+
+/** Ponto sozinho passa nas regras do pacote? (um ponto ruim sai do roteiro em vez de derrubar o destino) */
+export function pontoValido(p) {
+  return validarPacote({
+    versao: VERSAO_PACOTE, id: 'teste', nome: 'teste', cidade: 'teste', pais: 'Brasil', idioma: 'pt-BR', atualizadoEm: '2026-01-01',
+    centro: { lat: p.lat, lng: p.lng }, rotaDemonstracao: [p.id], pois: [p], perguntasGerais: [], avisos: [],
+  }).length === 0;
+}
+
 /** Item do Wikidata (já agrupado) → ponto do pacote, com o texto do artigo quando existir. */
 export function pontoDeItem(item, extract) {
   const qid = item.qid;
   const doArtigo = extract ? pontoDeArtigo({ pageid: 0, title: item.nome, lat: item.lat, lon: item.lng, extract }) : null;
   const desc = String(item.descricao || '').trim();
-  const frase = desc ? `${item.nome}: ${desc}.`.replace(/\.\.$/, '.') : `${item.nome}.`;
+  // Sem artigo: a descrição do Wikidata; sem descrição, os tipos ("Escola de Minas: instituição de ensino, patrimônio").
+  const sobre = desc || (item.tipos || []).slice(0, 2).join(', ') || ROTULOS[item.categoria] || 'ponto turístico';
+  let frase = `${item.nome}: ${sobre}.`.replace(/\.\.$/, '.');
+  if (frase.length < 20) frase = `${frase} Ponto de ${ROTULOS[item.categoria] || 'interesse turístico'} registrado no Wikidata.`;
   const base = doArtigo || {
     nome: item.nome, lat: +item.lat.toFixed(6), lng: +item.lng.toFixed(6), raioM: 60,
     narrativa: { curto: frase, medio: frase, longo: frase }, curiosidades: [], perguntas: [],
@@ -142,7 +155,7 @@ export function itensDoWikidata(json) {
     if (!categoria) continue;
     vistos.add(qid);
     const artigo = b.a?.value ? decodeURIComponent(b.a.value.split('/wiki/').pop()).replace(/_/g, ' ') : null;
-    out.push({ qid, nome: b.nome.value, lat: +m[2], lng: +m[1], km: +b.km?.value || 0, categoria, descricao, artigo });
+    out.push({ qid, nome: b.nome.value, lat: +m[2], lng: +m[1], km: +b.km?.value || 0, categoria, descricao, tipos, artigo });
   }
   return out;
 }
@@ -291,6 +304,7 @@ export function criarDescoberta({ fetchImpl = fetch } = {}) {
     const pois = [];
     for (const p of [...doWikidata, ...daWikipedia].sort((x, y) => distanciaM(centro, x) - distanciaM(centro, y))) {
       if (pois.some((q) => q.id === p.id || (q.nome === p.nome && distanciaM(q, p) < 15))) continue;
+      if (!pontoValido(p)) continue;
       pois.push(p);
       if (pois.length >= MAX_PONTOS) break;
     }
