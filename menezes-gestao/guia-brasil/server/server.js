@@ -127,7 +127,7 @@ export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), past
       return res.end(reg.corpo);
     }
     // Qualquer lugar (G-017): busca por nome e destino gerado ao redor de uma coordenada.
-    if (req.method === 'GET' && (p === '/api/lugares' || p === '/api/perto')) {
+    if (req.method === 'GET' && (p === '/api/lugares' || p === '/api/perto' || p === '/api/onde')) {
       if (!limitador(ip)) throw new ErroHttp(429, 'Muitas buscas em pouco tempo. Tente de novo em alguns minutos.');
       try {
         if (p === '/api/lugares') {
@@ -137,6 +137,7 @@ export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), past
         }
         const lugar = pos({ lat: url.searchParams.get('lat'), lng: url.searchParams.get('lng') });
         if (!lugar) throw new ErroHttp(400, 'Coordenadas inválidas.');
+        if (p === '/api/onde') return json(res, 200, await descoberta.ondeEstou(lugar.lat, lugar.lng));
         const inicio = Date.now();
         const pacote = await descoberta.gerarPacote({ ...lugar, nome: texto(url.searchParams.get('nome'), 80) || null });
         log.info(JSON.stringify({ rota: p, pontos: pacote.pois.length, ms: Date.now() - inicio }));

@@ -109,7 +109,7 @@ function localizarAgora(forcar = false) {
     if (app.passeioAtivo || app.prefs.simulacao) return;
     app.pos = p;
     estadoGps(`Localização encontrada (precisão de ${Math.round(p.precisao || 0)} m).`);
-    atualizarSelos(); renderPerto();
+    atualizarSelos(); renderPerto(); mostrarOndeEstou(p);
   }, (msg, codigo) => {
     estadoGps(codigo === 1 ? 'Localização bloqueada (veja o aviso no topo).' : codigo === 3 ? 'O GPS demorou. Toque para tentar de novo.' : 'Não consegui ler o GPS.');
     atualizarSelos(); alertaFaixa(msg, codigo === 1 ? 15000 : 8000);
@@ -123,6 +123,25 @@ $('#btn-sair-simulacao').addEventListener('click', () => {
   localizarAgora(true);
 });
 
+const CATEGORIAS = { praca: 'praça', historico: 'patrimônio histórico', cultura: 'cultura', natureza: 'natureza', lugar: 'lugar' };
+
+/** "Você está em Mercado de Arte Popular · Centro · Feira de Santana": nome do lugar pelo mapa (só online). */
+async function mostrarOndeEstou(p) {
+  if (!p || p.simulada || !online()) return;
+  const chave = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
+  if (!app.onde || app.onde.chave !== chave) {
+    try {
+      const o = await api(`/api/onde?${new URLSearchParams({ lat: String(p.lat), lng: String(p.lng) })}`, null, 10000);
+      app.onde = { ...o, chave };
+    } catch { return; } // sem nome: fica só a linha do GPS
+  }
+  if (app.prefs.simulacao) return;
+  const e = $('#onde-estou');
+  e.textContent = `Você está em ${app.onde.texto}`;
+  e.hidden = false;
+  renderDistanciaDestino();
+}
+
 /** Longe de todos os pontos (ex.: testando fora de Salvador): explica e oferece a simulação. */
 function renderDistanciaDestino() {
   const c = $('#cartao-longe');
@@ -131,7 +150,12 @@ function renderDistanciaDestino() {
   if (!maisPerto || maisPerto.distancia < 2000) { c.hidden = true; return; }
   const km = maisPerto.distancia / 1000;
   const dist = km < 100 ? `${km.toFixed(1).replace('.', ',')} km` : `${Math.round(km).toLocaleString('pt-BR')} km`;
-  $('#longe-texto').textContent = `O GPS encontrou você, a ${dist} de ${app.pacote.cidade}. Quer o guia daqui? Ou ligue a simulação para testar ${app.pacote.cidade}.`;
+  const aqui = app.onde && app.onde.cidade && app.onde.cidade !== app.pacote.cidade ? app.onde.cidade : '';
+  $('#longe-texto').textContent = aqui
+    ? `Você está em ${aqui}, a ${dist} dos pontos de ${app.pacote.cidade}. Quer o guia de ${aqui}? Ou ligue a simulação para testar ${app.pacote.cidade}.`
+    : `O GPS encontrou você, a ${dist} de ${app.pacote.cidade}. Quer o guia daqui? Ou ligue a simulação para testar ${app.pacote.cidade}.`;
+  const b = $('#btn-guia-aqui');
+  if (!b.disabled) b.textContent = aqui ? `Guia de ${aqui}` : 'Guia de onde estou';
   c.hidden = false;
 }
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-ir]'); if (b) ir(b.dataset.ir); });
@@ -196,6 +220,7 @@ function guiaDeOndeEstou(botao) {
   estadoGps('Procurando você...');
   localizarUmaVez((p) => {
     app.pos = p; atualizarSelos(); estadoGps(`Encontrado (precisão de ${Math.round(p.precisao || 0)} m).`);
+    mostrarOndeEstou(p);
     gerarDestino({ lat: p.lat, lng: p.lng }, botao);
   }, (msg, codigo) => { estadoGps(codigo === 1 ? 'Localização bloqueada.' : 'Não consegui ler o GPS.'); alertaFaixa(msg, 15000); });
 }
@@ -331,6 +356,7 @@ function ligarSimulacao() {
   if (app.simulador) app.simulador.parar();
   app.simulador = simularCaminhada(app.pacote, aoMudarPosicao);
   $('#simulacao').hidden = false;
+  $('#onde-estou').hidden = true;
   $('#sim-onde').textContent = `Próximo: ${app.simulador.proximo().nome}`;
 }
 function desligarSimulacao() {
@@ -463,7 +489,7 @@ function renderPerto() {
     const dist = distancia == null ? '' : distancia < 1000 ? `${Math.round(distancia / 5) * 5} m` : `${(distancia / 1000).toFixed(1)} km`;
     return el('li', {}, el('button', { class: `ponto ${narrados[poi.id] ? 'narrado' : ''}`, onclick: () => { mostrarAgora(poi, true); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
       seta,
-      el('div', {}, el('strong', {}, poi.nome), el('span', {}, narrados[poi.id] ? 'já visitado · toque para ouvir de novo' : poi.categoria)),
+      el('div', {}, el('strong', {}, poi.nome), el('span', {}, narrados[poi.id] ? 'já visitado · toque para ouvir de novo' : (CATEGORIAS[poi.categoria] || poi.categoria))),
       el('span', { class: 'dist' }, dist)));
   }));
 }

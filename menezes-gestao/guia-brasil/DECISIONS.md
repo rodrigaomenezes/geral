@@ -126,3 +126,21 @@ da simulação tem *Usar meu GPS de verdade*.
 teste; a Wikipédia dá texto verificável com licença que permite reuso com atribuição.
 **Limites:** sem curadoria (pode entrar rua ou escola com artigo); sem avisos de segurança; Nominatim público não é
 para volume alto (com muitos usuários, trocar por serviço pago ou próprio, com decisão nova).
+
+# G-018 — Pontos turísticos pelo Wikidata, com filtro por tipo; "você está em" pelo mapa
+**Decisão:** o destino gerado (G-017) passa a ter o Wikidata como fonte principal: itens com coordenada num raio de
+3 km (10 km se vierem menos de 8), mantidos só os de tipo turístico (igreja, museu, mercado, praça, monumento,
+cultura, patrimônio histórico, natureza) pelo tipo (P31), pela descrição ou pelo começo do nome. Emissoras, rádio,
+jornal, shopping, hotel, estádio, aeroporto, município e bairro ficam de fora (patrimônio tombado entra mesmo se for
+empresa). O texto vem do artigo da Wikipédia ligado ao item; sem artigo, da descrição do Wikidata (fonte "Wikidata",
+CC0). Os artigos com coordenada da Wikipédia continuam como complemento, com o mesmo filtro e sem repetir o mesmo
+lugar. Uma fonte fora do ar não derruba a outra. Nova rota `GET /api/onde` (Nominatim reverso no nível do prédio): o
+Passeio mostra "Você está em Mercado de Arte Popular · Centro · Feira de Santana" e o cartão "longe" passa a oferecer
+"Guia de Feira de Santana".
+**Por quê:** teste em campo no Mercado de Arte Popular de Feira de Santana: o app não disse onde a pessoa estava e o
+roteiro trouxe só emissoras de TV e rádio, porque eram os únicos artigos da Wikipédia com coordenada perto; o mercado
+(tombado, com artigo) só tem a coordenada no Wikidata. Conferido nos serviços reais em 04/11/2026: com o filtro, Feira
+fica com 47 de 57 itens (mercado, Painéis do MAP, igrejas, coretos, museu, monumentos) e Ouro Preto com 60 de 102.
+O Overpass (OpenStreetMap) foi considerado e descartado: respondeu "sem capacidade" (502) e passou de 25 s no teste.
+**Limites:** inventários municipais entram inteiros (ex.: um clube num prédio de interesse histórico); destinos
+gerados antes desta versão continuam no aparelho até tocar de novo em *Guia de onde estou* ou buscar a cidade.
