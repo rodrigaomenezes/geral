@@ -1,0 +1,21 @@
+{
+  "name": "brobot-sinapse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ERP Sinapse: gestão do trabalho interno de Operações, Suporte e CS da Brobot (Fase 1 · demonstração).",
+  "main": "server/main.js",
+  "scripts": {
+    "start": "node server/main.js",
+    "dev": "node --watch server/main.js",
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
+    "migrar": "node server/db/migrar-cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.16",
+    "pg": "^8.23.1"
+  }
+}

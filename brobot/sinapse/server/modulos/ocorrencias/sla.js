@@ -1,0 +1,62 @@
+'use strict';
+// Cálculo de prazos por calendário (GOV-008, WFL-005, WFL-006). Regra pura, sem banco.
+// Expediente e feriados vêm da configuração da organização; crítica conta em horas corridas (24x7).
+
+const { HORA } = require('../../nucleo/relogio');
+
+const PADRAO = {
+  fusoMinutos: -180, // America/Sao_Paulo (sem horário de verão desde 2019)
+  expediente: { inicio: 8, fim: 18, dias: [1, 2, 3, 4, 5] },
+  sla: {
+    critica: { resposta: 1, resolucao: 4, corrido: true },
+    alta: { resposta: 2, resolucao: 8 },
+    media: { resposta: 4, resolucao: 24 },
+    baixa: { resposta: 8, resolucao: 40 },
+  },
+  slaTriagemHoras: 1,
+  fatorVip: 0.5,
+  handoffAceiteHoras: 2,
+  reaberturaDias: 7,
+  revisaoEsperaMaxDias: 3,
+};
+
+function calendario(configTenant = {}, feriados = []) {
+  return {
+    ...PADRAO,
+    ...configTenant,
+    expediente: { ...PADRAO.expediente, ...(configTenant.expediente || {}) },
+    sla: { ...PADRAO.sla, ...(configTenant.sla || {}) },
+    feriados: new Set(feriados.map((f) => (typeof f === 'string' ? f : f.toISOString().slice(0, 10)))),
+  };
+}
+
+/** Soma `horas` úteis a partir de `inicio` respeitando expediente, dias da semana e feriados. */
+function somarHorasUteis(inicio, horas, cal) {
+  const off = cal.fusoMinutos * 60e3;
+  let local = new Date(inicio.getTime() + off); // relógio "de parede" no fuso, lido com getUTC*
+  let restante = horas * HORA;
+  for (let guarda = 0; guarda < 3660 && restante > 0; guarda++) {
+    const dia = local.toISOString().slice(0, 10);
+    const util = cal.expediente.dias.includes(local.getUTCDay()) && !cal.feriados.has(dia);
+    const abre = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), cal.expediente.inicio);
+    const fecha = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), cal.expediente.fim);
+    const proximoDia = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, 0);
+    if (!util || local.getTime() >= fecha) { local = new Date(proximoDia); continue; }
+    const desde = Math.max(local.getTime(), abre);
+    const disponivel = fecha - desde;
+    if (restante <= disponivel) { local = new Date(desde + restante); restante = 0; break; }
+    restante -= disponivel;
+    local = new Date(proximoDia);
+  }
+  return new Date(local.getTime() - off);
+}
+
+/** Prazos de resposta e resolução por prioridade; VIP tem prazo reduzido pelo fator configurado. */
+function prazos(prioridade, { agora, vip = false, cal }) {
+  const regra = cal.sla[prioridade] || cal.sla.media;
+  const fator = vip ? cal.fatorVip : 1;
+  const somar = (h) => (regra.corrido ? new Date(agora.getTime() + h * fator * HORA) : somarHorasUteis(agora, h * fator, cal));
+  return { respostaEm: somar(regra.resposta), resolucaoEm: somar(regra.resolucao) };
+}
+
+module.exports = { calendario, somarHorasUteis, prazos, PADRAO };
