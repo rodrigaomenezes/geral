@@ -123,3 +123,10 @@ test('API: listagens são paginadas e o painel não tem órfãs nem ocorrência 
   assert.equal(p.corpo.ocorrencias.orfas, 0);
   assert.equal(p.corpo.ocorrencias.sem_proxima_acao, 0);
 });
+
+test('banco: UPDATE informa quantas linhas mudou nos dois motores (rowCount)', async () => {
+  const r = await t.app.db.query("UPDATE equipes SET nome = nome WHERE codigo = 'suporte'");
+  assert.equal(r.rowCount, 2, 'uma equipe Suporte em cada organização');
+  const nada = await t.app.db.query("UPDATE equipes SET nome = nome WHERE codigo = 'nao_existe'");
+  assert.equal(nada.rowCount, 0);
+});
