@@ -14,6 +14,7 @@ const identidade = require('../modulos/identidade/servico');
 const PUBLICO = path.join(__dirname, '..', '..', 'public');
 const COOKIE = 'sinapse_sessao';
 const LIMITE_CORPO = 1024 * 1024;
+const LIMITE_ARQUIVO = 5 * 1024 * 1024; // CSV de integração: upload próprio, não JSON
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon' };
 
@@ -41,16 +42,21 @@ function lerCookie(req, nome) {
   return null;
 }
 
-function lerCorpo(req) {
+function lerCorpo(req, { texto = false } = {}) {
+  const limite = texto ? LIMITE_ARQUIVO : LIMITE_CORPO;
   return new Promise((resolve, reject) => {
     let tamanho = 0;
     const partes = [];
     req.on('data', (ch) => {
       tamanho += ch.length;
-      if (tamanho > LIMITE_CORPO) { reject(new ErroNegocio(413, 'corpo_grande', 'Conteúdo acima de 1 MB. Envie arquivos pelo upload próprio.')); req.destroy(); return; }
+      if (tamanho > limite) {
+        reject(new ErroNegocio(413, 'corpo_grande', texto ? 'Arquivo acima de 5 MB. Divida em partes menores.' : 'Conteúdo acima de 1 MB. Envie arquivos pelo upload próprio.'));
+        req.destroy(); return;
+      }
       partes.push(ch);
     });
     req.on('end', () => {
+      if (texto) return resolve(Buffer.concat(partes).toString('utf8'));
       if (!partes.length) return resolve({});
       try { resolve(JSON.parse(Buffer.concat(partes).toString('utf8'))); } catch { reject(erro.entrada('O corpo da requisição não é um JSON válido.')); }
     });
@@ -108,8 +114,9 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
       if (req.method !== 'GET') {
         const origem = req.headers.origin;
         if (origem && new URL(origem).host !== req.headers.host) throw new ErroNegocio(403, 'origem_invalida', 'Requisição de outra origem recusada.');
-        if (!rota.publica && !/application\/json/.test(req.headers['content-type'] || '')) {
-          throw new ErroNegocio(415, 'tipo_invalido', 'Envie os dados como JSON (Content-Type: application/json).');
+        const tipo = req.headers['content-type'] || '';
+        if (rota.texto ? !/text\/(csv|plain)/.test(tipo) : !rota.publica && !/application\/json/.test(tipo)) {
+          throw new ErroNegocio(415, 'tipo_invalido', rota.texto ? 'Envie o arquivo como CSV (Content-Type: text/csv).' : 'Envie os dados como JSON (Content-Type: application/json).');
         }
       }
       const params = Object.fromEntries(rota.nomes.map((n, i) => [n, decodeURIComponent(url.pathname.match(rota.re)[i + 1])]));
@@ -120,7 +127,7 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
         if (rota.permissao && !pode(usuario, rota.permissao)) throw erro.semPermissao(rota.descricao || 'esta ação');
         if (rota.demo && !cfg.demo) throw new ErroNegocio(404, 'rota_inexistente', 'O simulador está desligado neste ambiente.');
       }
-      const corpo = req.method === 'GET' ? {} : await lerCorpo(req);
+      const corpo = req.method === 'GET' ? {} : await lerCorpo(req, { texto: !!rota.texto });
       const ctx = usuario ? { tenantId: usuario.tenant_id, usuario, correlacao } : { correlacao };
       const r = await rota.handler({ req, res, params, query: Object.fromEntries(url.searchParams), corpo, usuario, ctx, token, db, cfg, deps });
       if (r && r.__bruto) { registrar(r.status); return; }

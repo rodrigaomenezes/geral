@@ -68,11 +68,16 @@ async function criarOcorrenciaDePendencias(c, ctx, rodada, pendencias, { tipo, t
   return oc;
 }
 
-/** D-4 (PRE-002). */
+/** D-4 (PRE-002). Rodada alimentada por CSV não chama a Platform: espera o arquivo da pré-rodada. */
 async function jobPreRodada(c, ctx, { rodadaId }) {
   const r = await buscarRodada(c, rodadaId, true);
-  if (!r || r.estado !== 'agendada') return {};
+  if (!r || r.estado !== 'agendada' || r.fonte === 'csv') return {};
   const resultado = await platform.testarRodada(c, r); // Platform fora do ar → erro → retentativa (AT-005)
+  return processarPreRodada(c, ctx, r, resultado);
+}
+
+/** Resultado da pré-rodada por veículo [{ placa, ok, codigoPlatform }], venha da API ou de CSV. */
+async function processarPreRodada(c, ctx, r, resultado) {
   const falhas = resultado.filter((v) => !v.ok);
   const pend = await registrarFalhas(c, ctx, r, falhas, 'pre_rodada');
   const doCliente = pend.filter((p) => p.normalizado.doCliente);
@@ -163,8 +168,12 @@ async function marcarCorrigida(c, ctx, p, evidencia) {
 /** D0 (POS-001 a POS-005, POS-010): resultado oficial e comparação com a pré-rodada. */
 async function jobExecutar(c, ctx, { rodadaId }) {
   const r = await buscarRodada(c, rodadaId, true);
-  if (!r || ['executada', 'concluida'].includes(r.estado)) return {};
+  if (!r || ['executada', 'concluida'].includes(r.estado) || r.fonte === 'csv') return {};
   const resultado = await platform.executarOficial(c, r);
+  return processarOficial(c, ctx, r, resultado);
+}
+
+async function processarOficial(c, ctx, r, resultado) {
   const falhas = resultado.filter((v) => !v.ok);
   const okPlacas = new Set(resultado.filter((v) => v.ok).map((v) => v.placa));
   // POS-008: placa que passou na rodada oficial tem a pendência anterior encerrada, ligada ao histórico.
@@ -225,4 +234,4 @@ async function detalhe(c, id) {
 }
 const pick = (n) => ({ instrucao: n.instrucao, doCliente: n.doCliente });
 
-module.exports = { agendar, jobPreRodada, jobExecutar, revalidar, listar, detalhe };
+module.exports = { agendar, jobPreRodada, jobExecutar, processarPreRodada, processarOficial, buscarRodada, marcarCorrigida, revalidar, listar, detalhe };

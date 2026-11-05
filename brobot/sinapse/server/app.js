@@ -12,6 +12,7 @@ const comunicacao = require('./modulos/comunicacao/servico');
 const supervisor = require('./modulos/supervisor/servico');
 const omieSync = require('./modulos/integracoes/omie-sync');
 const motor = require('./modulos/processos/motor');
+const agenda = require('./modulos/agenda/servico');
 const seed = require('./modulos/demo/seed');
 
 const ROTAS = [
@@ -22,6 +23,9 @@ const ROTAS = [
   ...require('./modulos/entrada/rotas'),
   ...require('./modulos/supervisor/rotas'),
   ...require('./modulos/processos/rotas'),
+  ...require('./modulos/agenda/rotas'),
+  ...require('./modulos/comercial/rotas'),
+  ...require('./modulos/integracoes/csv/rotas'),
   ...require('./modulos/demo/rotas'),
 ];
 
@@ -39,6 +43,7 @@ function handlersDeJobs(db) {
     'processos.despachar': motor.jobDespachar,
     'processos.agenda': motor.jobAgenda,
     'processo.avancar': motor.jobAvancar,
+    'lembretes.avisar': agenda.jobAvisar,
     // Item que esgotou as tentativas: efeitos de "falhou" ficam visíveis (RN-015).
     __aoMorrer: async (job) => {
       if (job.tipo === 'comunicacao.enviar') await db.comoTenant(job.tenant_id, (c) => comunicacao.aoFalharEnvio(c, job.payload));
