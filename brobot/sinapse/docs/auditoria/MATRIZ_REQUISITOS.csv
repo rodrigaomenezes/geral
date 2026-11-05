@@ -1,0 +1,210 @@
+id;requisito (resumo);status;evidencia_codigo;teste;lacuna_ou_dependencia
+GOV-001;Cadastrar organizações, unidades, equipes e perfis com isolamento de acesso.;PARCIAL;"identidade/permissoes.js; 001 tenants/equipes/usuarios";"regras API 401/403; AT-014";"""unidades"" não existem; cadastro de usuário/equipe só por seed (sem tela)"
+GOV-002;Configurar perfis VIP com critérios, validade, aprovador e histórico.;PARCIAL;"contas.vip_* (001); clientes/servico.js";—;"critério/aprovador/validade gravados; sem tela de aprovação nem teste"
+GOV-003;Manter matriz de responsáveis por processo, carteira, horário e substituto.;PARCIAL;"usuarios.substituto_id; identidade.resolverResponsavel";AT-003;"sem matriz por processo/horário; substituto único"
+GOV-004;Impedir tarefas ativas sem dono ou fila de contingência.;IMPLEMENTADO E TESTADO;"CHECK tarefas.equipe_id NOT NULL; supervisor";"AT-010; regras painel sem órfãs";
+GOV-005;Aplicar regras VIP→CS e demais→Suporte, com exceções justificadas.;IMPLEMENTADO E TESTADO;"clientes.equipeDaConta; CHECK justificativa";regras roteamento RN-001;
+GOV-006;Cadastrar ponto focal principal e suplente com canais válidos e histórico.;IMPLEMENTADO E TESTADO;pontos_focais (vigente, histórico);regras ponto focal histórico;
+GOV-007;Alertar e bloquear marcos críticos quando faltar ponto focal obrigatório.;PARCIAL;"alertas sem_ponto_focal; tarefa antes do D-3";processos força-tarefa;"alerta sim; bloqueio de marco crítico não comprovado por teste"
+GOV-008;Gerir calendário de feriados, expediente, plantões e SLA por contrato.;PARCIAL;"ocorrencias/sla.js; feriados";regras SLA;plantões e SLA por contrato ausentes
+GOV-009;Permitir delegação temporária com auditoria e expiração.;AUSENTE;—;—;delegação temporária
+GOV-010;Exibir matriz RACI e responsáveis vigentes por processo.;AUSENTE;—;—;tela RACI
+INT-001;Receber e persistir demandas de e-mail, WhatsApp, portal, API e Platform.;PARCIAL;"entrada/servico.js; whatsapp-rotas.js";"AT-001/002; WhatsApp oficial; QR";"e-mail e portal só pelo webhook genérico; sem conector de e-mail real"
+INT-002;Gerar identificador único e correlação de conversas, anexos e eventos.;IMPLEMENTADO E TESTADO;"protocolo; conversa_chave; causacao em eventos";AT-002;
+INT-003;Deduplicar mensagens, webhooks e tickets correlatos.;IMPLEMENTADO E TESTADO;entradas.chave_idempotencia única;"AT-002; WhatsApp dedup";
+INT-004;Classificar tipo, conta, criticidade, produto, origem e intenção.;PARCIAL;entrada/classificador.js (palavras-chave);regras classificação;produto/intenção/criticidade simples
+INT-005;Enviar classificação incerta a triagem com SLA e evidência.;IMPLEMENTADO E TESTADO;triagem com prazo;"AT-001; regras classificação";
+INT-006;Criar, vincular, dividir, mesclar e relacionar ocorrências sem apagar histórico.;PARCIAL;ocorrencia_vinculos (001);—;sem dividir/mesclar na API/tela
+INT-007;Permitir resposta no canal de origem, com registro de envio e entrega.;IMPLEMENTADO E TESTADO;ocorrencias.responder → mensageria;WhatsApp oficial/QR status;
+INT-008;Manter fila de entrada não classificada com supervisão automática.;PARCIAL;supervisor varre triagem;AT-001;supervisão automática da fila não testada isoladamente
+INT-009;Validar anexos, tipos, tamanho, malware e política de retenção.;AUSENTE;—;—;anexos inexistentes
+INT-010;Preservar histórico completo e pesquisa por cliente, veículo, CNPJ e protocolo com autorização.;IMPLEMENTADO SEM TESTE;busca em /api/ocorrencias;—;busca por veículo não comprovada
+WFL-001;Executar máquina de estados por tipo de processo e versão.;IMPLEMENTADO E TESTADO;ocorrencias/maquina.js;regras máquina;
+WFL-002;Validar pré-condições, guardas, evidências e permissões nas transições.;IMPLEMENTADO E TESTADO;maquina.planejar;regras máquina;
+WFL-003;Gerar tarefas automaticamente a partir de eventos e regras.;IMPLEMENTADO E TESTADO;processos/motor.js;processos execução;
+WFL-004;Definir due_at e next_action_at obrigatórios para estados ativos.;IMPLEMENTADO E TESTADO;CHECK ativa_completa;regras banco RN-008;
+WFL-005;Calcular SLA por calendário, severidade e regras contratuais.;IMPLEMENTADO E TESTADO;sla.js;regras SLA;SLA por contrato ausente
+WFL-006;Separar SLA de resposta, tratamento, dependência externa e resolução.;PARCIAL;resposta_em/prazo_em;regras SLA;dependência externa sem relógio próprio
+WFL-007;Escalonar atrasos por níveis e registrar ciência/ação.;PARCIAL;supervisor escalonamento;AT-010;níveis múltiplos e registro de ciência parciais
+WFL-008;Executar handoff com aceite e fallback quando não recebido.;IMPLEMENTADO E TESTADO;handoffs + supervisor;AT-010;
+WFL-009;Executar retentativas controladas com backoff e limite.;IMPLEMENTADO E TESTADO;jobs/fila.js backoff + DLQ;AT-005/007;
+WFL-010;Suportar pausa justificada sem interromper supervisão da pendência.;IMPLEMENTADO E TESTADO;aguardar_cliente com revisão ≤3d;regras máquina;
+WFL-011;Distinguir tarefa concluída, ocorrência resolvida e encerrada sem correção.;IMPLEMENTADO E TESTADO;tarefa concluida × ocorrência resolvida/encerrada;"regras máquina; AT-009";
+WFL-012;Reabrir automaticamente em evento novo relacionado, conforme política.;IMPLEMENTADO E TESTADO;reabertura 7 dias;AT-012;
+WFL-013;Versionar templates de processo sem alterar instâncias antigas silenciosamente.;IMPLEMENTADO E TESTADO;processo_versoes imutáveis;processos execução;
+WFL-014;Permitir intervenção humana excepcional com justificativa e auditoria.;PARCIAL;"alterarComMotivo; reatribuir";—;sem teste dedicado
+WFL-015;Detectar loops, estados impossíveis e transições concorrentes.;IMPLEMENTADO E TESTADO;"version + FOR UPDATE; limite 5/24h";"AT-011; processos laço";
+ONB-001;Criar onboarding ao receber contratação validada do Comercial.;IMPLEMENTADO E TESTADO;comercial ganha → conta em onboarding;comercial proposta→ganha;
+ONB-002;Verificar dados cadastrais, módulos, contrato, VIP e ponto focal.;PARCIAL;checagens no processo de onboarding;—;sem checklist estruturado
+ONB-003;Solicitar dados faltantes à área ou cliente responsável com prazo.;AUSENTE;—;—;
+ONB-004;Provisionar conta e módulos na Platform por integração autorizada.;BLOQUEADO POR API/DECISÃO;exportação CSV de provisionamento;—;"Platform: só CSV nesta fase; capacidade de importação não homologada"
+ONB-005;Registrar checklist de certificados, placas, Renavam, SNE e permissões.;AUSENTE;—;—;checklist
+ONB-006;Importar lotes de placas com validação, resultado parcial e rejeições.;PARCIAL;importação CSV de veículos de rodada;CSV Platform;lote de placas do onboarding ausente
+ONB-007;Acompanhar configurações e agendamentos de robôs na Platform.;AUSENTE;—;—;
+ONB-008;Validar rodada inicial e critério de sucesso por produto.;BLOQUEADO POR API/DECISÃO;—;—;critério de sucesso por produto depende de homologação (RN-010)
+ONB-009;Separar ativação administrativa, operacional e sinalização financeira ao OMIE.;AUSENTE;—;—;
+ONB-010;Impedir conclusão sem critérios e permitir exceção formal aprovada.;AUSENTE;—;—;
+ONB-011;Orquestrar alteração de módulos, dados, carteira e ponto focal.;AUSENTE;—;—;
+ONB-012;Executar offboarding com checklist de acessos, pendências, evidências e retenção.;AUSENTE;—;—;offboarding
+PRE-001;Detectar calendário de rodadas por conta/produto na Platform.;MOCK/DEMO;"platform-demo.js; CSV rodadas";CSV Platform;calendário real depende de CSV homologado
+PRE-002;Iniciar pré-rodada D-4 e registrar execução e resultado.;IMPLEMENTADO E TESTADO;rodadas/servico.js jobPreRodada;AT-005;execução real é da Platform (CSV/demo)
+PRE-003;Normalizar erros de vínculo SNE, certificado, credencial e demais falhas.;IMPLEMENTADO E TESTADO;rodadas/erros.js normalizarErro;regras erros normalizados;
+PRE-004;Correlacionar erros por conta, CNPJ, veículo, produto e rodada.;IMPLEMENTADO E TESTADO;pendencias (conta, placa, erro, rodada);"CSV Platform; AT-008";
+PRE-005;Criar pendências sem duplicar casos persistentes.;IMPLEMENTADO E TESTADO;pendencias única placa+erro;AT-008;
+PRE-006;Disparar contato D-3 com contexto, instruções e rastreio.;IMPLEMENTADO E TESTADO;processo padrão D-3;AT-008;
+PRE-007;Gerar tarefa de ligação intermediária e registrar tentativa/resultado.;IMPLEMENTADO E TESTADO;tarefa de ligação com resultado;"processos ligação; canais telefonia";
+PRE-008;Gerar contato D-1 apenas para pendências não resolvidas.;IMPLEMENTADO E TESTADO;D-1 só se persistir;AT-008;
+PRE-009;Cancelar contatos futuros após confirmação técnica de correção.;IMPLEMENTADO E TESTADO;rodadas.revalidar encerra cadência;AT-008;confirmação técnica vem de CSV/demo
+PRE-010;Escalonar risco de rodada bloqueada ou conta sem resposta.;PARCIAL;escalonamento de risco;—;"sem teste dedicado; regra ""1 CNPJ desativa"" não automatizada (correto)"
+PRE-011;Emitir comunicado de veículos com sucesso/falha após rodada oficial.;PARCIAL;comunicado pós-rodada;AT-009;quem autoriza o comunicado: decisão pendente
+PRE-012;Medir taxa de correção antes de D0 e aderência da cadência.;IMPLEMENTADO SEM TESTE;dashboards rodadas;dashboards respondem;sem teste de fórmula
+POS-001;Receber resultado oficial por execução/conta/veículo.;PARCIAL;"CSV resultado oficial; demo";CSV Platform;layout não homologado
+POS-002;Comparar resultado com pendências da pré-rodada.;IMPLEMENTADO E TESTADO;jobExecutar compara pendências;AT-009;
+POS-003;Identificar erros novos de usuário, vínculo, cadastro e credencial.;IMPLEMENTADO E TESTADO;novas pendências no pós;AT-009;
+POS-004;Gerar comunicação ao grupo/canal autorizado com resumo e evidências.;IMPLEMENTADO E TESTADO;comunicado no grupo;AT-009;
+POS-005;Programar follow-up em três dias ao ponto focal.;IMPLEMENTADO E TESTADO;follow-up D+3;AT-009;
+POS-006;Distinguir encerramento de contato de resolução efetiva.;IMPLEMENTADO E TESTADO;contato encerra, pendência fica;AT-009;
+POS-007;Manter pendência não resolvida visível e elegível para revalidação.;IMPLEMENTADO E TESTADO;pendência persistente;AT-009;
+POS-008;Vincular correção posterior ao histórico original.;PARCIAL;pendencias ligadas à ocorrência;—;sem teste da correção posterior
+POS-009;Monitorar reincidência e recomendar análise de causa raiz.;PARCIAL;contador de recorrência;—;recomendação de RCA ausente
+POS-010;Publicar métricas de sucesso, falha e recuperação por rodada.;IMPLEMENTADO SEM TESTE;dashboards rodadas;dashboards respondem;fórmulas sem teste próprio
+REC-001;Ingerir volumetria e erros de consulta de placas recorrentes da Platform.;BLOQUEADO POR API/DECISÃO;—;—;volumetria da Platform: sem layout CSV
+REC-002;Distinguir erro de consulta, erro de usuário e indisponibilidade externa.;IMPLEMENTADO E TESTADO;categorias de erro;regras erros normalizados;
+REC-003;Correlacionar erros repetidos e criar ocorrência única quando aplicável.;PARCIAL;pendência única;AT-008;
+REC-004;Roteá-los a Suporte ou Desenvolvimento conforme matriz de responsabilidade.;PARCIAL;erro técnico → Desenvolvimento;processos (padrão);sem teste
+REC-005;Exigir aceite e acompanhar tickets técnicos até validação.;PARCIAL;handoff com aceite;AT-010;
+REC-006;Reconciliar sucesso técnico com retorno da Platform.;BLOQUEADO POR API/DECISÃO;—;—;retorno Platform
+REC-007;Monitorar recorrências sem novas execuções e alertar.;AUSENTE;—;—;
+REC-008;Exibir histórico, volume afetado e impacto por cliente/produto.;AUSENTE;—;—;
+CRE-001;Ler somente status/metadados autorizados das credenciais na Platform.;PARCIAL;"credenciais_ref (só metadados); CSV credenciais";—;layout não homologado
+CRE-002;Detectar credencial ausente, inválida, expirada, 2FA e vínculo SNE.;PARCIAL;status em credenciais_ref;—;2FA/SNE dependem do CSV
+CRE-003;Detectar consultas esperadas que não foram geradas e investigar causa.;BLOQUEADO POR API/DECISÃO;—;—;consultas não geradas: sem dado da Platform
+CRE-004;Alertar sobre expiração com antecedência configurável.;PARCIAL;data de expiração exibida;—;alerta antecipado configurável ausente
+CRE-005;Solicitar regularização ao ponto focal com instruções seguras.;IMPLEMENTADO SEM TESTE;mensagens do processo;—;
+CRE-006;Verificar correção por nova consulta ou teste técnico.;PARCIAL;revalidação via CSV/demo;AT-008;
+CRE-007;Não copiar segredos, certificados privados ou senhas para o ERP.;IMPLEMENTADO E TESTADO;nenhuma coluna de segredo de cliente;AT-008 (revisão de esquema);verificado por leitura do esquema
+CRE-008;Permitir visão por conta, produto, criticidade e pendência.;IMPLEMENTADO SEM TESTE;tela de conta;—;
+COM-001;Gerir modelos versionados de WhatsApp, e-mail e notificações.;IMPLEMENTADO E TESTADO;modelos_mensagem versionados;mensagens padrão;
+COM-002;Submeter modelos à revisão/aprovação com histórico.;IMPLEMENTADO E TESTADO;revisão/aprovação por outra pessoa;mensagens padrão;
+COM-003;Personalizar mensagens com dados estruturados e validação.;IMPLEMENTADO E TESTADO;renderizarAtual com variáveis;mensagens padrão;
+COM-004;Controlar horários, consentimento, opt-out e política de canais.;IMPLEMENTADO E TESTADO;"escolherCanal; opt_out; janela";regras canal COM-004;
+COM-005;Registrar envio, entrega, falha, resposta e correlação.;IMPLEMENTADO E TESTADO;status_entrega;WhatsApp oficial/QR;
+COM-006;Aplicar retentativa e canal alternativo quando permitido.;IMPLEMENTADO E TESTADO;retentativa + e-mail;AT-007;
+COM-007;Permitir comunicação humana sem perder trilha do atendimento.;IMPLEMENTADO E TESTADO;"responder; eco do celular";WhatsApp QR;
+COM-008;Oferecer central de pendências na experiência do cliente por integração à Platform.;BLOQUEADO POR API/DECISÃO;—;—;central do cliente fica na Platform
+COM-009;"Evitar alertas incessantes; aplicar severidade, frequência e acessibilidade.";PARCIAL;sino sem repetição;meu dia notificação uma vez;severidade/acessibilidade parcial
+COM-010;Publicar campanhas de adoção de produto com controle de frequência.;PARCIAL;processo semanal (desligado);—;sem teste
+CS-001;Gerir carteira VIP, responsáveis, contatos e plano de relacionamento.;IMPLEMENTADO SEM TESTE;carteira VIP;—;
+CS-002;Calcular saúde de conta com indicadores transparentes e configuráveis.;IMPLEMENTADO SEM TESTE;saúde da conta com motivos;dashboards;fórmula configurável ausente
+CS-003;Ler últimos acessos e uso por módulo via eventos autorizados da Platform.;PARCIAL;uso_contas via CSV;—;layout não homologado
+CS-004;Gerar tarefas para contas inativas ou com adoção insuficiente.;AUSENTE;—;—;
+CS-005;Gerir sessões coletivas, convites, inscrições e presença.;AUSENTE;—;—;treinamentos
+CS-006;Versionar roteiro de treinamento por tela e produto.;AUSENTE;—;—;
+CS-007;Utilizar conta de demonstração, sem expor dados reais de clientes.;AUSENTE;—;—;
+CS-008;Registrar dúvidas, avaliação e ações posteriores ao treinamento.;AUSENTE;—;—;
+CS-009;Acompanhar efetividade do treinamento por evolução de uso.;AUSENTE;—;—;
+CS-010;Programar insights do Caça Condutores com frequência e opt-out.;PARCIAL;processo CaçaCondutores semanal desligado;—;sem teste
+CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;PARCIAL;Comercial no mesmo sistema;—;encaminhamento CS→Comercial ausente
+CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;AUSENTE;—;—;
+DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;PARCIAL;ocorrência tipo técnica;regras DEV-005;evidência sanitizada não verificada
+DEV-002;Rastrear prioridade, impacto, responsável e aceite do Desenvolvimento.;PARCIAL;prioridade/responsável/aceite;AT-010;
+DEV-003;Sincronizar estados e comentários de ferramentas técnicas autorizadas.;AUSENTE;—;—;sincronizar ferramenta técnica
+DEV-004;Notificar mudanças e falhas de handoff automaticamente.;PARCIAL;notificações de handoff;AT-010;
+DEV-005;Exigir validação operacional após correção antes de resolução final.;IMPLEMENTADO E TESTADO;dev não resolve técnica;regras máquina;
+DEV-006;Gerir incidentes críticos, comunicação, mitigação e post-mortem.;AUSENTE;—;—;incidentes/post-mortem
+DEV-007;Vincular problemas recorrentes a causa raiz e ações preventivas.;AUSENTE;—;—;
+DEV-008;Gerir solicitações de melhoria, backlog, aprovações e releases.;AUSENTE;—;—;
+FIN-001;Definir OMIE como fonte autoritativa para dados e eventos financeiros.;IMPLEMENTADO E TESTADO;"sem cálculo financeiro; status_financeiro só leitura";AT-006;
+FIN-002;Manter mapeamento de cliente/contrato ERP↔OMIE sem duplicação indevida.;PARCIAL;"contas.omie_codigo; divergências CSV";CSV OMIE;
+FIN-003;Receber status financeiro necessário para ações operacionais autorizadas.;PARCIAL;"CSV situação financeira; omie-demo";"AT-006; CSV OMIE";layout não homologado
+FIN-004;Enviar eventos operacionais relevantes ao Financeiro por integração versionada.;PARCIAL;"outbox gravado; exportação CSV";—;sem confirmação de retorno
+FIN-005;Nunca emitir NFS-e, boleto ou baixa financeira no ERP Sinapse.;IMPLEMENTADO E TESTADO;nenhuma rota emite documento;AT-015 (revisão);garantido por ausência
+FIN-006;Não aplicar bloqueio operacional por inadimplência sem regra aprovada e autorização.;IMPLEMENTADO E TESTADO;bloqueio recusado e auditado;AT-015;
+FIN-007;Tratar indisponibilidade do OMIE com fila, retentativa e reconciliação.;IMPLEMENTADO E TESTADO;omie-sync retentativa;AT-006;
+FIN-008;Registrar divergências de identificadores, contratos e status com tratamento.;IMPLEMENTADO E TESTADO;divergencias;CSV OMIE;
+FIN-009;Separar permissões de visualização operacional de dados financeiros sensíveis.;IMPLEMENTADO E TESTADO;financeiro.detalhe;regras financeiro mínimo;
+FIN-010;Exibir apenas informações financeiras mínimas e justificadas no contexto operacional.;IMPLEMENTADO E TESTADO;situacaoVisivel;regras FIN-010;
+SUP-001;Verificar periodicamente ocorrências órfãs, vencidas ou sem próxima ação.;IMPLEMENTADO E TESTADO;supervisor varrer;"regras painel sem órfãs; AT-010";
+SUP-002;Detectar filas paradas, agendadores inativos e webhooks interrompidos.;PARCIAL;supervisor jobs vencidos;—;webhooks interrompidos não detectados
+SUP-003;Manter heartbeat e monitor externo do supervisor.;PARCIAL;/api/health/supervisor;AT-013;monitor externo não configurado
+SUP-004;Executar reconciliação Platform↔ERP↔OMIE nas fronteiras permitidas.;PARCIAL;reconciliação OMIE;AT-006;Platform ausente
+SUP-005;Gerir dead-letter queue e reprocessamento com autorização.;IMPLEMENTADO SEM TESTE;jobs morto + reprocessar com motivo;—;sem teste do reprocessamento
+SUP-006;Produzir painéis por área, carteira, produto, cliente, período e SLA.;IMPLEMENTADO E TESTADO;6 dashboards;dashboards;
+SUP-007;Registrar toda alteração sensível com trilha auditável.;IMPLEMENTADO E TESTADO;auditoria só anexação;regras banco;
+SUP-008;Gerir retenção, exportação, anonimização e direitos de titulares conforme LGPD.;AUSENTE;—;—;LGPD
+SUP-009;Disponibilizar logs, métricas, traces e alertas por correlação.;PARCIAL;correlação por requisição;—;sem métricas/traces
+SUP-010;Permitir parametrização de regras com aprovação, simulação e rollback.;IMPLEMENTADO E TESTADO;processos com simulação/restauração;processos;
+SUP-011;Controlar indisponibilidades e contingência de canais.;PARCIAL;integracoes.disponivel;AT-005/007;
+SUP-012;Exibir cobertura de automação, exceções e trabalho manual residual.;IMPLEMENTADO SEM TESTE;dashboard automação;dashboards;
+RN-001;"VIP é atendido pelo CS; demais pelo Suporte, salvo exceção aprovada.";IMPLEMENTADO E TESTADO;equipeDaConta;regras;
+RN-002;Toda conta operacional precisa de ponto focal válido e canal de contato.;PARCIAL;alertas/tarefa;processos força-tarefa;
+RN-003;"Pré-rodada é iniciada D-4; contatos D-3, intermediário e D-1 conforme calendário aprovado.";IMPLEMENTADO E TESTADO;MARCOS;AT-008;
+RN-004;Pós-rodada gera contato inicial e follow-up após três dias, sem apagar pendência técnica.;IMPLEMENTADO E TESTADO;pós-rodada;AT-009;
+RN-005;Erro corrigido tecnicamente encerra pendência e cancela contatos futuros relacionados.;IMPLEMENTADO E TESTADO;marcarCorrigida;AT-008;
+RN-006;"Uma ocorrência pode conter múltiplos veículos e erros; cada item mantém rastreabilidade.";IMPLEMENTADO E TESTADO;ocorrencia_itens;AT-008;
+RN-007;Handoff não é concluído sem aceite ou timeout com fallback.;IMPLEMENTADO E TESTADO;handoff;AT-010;
+RN-008;Nenhuma ocorrência ativa pode ter owner/fila, prazo ou próxima ação nulos.;IMPLEMENTADO E TESTADO;CHECK;regras banco;
+RN-009;"Encerramento resolvido exige evidência; encerramento sem resolução exige motivo explícito.";IMPLEMENTADO E TESTADO;máquina + CHECK;regras máquina;
+RN-010;Regras de bloqueio por CNPJ e critério de sucesso de onboarding dependem de homologação.;BLOQUEADO POR API/DECISÃO;—;—;homologação
+RN-011;"OMIE é autoritativo para finanças; ERP não altera saldos/recebíveis por inferência.";IMPLEMENTADO E TESTADO;só leitura;AT-006/015;
+RN-012;Mudança de regra em produção deve ser versionada e reversível.;IMPLEMENTADO E TESTADO;processos versionados;processos;
+RN-013;Nenhum processamento de IA pode executar decisão financeira ou expor segredos.;IMPLEMENTADO E TESTADO;sem IA;—;garantido por ausência
+RN-014;Eventos duplicados não podem produzir efeitos duplicados.;IMPLEMENTADO E TESTADO;chaves únicas;AT-002;
+RN-015;Falhas externas não podem causar perda silenciosa nem encerramento indevido.;IMPLEMENTADO E TESTADO;DLQ + falha registrada;AT-005/007;
+RNF-001;Disponibilidade Meta inicial sugerida 99,9% mensal do ERP, com janelas e exclusões formalizadas.;AUSENTE;—;—;sem SLO nem monitor
+RNF-002;"Durabilidade Nenhum evento confirmado ao emissor deve ser descartado; backups e recuperação testados.";PARCIAL;entrada antes de 202;AT-002;backup/restauração não testados
+RNF-003;Performance P95 de páginas operacionais até 2 s em carga nominal, a validar em dimensionamento.;AUSENTE;—;—;sem teste de carga
+RNF-004;Processamento Eventos críticos reconhecidos em até 60 s em condições normais, salvo dependência externa.;PARCIAL;ciclo 2 s;—;sem medição
+RNF-005;Segurança TLS, criptografia em repouso, MFA administrativo, segregação por tenant, secrets manager.;PARCIAL;"RLS; AES-GCM; scrypt";"AT-014; cifra";"MFA ausente; TLS do PG sem verificação"
+RNF-006;Privacidade LGPD, minimização, base legal, retenção, consentimento quando aplicável, logs protegidos.;AUSENTE;—;—;LGPD
+RNF-007;Auditabilidade 100% de transições críticas com ator, data, motivo, correlação e evidência.;IMPLEMENTADO E TESTADO;auditoria + eventos;AT-002/014;
+RNF-008;"Recuperação RPO/RTO a homologar por criticidade; exercícios de restauração regulares.";AUSENTE;—;—;RPO/RTO
+RNF-009;Escalabilidade Workers horizontais e limites de concorrência por integração/tenant.;PARCIAL;SKIP LOCKED;AT-011;PGlite é processo único
+RNF-010;Manutenibilidade Módulos coesos, contratos versionados, testes e documentação obrigatória.;PARCIAL;"módulos coesos; CI";CI pglite+pg;sem lint
+RNF-011;Observabilidade Métricas, traces, logs estruturados, dashboards e alertas com dono.;AUSENTE;—;—;sem métricas/alertas
+RNF-012;Acessibilidade Interfaces responsivas e boas práticas WCAG, nível-alvo a definir.;PARCIAL;360 px;—;sem auditoria WCAG
+AT-001;Mensagem sem cliente identificado Permanece em triagem com SLA, sem perda.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-001;
+AT-002;"Mesmo webhook três vezes Uma ocorrência/efeito; eventos duplicados auditados.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-002;
+AT-003;Usuário responsável indisponível Tarefa é atribuída ao substituto/fila.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-003;
+AT-004;Redmine antigo indisponível Novo ERP continua sem dependência operacional.;IMPLEMENTADO E TESTADO;nenhuma dependência do Redmine;AT-004 por desenho;"não há teste automatizado; garantido por ausência"
+AT-005;"Platform indisponível Ocorrência e checkpoint preservados; retentativa e alerta.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-005;
+AT-006;"OMIE indisponível Fila financeira de integração aguarda e reconcilia; ERP não inventa status.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-006;
+AT-007;WhatsApp falha Erro registrado, retentativa e fallback autorizado.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-007;
+AT-008;D-3 credencial corrigida Contatos futuros cancelados após confirmação técnica.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-008;
+AT-009;"Pós-rodada sem correção após D+3 Contato pode encerrar; pendência segue visível.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-009;
+AT-010;Handoff não aceito Escalonamento e fila de contingência.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-010;
+AT-011;"Dois workers alteram mesma ocorrência Uma transição válida; conflito tratado sem corrupção.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-011;
+AT-012;Evento atrasado após encerramento Regra de reabertura/correlação executada.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-012;
+AT-013;Watchdog parado Monitor externo gera alerta.;PARCIAL;/api/health/supervisor;AT-013;"503 testado; monitor externo não configurado"
+AT-014;Tenant A solicita dados de B Acesso negado e auditado.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-014;
+AT-015;Solicitação de bloqueio por inadimplência;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-015;
+AT-016;Falha de migração Rollback documentado e dados íntegros.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-016;
+BL-01;"Coluna VIP em Consultas Identificação operacional; verificar se a informação ficará na Platform, ERP ou ambos.";BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
+BL-02;Classificação VIP em Credenciais Visualização por carteira e roteamento no ERP.;IMPLEMENTADO SEM TESTE;carteira VIP;—;
+BL-03;Erros invisíveis Detectar consultas não geradas por ausência de credencial.;BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
+BL-04;"Central de pendências Notificações persistentes e acessíveis ao cliente; evitar pop-up invasivo sem limite.";BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
+BL-05;Insights Caça Condutores Mensagens de adoção 1x/semana, com preferências.;PARCIAL;processo semanal desligado;—;
+BL-06;Visões de sucesso pré/pós Painéis ERP de correção e falha.;IMPLEMENTADO SEM TESTE;dashboard rodadas;—;
+BL-07;Último login e mapa de uso Telemetria Platform, análise ERP e consentimento.;BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
+BL-08;Frequência de consulta Indicação Condutores;BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
+BL-09;"WhatsApp→tickets Conector ERP; substitui ideia de acoplamento direto ao Redmine.";IMPLEMENTADO E TESTADO;WhatsApp oficial e QR viram entrada/ocorrência;WhatsApp oficial/QR;
+CRM-001;organizações, pessoas e contatos com deduplicação;PARCIAL;contas, pontos_focais, oportunidades (empresa/cnpj);comercial;"pessoa×organização não separadas; sem dedup de pessoa"
+CRM-002;leads, origem, qualificação e atribuição;PARCIAL;oportunidades.origem/etapa novo;comercial;captura externa ausente
+CRM-003;múltiplos pipelines configuráveis;AUSENTE;funil único fixo (comercial/funil.js);—;múltiplos pipelines
+CRM-004;oportunidades com valor, probabilidade e produtos;PARCIAL;oportunidades valor/responsável/produtos;comercial;moeda/probabilidade por etapa parciais
+CRM-005;atividades e calendário;PARCIAL;lembretes, tarefas, telefonia;"meu dia; telefonia";atividade comercial tipada ausente
+CRM-006;próxima ação obrigatória;PARCIAL;proxima_acao_em em oportunidade;comercial;alerta/substituição por ausência não testados
+CRM-007;propostas e versões;AUSENTE;—;—;propostas versionadas
+CRM-008;alçadas de desconto;AUSENTE;—;—;alçadas
+CRM-009;catálogo de produtos;AUSENTE;produtos como texto;—;catálogo
+CRM-010;trilha de negociação;PARCIAL;notas/histórico da oportunidade;—;
+CRM-011;ganho/perdido/suspenso/reaberto;PARCIAL;ganha/perdida com motivo;comercial;suspenso/reaberto ausentes
+CRM-012;teste/piloto quando aplicável;IMPLEMENTADO E TESTADO;fase teste com período/critério;funil teste;DECISÃO PENDENTE: obrigatório para todo produto?
+CRM-013;handoff venda→onboarding;PARCIAL;ganha → conta em onboarding;comercial ganha;aceite formal e dados mínimos ausentes
+CRM-014;renovação e expansão;AUSENTE;—;—;
+CRM-015;previsões e relatórios;PARCIAL;dashboard comercial;dashboards;
+CRM-016;automações comerciais;PARCIAL;motor de processos genérico;processos;gatilhos comerciais limitados
+CRM-017;RBAC por carteira;PARCIAL;"permissões comercial.*; RLS";dashboards permissão;carteira por vendedor não comprovada
+CRM-018;migração do Pipedrive;BLOQUEADO POR API/DECISÃO;—;—;precisa exportação real do Pipedrive
+CRM-019;experiência do vendedor;PARCIAL;tela Comercial (quadro, lista);—;
+CRM-020;desligamento do Pipedrive;BLOQUEADO POR API/DECISÃO;—;—;homologação
