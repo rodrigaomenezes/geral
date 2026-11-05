@@ -162,3 +162,30 @@ input, select, textarea { font: inherit; padding: .55rem .6rem; border: 1px soli
   .menu a { border-top: 0; padding: .6rem 1rem; }
   main { padding: 1.25rem 1.5rem 3rem; }
 }
+
+/* Processos automáticos */
+.cond { display: grid; grid-template-columns: 1fr; gap: .35rem; padding: .5rem; border: 1px dashed var(--borda); border-radius: 8px; margin-bottom: .5rem; position: relative; }
+.cond .btn-icone { position: absolute; top: .2rem; right: .3rem; }
+.bloco-cond { margin-top: .75rem; }
+.bloco-cond h3 { margin-top: 0; }
+.passo { border: 1px solid var(--borda); border-left: 4px solid var(--destaque); border-radius: var(--raio); padding: .75rem; margin-bottom: .75rem; background: var(--fundo); }
+.passo-topo { display: flex; gap: .4rem; align-items: center; margin-bottom: .5rem; }
+.passo-topo select { flex: 1; font-weight: 600; }
+.passo-num { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--destaque); color: #fff; font-weight: 700; flex: none; }
+.passo details summary { cursor: pointer; color: var(--info); font-size: .85rem; }
+.passos-lidos { margin: 0; padding-left: 1.1rem; }
+.passos-lidos li { margin-bottom: .35rem; }
+.execucao { border: 1px solid var(--borda); border-radius: var(--raio); padding: .6rem .75rem; margin-bottom: .5rem; background: #fff; }
+.execucao summary { cursor: pointer; }
+.execucao .tempo { margin-top: .6rem; }
+.tempo-futuro { color: var(--suave); }
+.tempo li.tempo-futuro::before { background: var(--borda); }
+@media (min-width: 720px) {
+  .cond { grid-template-columns: 1.4fr 1fr 1.2fr 2rem; align-items: center; border-style: solid; }
+  .cond .btn-icone { position: static; }
+  .passo-params { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+}
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.passos-lidos { list-style: none; padding-left: 0; }
+.passos-lidos li { padding: .35rem 0; border-top: 1px solid var(--borda); }
+.passos-lidos li:first-child { border-top: 0; font-weight: 600; }

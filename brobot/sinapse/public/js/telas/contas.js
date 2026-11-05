@@ -50,6 +50,11 @@ export async function telaConta(el, ctx, id) {
     h('p', { class: 'suave' }, 'O ponto focal atual do mesmo papel vai para o histórico (nada é apagado).'),
   ], 'Salvar', async (d) => { await api.post(`/contas/${id}/pontos-focais`, d); fechar(); aviso('Ponto focal atualizado.'); recarregar(); }));
 
+  const grupo = () => modal('Grupo de WhatsApp do cliente', (fechar) => formulario([
+    h('p', { class: 'suave' }, 'Os processos que enviam "no grupo" usam este destino (comunicado da rodada, formalização da ligação).'),
+    campo('Identificador do grupo no WhatsApp', h('input', { name: 'grupo', value: c.grupo_whatsapp || '', maxlength: 120, placeholder: 'ex.: 1203630…@g.us' })),
+  ], 'Salvar', async (d) => { await api.post(`/contas/${id}/grupo`, { grupo: d.grupo || '' }); fechar(); aviso('Grupo atualizado.'); recarregar(); }));
+
   const bloqueio = () => modal('Pedir bloqueio por inadimplência', (fechar) => formulario([
     h('p', {}, 'O bloqueio operacional só acontece com regra aprovada pelo Financeiro e autorização. O pedido é registrado na auditoria.'),
     campo('Motivo', h('textarea', { name: 'motivo', required: true, minlength: 5, rows: 2 })),
@@ -63,10 +68,11 @@ export async function telaConta(el, ctx, id) {
     c.alertas.length ? h('div', { class: 'alertas' }, c.alertas.map((a) => h('p', { class: `alerta ${a.codigo === 'sem_ponto_focal' ? 'alerta-perigo' : ''}` }, a.texto))) : null,
     h('div', { class: 'acoes' },
       ctx.pode('conta.editar') ? h('button', { class: 'btn btn-primario', onclick: novoPf }, 'Definir ponto focal') : null,
+      ctx.pode('conta.editar') ? h('button', { class: 'btn', onclick: grupo }, c.grupo_whatsapp ? 'Alterar grupo do WhatsApp' : 'Cadastrar grupo do WhatsApp') : null,
       ctx.pode('financeiro.bloqueio') ? h('button', { class: 'btn btn-fantasma', onclick: bloqueio }, 'Pedir bloqueio por inadimplência') : null),
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Cadastro'), h('dl', { class: 'dados' },
-        ...par('CNPJ', cnpj(c.cnpj)), ...par('Segmento', c.segmento || '—'), ...par('ID Platform', c.id_platform || '—'), ...par('ID OMIE', c.id_omie || '—'),
+        ...par('CNPJ', cnpj(c.cnpj)), ...par('Grupo do WhatsApp', c.grupo_whatsapp ? 'cadastrado' : 'não cadastrado (mensagens "no grupo" vão ao ponto focal)'), ...par('Segmento', c.segmento || '—'), ...par('ID Platform', c.id_platform || '—'), ...par('ID OMIE', c.id_omie || '—'),
         ...(c.vip ? [...par('Critério VIP', c.vip_criterio), ...par('Aprovado por', c.vip_aprovador), ...par('VIP válido até', data(c.vip_validade))] : []),
         ...(c.roteamento_excecao ? [...par('Exceção de roteamento', `${EQUIPE[c.roteamento_excecao]}: ${c.roteamento_justificativa}`)] : []),
         ...par('Situação financeira (OMIE)', `${c.financeiro.rotulo}${c.financeiro.sincronizadoEm ? ` · sincronizado ${dataHora(c.financeiro.sincronizadoEm)}` : ''}`))),

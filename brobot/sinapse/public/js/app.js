@@ -10,12 +10,14 @@ import { telaRodadas, telaRodada } from './telas/rodadas.js';
 import { telaSupervisor } from './telas/supervisor.js';
 import { telaAuditoria } from './telas/auditoria.js';
 import { telaSimulador } from './telas/simulador.js';
+import { telaProcessos, editorRota } from './telas/processos.js';
 
 const MENU = [
   { rota: 'painel', rotulo: 'Painel', perm: 'ocorrencia.ver' },
   { rota: 'ocorrencias', rotulo: 'Ocorrências', perm: 'ocorrencia.ver' },
   { rota: 'triagem', rotulo: 'Triagem', perm: 'ocorrencia.triar' },
   { rota: 'tarefas', rotulo: 'Tarefas', perm: 'ocorrencia.ver' },
+  { rota: 'processos', rotulo: 'Processos', perm: 'processo.ver' },
   { rota: 'rodadas', rotulo: 'Rodadas', perm: 'rodada.ver' },
   { rota: 'contas', rotulo: 'Carteira', perm: 'conta.ver' },
   { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
@@ -30,6 +32,7 @@ const ROTAS = {
   tarefas: telaTarefas,
   contas: (el, ctx, id) => (id ? telaConta(el, ctx, id) : telaContas(el, ctx)),
   rodadas: (el, ctx, id) => (id ? telaRodada(el, ctx, id) : telaRodadas(el, ctx)),
+  processos: (el, ctx, id, extra) => (extra === 'editar' ? editorRota(el, ctx, id) : telaProcessos(el, ctx, id)),
   supervisor: telaSupervisor,
   auditoria: telaAuditoria,
   simulador: telaSimulador,
@@ -46,7 +49,17 @@ const ctx = {
 
 const raiz = document.getElementById('app');
 
+function aplicarMarca(m) {
+  if (!m) return;
+  const raizCss = document.documentElement.style;
+  if (m.corPrimaria) raizCss.setProperty('--marca', m.corPrimaria);
+  if (m.corDestaque) { raizCss.setProperty('--destaque', m.corDestaque); }
+  if (m.nome) document.title = `${m.nome} · Sinapse`;
+}
+
 function montarCasca() {
+  aplicarMarca(ctx.usuario.marca);
+  const logo = ctx.usuario.marca?.logo || '/icon.svg';
   const itens = MENU.filter((m) => ctx.pode(m.perm) && (!m.demo || ctx.usuario.demo));
   const nav = h('nav', { class: 'menu', id: 'menu', 'aria-label': 'Menu principal' },
     itens.map((m) => h('a', { href: `#/${m.rota}`, dataset: { rota: m.rota } }, m.rotulo)));
@@ -54,7 +67,7 @@ function montarCasca() {
     onclick: (e) => { const aberto = nav.classList.toggle('aberto'); e.currentTarget.setAttribute('aria-expanded', String(aberto)); } }, '☰');
   const topo = h('header', { class: 'topo' },
     botaoMenu,
-    h('a', { class: 'marca', href: '#/painel' }, h('img', { src: '/icon.svg', alt: '', width: 28, height: 28 }), h('span', {}, 'Sinapse'), h('small', {}, 'ERP Operacional Brobot')),
+    h('a', { class: 'marca', href: '#/painel' }, h('img', { src: logo, alt: '', height: 28 }), h('span', {}, 'Sinapse'), h('small', {}, `ERP Operacional ${ctx.usuario.marca?.nome || ctx.usuario.organizacao}`)),
     h('div', { class: 'quem' },
       h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}`),
     ),
@@ -72,13 +85,13 @@ async function sair() {
 
 async function rotear() {
   if (!ctx.usuario) return;
-  const [rota = 'painel', id] = location.hash.replace(/^#\/?/, '').split('/');
+  const [rota = 'painel', id, extra] = location.hash.replace(/^#\/?/, '').split('/');
   const fn = ROTAS[rota] || ROTAS.painel;
   document.querySelectorAll('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === rota));
   const el = document.getElementById('conteudo');
   trocar(el, carregando());
   try {
-    await fn(el, ctx, id ? decodeURIComponent(id) : undefined);
+    await fn(el, ctx, id ? decodeURIComponent(id) : undefined, extra);
     el.focus({ preventScroll: true });
   } catch (e) {
     trocar(el, h('div', { class: 'cartao erro' }, h('h2', {}, 'Não foi possível abrir esta tela'), h('p', {}, textoErro(e)),

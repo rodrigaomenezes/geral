@@ -1,5 +1,6 @@
 import { h, trocar, dataHora, relativo, selo, campo, opcoes, aviso, modal, vazio } from '../dom.js';
 import { api, textoErro } from '../api.js';
+import { secaoAutomacoes } from './processos.js';
 
 const COR_ESTADO = { triagem: 'alerta', aberta: 'info', em_atendimento: 'ativo', aguardando_cliente: 'neutro', aguardando_terceiro: 'neutro',
   em_handoff: 'alerta', resolvida: 'ok', encerrada_sem_resolucao: 'neutro' };
@@ -171,6 +172,7 @@ export async function telaOcorrencia(el, ctx, id) {
       ativa && ctx.pode('ocorrencia.ver') ? h('div', { class: 'responder' }, texto, h('div', { class: 'form-acoes' },
         h('button', { class: 'btn', onclick: enviarMsg('notas') }, 'Nota interna'),
         ctx.pode('ocorrencia.atender') && o.conta_id ? h('button', { class: 'btn btn-primario', onclick: enviarMsg('respostas') }, 'Responder ao cliente') : null)) : null),
+    ctx.pode('processo.ver') ? await secaoAutomacoes(ctx, { ocorrencia: id }) : null,
     h('section', { class: 'cartao' }, h('h2', {}, 'Linha do tempo (auditoria)'), h('ol', { class: 'tempo' }, o.linhaDoTempo.map((a) => h('li', {},
       h('span', { class: 'tempo-data' }, dataHora(a.criado_em)), h('strong', {}, a.acao.replace('ocorrencia.', '').replaceAll('_', ' ')),
       ` por ${a.ator_nome}`, a.motivo ? h('div', { class: 'suave' }, a.motivo) : null)))));

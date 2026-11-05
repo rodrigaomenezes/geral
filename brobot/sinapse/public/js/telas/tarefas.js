@@ -1,4 +1,4 @@
-import { h, trocar, dataHora, relativo, selo, campo, aviso, modal, vazio } from '../dom.js';
+import { h, trocar, dataHora, relativo, selo, campo, opcoes, aviso, modal, vazio } from '../dom.js';
 import { api } from '../api.js';
 import { formulario } from './ocorrencias.js';
 
@@ -16,13 +16,16 @@ export async function telaTarefas(el, ctx) {
       h('div', { class: 'linha-titulo' }, t.titulo),
       h('div', { class: 'linha-meta' }, h('span', {}, t.equipe_nome), h('span', {}, t.responsavel_nome || 'Fila da equipe'),
         t.protocolo ? h('a', { href: `#/ocorrencias/${t.ocorrencia_id}` }, t.protocolo) : null, t.conta_nome ? h('span', {}, t.conta_nome) : null),
-      ctx.pode('ocorrencia.atender') ? h('div', { class: 'form-acoes' }, h('button', { class: 'btn', onclick: () => concluir(t) }, 'Concluir')) : null))
+      ctx.pode('ocorrencia.atender') ? h('div', { class: 'form-acoes' }, h('button', { class: `btn ${t.tipo === 'ligacao' ? 'btn-primario' : ''}`, onclick: () => concluir(t) }, t.tipo === 'ligacao' ? 'Registrar ligação' : 'Concluir')) : null))
       : vazio(minhas ? 'Nenhuma tarefa sua ou da sua equipe.' : 'Nenhuma tarefa aberta.'));
   }
 
   function concluir(t) {
-    modal('Concluir tarefa', (fechar) => formulario([
+    modal(t.tipo === 'ligacao' ? 'Registrar a ligação' : 'Concluir tarefa', (fechar) => formulario([
       h('p', {}, t.titulo),
+      t.tipo === 'ligacao' ? campo('A ligação foi atendida?', opcoes(h('select', { name: 'resultadoCodigo', required: true }),
+        { atendeu: 'Sim, falei com o ponto focal', nao_atendeu: 'Não atendeu' }, 'Escolha'),
+        'Se não atender, o processo formaliza sozinho por mensagem no grupo e com o ponto focal.') : null,
       campo(t.tipo === 'ligacao' ? 'Resultado da ligação' : 'Resultado', h('textarea', { name: 'resultado', rows: 3, required: true, minlength: 3 }),
         t.tipo === 'ligacao' ? 'Ex.: atendeu, combinou corrigir o vínculo SNE até amanhã às 12h.' : null),
     ], 'Concluir', async (d) => { await api.post(`/tarefas/${t.id}/concluir`, d); fechar(); aviso('Tarefa concluída.'); carregar(); }));
