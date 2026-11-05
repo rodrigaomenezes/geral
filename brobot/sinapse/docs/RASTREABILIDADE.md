@@ -57,7 +57,7 @@ Testes: `test/aceite.test.js` (AT-xxx) e `test/regras.test.js`.
 | POS | 001, 002, 003, 004, 005, 006, 007, 008, 010 | 009 recomendação de RCA ◐ (contador de recorrência) |
 | REC | 002 (categorias), 003, 004 (erro técnico → Desenvolvimento) | 001, 005–008 ◐/○ (volumetria da Platform) |
 | CRE | 001, 002 (status), 005, 006, 007, 008 | 003 consultas não geradas ○, 004 alerta de expiração ◐ (data exibida) |
-| COM | 001, 003, 004, 005, 006, 007, 009, 010 (processo semanal com opt-out) | 002 aprovação de modelos ○, 008 central do cliente ○ (Platform) |
+| COM | 001, 003, 004, 005 (status de entrega real), 006, 007, 009, 010 (processo semanal com opt-out) | 002 aprovação de modelos ○, 008 central do cliente ○ (Platform) |
 | CS | 001 (carteira VIP), 003 ◐ (último login por CSV), 011 ◐ (Comercial no mesmo sistema), 010 (insights CaçaCondutores semanais, desligado até revisão) | 002–009, 011, 012 ○ (Fase 4) |
 | DEV | 001, 002, 004, 005 | 003 sincronizar ferramenta técnica ○, 006 incidentes ○, 007 ◐, 008 ○ |
 | FIN | 001, 002, 003, 005, 006, 007, 008, 009, 010 | 004 eventos ao Financeiro ◐ (outbox gravado, sem envio) |
@@ -97,4 +97,7 @@ dimensionamento e da infraestrutura definitiva.
 | Central de notificações (lembrete vencido, escalonamento, transferência) sem repetição | ✔ | sino no topo |
 | Comercial: funil com teste antes do fechamento, quadro, indicadores, venda → onboarding | ✔ | `modulos/comercial` |
 | Platform/OMIE por CSV (rodadas, credenciais, uso, situação financeira; exportações) | ✔ | `modulos/integracoes/csv` |
-| Canais reais (WhatsApp, telefonia) aproveitando o Lumen Operações | ○ | próxima entrega |
+| Telefonia (treino, SIP/WebRTC, celular) ligada às tarefas de ligação dos processos | ✔ | `modulos/telefonia`, softphone |
+| WhatsApp oficial: envio, webhook assinado, deduplicação, status entregue/lida | ✔ | `integracoes/whatsapp-*` |
+| WhatsApp por QR, gravação, fila de ligações, templates fora da janela de 24 h | ○ | próximas entregas |
+| Identidade visual Brobot | ✔ | `public/styles.css`, `public/fonts` |

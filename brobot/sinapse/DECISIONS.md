@@ -71,3 +71,14 @@ API: o adaptador real substitui o arquivo sem mudar o resto.
 # T-013 — Reaproveitar canais do Lumen Operações
 **Decisão:** WhatsApp (API oficial + QR), telefonia (SIP/WebRTC, celular, treino) e fila de ligações vêm do Lumen
 Operações, adaptados ao PostgreSQL multiempresa. **Atenção:** este repositório é público; o código portado fica visível.
+
+# T-014 — Identidade visual Brobot no padrão do sistema
+**Decisão:** paleta azul do site da Brobot, Montserrat (OFL, servida de `public/fonts`, sem chamada externa), botões em
+pílula e fundo em grade no login. Wordmark em CSS até receber o logo oficial em SVG. `tenants.config.marca` continua
+permitindo outra marca por organização (white-label).
+
+# T-015 — Canais portados do Lumen: telefonia e WhatsApp oficial
+**Decisão:** provedores de telefonia trocáveis (treino, SIP/WebRTC com JsSIP 3.13.8 MIT em `public/vendor`, celular) e
+Meta Cloud API para WhatsApp. Segredos (senha de ramal, token da Meta) cifrados com AES-256-GCM (`SINAPSE_CHAVE`);
+webhook validado por HMAC do corpo cru (`META_APP_SECRET`). CSP passa a permitir `wss:` (operadora SIP).
+**Não portado ainda:** WhatsApp por QR (Baileys: sessão em memória e risco de bloqueio do número), gravação de ligações.
