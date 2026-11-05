@@ -183,6 +183,11 @@ test('WhatsApp por QR Code: conectar, escanear, receber (dedup), responder, eco 
   await t.avancar(0.01);
   assert.equal(sock._enviadas.at(-1).conteudo.text, 'Olá! Vamos renovar com você.');
   await esperar(async () => (await t.sql('SELECT status_entrega FROM interacoes WHERE id = $1', [r.corpo.id]))[0].status_entrega === 'lida');
+  // o eco da mensagem que o próprio sistema mandou não vira uma segunda mensagem no histórico
+  const enviada = sock._enviadas.at(-1);
+  sock.ev.emit('messages.upsert', { type: 'append', messages: [{ key: { remoteJid: enviada.jid, id: enviada.id, fromMe: true }, message: { conversation: enviada.conteudo.text } }] });
+  await new Promise((ok) => setTimeout(ok, 150));
+  assert.equal((await t.sql("SELECT count(*)::int AS q FROM interacoes WHERE texto = 'Olá! Vamos renovar com você.'"))[0].q, 1);
   // quem respondeu direto no celular também fica no histórico da conversa (uma vez)
   falso.ecoar(pasta, { para: '553165432109', texto: 'Mandei o passo a passo pelo celular' });
   await esperar(async () => (await t.sql("SELECT 1 FROM interacoes WHERE texto = 'Mandei o passo a passo pelo celular' AND ocorrencia_id = $1", [rec.ocorrencia_id])).length);

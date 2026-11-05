@@ -33,7 +33,9 @@ async function iniciar(numeroId) {
   if (atual && atual.sock && !atual.parar) return atual;
   const B = await carregarBaileys();
   const { state, saveCreds } = await B.useMultiFileAuthState(pastaDa(numeroId));
-  const s = { estado: 'conectando', qr: null, parar: false, tentativas: atual?.tentativas || 0, conectouAlgumaVez: !!state.creds?.registered };
+  // `doSistema`: ids enviados pelo próprio Sinapse; o eco deles chega antes de o envio gravar o id, e não pode virar
+  // uma segunda mensagem "do celular" no histórico. Limitado às últimas 500.
+  const s = { estado: 'conectando', qr: null, parar: false, tentativas: atual?.tentativas || 0, conectouAlgumaVez: !!state.creds?.registered, doSistema: new Set() };
   sessoes.set(numeroId, s);
   const opcoes = { auth: state, logger: silencioso, markOnlineOnConnect: false, syncFullHistory: false, generateHighQualityLinkPreview: false,
     browser: B.Browsers ? B.Browsers.macOS('Sinapse Brobot') : undefined, getMessage: async () => undefined };
@@ -143,7 +145,7 @@ async function aoChegar(numeroId, s, ev) {
     const numero = await telefoneDe(s, m.key);
     if (!numero) continue;
     const msg = { id: m.key.id, numero, nome: m.key.fromMe ? null : m.pushName || null, texto };
-    if (m.key.fromMe) await cfg.aoEco(n, msg); else await cfg.aoReceber(n, msg);
+    if (m.key.fromMe) { if (!s.doSistema.has(m.key.id)) await cfg.aoEco(n, msg); } else await cfg.aoReceber(n, msg);
   }
 }
 
@@ -160,6 +162,7 @@ async function enviar(numero, para, { texto }) {
     if (r && r.exists) jid = r.jid; else throw Object.assign(new Error('Esse número não tem WhatsApp.'), { integracao: 'whatsapp', semWhatsapp: true });
   } catch (e) { if (e.semWhatsapp) throw e; jid = `${jid}@s.whatsapp.net`; }
   const r = await s.sock.sendMessage(jid, { text: texto || '' });
+  if (r?.key?.id) { s.doSistema.add(r.key.id); if (s.doSistema.size > 500) s.doSistema.delete(s.doSistema.values().next().value); }
   return { idExterno: r?.key?.id || null, status: 'enviada' };
 }
 
