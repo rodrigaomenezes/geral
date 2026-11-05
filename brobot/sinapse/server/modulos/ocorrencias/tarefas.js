@@ -15,9 +15,9 @@ async function criar(c, ctx, d) {
   if (!equipe) throw erro.regra('sem_fila', 'Toda tarefa precisa de uma equipe responsável (fila de contingência).');
   const responsavel = await identidade.resolverResponsavel(c, d.responsavelId);
   const t = uma(await c.query(
-    `INSERT INTO tarefas (tenant_id, ocorrencia_id, rodada_id, tipo, titulo, equipe_id, responsavel_id, prazo_em, chave)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (tenant_id, chave) DO NOTHING RETURNING *`,
-    [ctx.tenantId, d.ocorrenciaId || null, d.rodadaId || null, d.tipo, d.titulo.slice(0, 200), equipe, responsavel, d.prazoEm, d.chave || null],
+    `INSERT INTO tarefas (tenant_id, ocorrencia_id, rodada_id, tipo, titulo, equipe_id, responsavel_id, prazo_em, chave, execucao_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (tenant_id, chave) DO NOTHING RETURNING *`,
+    [ctx.tenantId, d.ocorrenciaId || null, d.rodadaId || null, d.tipo, d.titulo.slice(0, 200), equipe, responsavel, d.prazoEm, d.chave || null, d.execucaoId || null],
   ));
   if (t) {
     await publicar(c, ctx, { tipo: 'tarefa.criada', agregado: 'tarefa', agregadoId: t.id, chave: `tarefa.criada:${t.id}`,
@@ -26,20 +26,22 @@ async function criar(c, ctx, d) {
   return t;
 }
 
-async function concluir(c, ctx, id, resultado) {
+/** Concluir. Ligação exige o código atendeu/não atendeu: o processo que a criou segue pelo caminho certo. */
+async function concluir(c, ctx, id, resultado, resultadoCodigo) {
   const t = uma(await c.query('SELECT * FROM tarefas WHERE id = $1 FOR UPDATE', [id]));
   if (!t) throw erro.naoEncontrado('Tarefa');
   if (t.estado !== 'aberta') throw erro.conflito('Esta tarefa já foi concluída ou cancelada.');
-  const r = uma(await c.query(
-    "UPDATE tarefas SET estado = 'concluida', resultado = $2, concluida_por = $3, concluida_em = $4 WHERE id = $1 RETURNING *",
-    [id, resultado, ctx.usuario?.id || null, relogio.agora()],
-  ));
-  if (t.tipo === 'ligacao') {
-    await c.query("UPDATE contatos_programados SET estado = 'concluido', motivo = $2, atualizado_em = now() WHERE tarefa_id = $1", [id, resultado.slice(0, 200)]);
+  if (t.tipo === 'ligacao' && !['atendeu', 'nao_atendeu'].includes(resultadoCodigo)) {
+    throw erro.entrada('Informe se a ligação foi atendida.', [{ campo: 'resultadoCodigo', problema: 'use atendeu ou nao_atendeu' }]);
   }
+  const r = uma(await c.query(
+    "UPDATE tarefas SET estado = 'concluida', resultado = $2, resultado_codigo = $5, concluida_por = $3, concluida_em = $4 WHERE id = $1 RETURNING *",
+    [id, resultado, ctx.usuario?.id || null, relogio.agora(), resultadoCodigo || null],
+  ));
   await auditar(c, ctx, { acao: 'tarefa.concluida', entidade: t.ocorrencia_id ? 'ocorrencia' : 'tarefa', entidadeId: t.ocorrencia_id || id,
     depois: { tarefa: t.titulo, resultado } });
-  await publicar(c, ctx, { tipo: 'tarefa.concluida', agregado: 'tarefa', agregadoId: id, chave: `tarefa.concluida:${id}`, payload: { tipo: t.tipo } });
+  await publicar(c, ctx, { tipo: 'tarefa.concluida', agregado: 'tarefa', agregadoId: id, chave: `tarefa.concluida:${id}`,
+    payload: { tipo: t.tipo, resultadoCodigo: resultadoCodigo || null, execucaoId: t.execucao_id, ocorrenciaId: t.ocorrencia_id } });
   return r;
 }
 

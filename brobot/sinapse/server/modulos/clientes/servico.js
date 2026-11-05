@@ -113,6 +113,16 @@ async function definirPontoFocal(c, ctx, contaId, d) {
   return novo;
 }
 
+/** Grupo de WhatsApp do cliente: destino "no grupo" dos processos (decisão de 03/11/2026). */
+async function definirGrupo(c, ctx, contaId, grupo) {
+  const conta = await buscar(c, contaId);
+  if (!conta) throw erro.naoEncontrado('Conta');
+  await c.query('UPDATE contas SET grupo_whatsapp = $2, version = version + 1, atualizado_em = now() WHERE id = $1', [contaId, grupo || null]);
+  await auditar(c, ctx, { acao: 'conta.grupo_definido', entidade: 'conta', entidadeId: contaId, antes: { grupo: conta.grupo_whatsapp }, depois: { grupo: grupo || null } });
+  await publicar(c, ctx, { tipo: 'conta.grupo_definido', agregado: 'conta', agregadoId: contaId, payload: { contaId } });
+  return { ok: true };
+}
+
 /**
  * FIN-006 / AT-015: sem regra de bloqueio aprovada, nenhum bloqueio é feito — e o pedido fica auditado.
  * Devolve a recusa (em vez de lançar erro) para a auditoria não ser desfeita junto com a transação.
@@ -144,6 +154,6 @@ async function pontosFocaisVigentes(c, contaId) {
 }
 
 module.exports = {
-  equipeDaConta, situacaoVisivel, listar, buscar, detalhe, definirPontoFocal, pedirBloqueio, pontoFocalPorContato,
+  definirGrupo, equipeDaConta, situacaoVisivel, listar, buscar, detalhe, definirPontoFocal, pedirBloqueio, pontoFocalPorContato,
   pontosFocaisVigentes, alertasDaConta,
 };

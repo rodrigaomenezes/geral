@@ -10,7 +10,7 @@ const { relogio } = require('./relogio');
  * Contrato: event_id, event_type, schema_version, source, tenant_id, aggregate_type, aggregate_id,
  * occurred_at, payload, correlation_id, causation_id, idempotency_key.
  */
-async function publicar(c, ctx, { tipo, agregado, agregadoId, payload = {}, chave, causacao = null, versao = 1 }) {
+async function publicar(c, ctx, { tipo, agregado, agregadoId, payload = {}, chave, causacao = ctx.causacao || null, versao = 1 }) {
   const r = await c.query(
     `INSERT INTO eventos (tenant_id, event_type, schema_version, aggregate_type, aggregate_id, occurred_at, payload,
        correlation_id, causation_id, idempotency_key)

@@ -38,10 +38,11 @@ function proximaJanela(agora) {
  * Programa uma mensagem. `modelo` + `variaveis` (ou texto livre em resposta_atendimento).
  * Devolve a interação criada (status enfileirada ou bloqueada).
  */
-async function programarEnvio(c, ctx, { contaId, ocorrenciaId = null, pontoFocal, modelo, variaveis, canalPreferido,
+async function programarEnvio(c, ctx, { contaId, ocorrenciaId = null, pontoFocal, grupo = null, modelo, variaveis, canalPreferido,
   contatoProgramadoId = null, executarEm, fallback = true }) {
   const { texto, modelo: mv } = renderizar(modelo, variaveis);
-  const escolha = escolherCanal(pontoFocal, canalPreferido);
+  // Grupo do cliente (WhatsApp): canal operacional combinado com o cliente; sem canal alternativo.
+  const escolha = grupo ? { canal: 'whatsapp', para: grupo } : escolherCanal(pontoFocal, canalPreferido);
   const status = escolha.canal ? 'enfileirada' : 'bloqueada';
   const it = uma(await c.query(
     `INSERT INTO interacoes (tenant_id, ocorrencia_id, conta_id, canal, direcao, destinatario, texto, modelo, status_entrega, autor_id)
@@ -54,7 +55,7 @@ async function programarEnvio(c, ctx, { contaId, ocorrenciaId = null, pontoFocal
   }
   await enfileirar(c, ctx, {
     tipo: 'comunicacao.enviar', chave: `enviar:${it.id}`, executarEm, maxTentativas: 6,
-    payload: { interacaoId: it.id, pontoFocalId: pontoFocal.id, fallback, contatoProgramadoId },
+    payload: { interacaoId: it.id, pontoFocalId: grupo ? null : pontoFocal.id, fallback: fallback && !grupo, contatoProgramadoId },
   });
   return it;
 }

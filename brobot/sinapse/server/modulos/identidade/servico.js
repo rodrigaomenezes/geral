@@ -23,7 +23,7 @@ function conferirSenha(senha, guardado) {
 }
 
 const COLUNAS_USUARIO = `u.id, u.tenant_id, u.nome, u.email, u.papel, u.equipe_id, u.disponivel, u.substituto_id,
-  e.codigo AS equipe_codigo, e.nome AS equipe_nome, t.slug AS tenant_slug, t.nome AS tenant_nome, t.demonstracao`;
+  e.codigo AS equipe_codigo, e.nome AS equipe_nome, t.slug AS tenant_slug, t.nome AS tenant_nome, t.demonstracao, t.config -> 'marca' AS marca`;
 
 async function autenticar(db, email, senha) {
   const r = await db.sistema((c) => c.query(

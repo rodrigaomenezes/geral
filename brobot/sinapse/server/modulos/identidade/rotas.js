@@ -7,8 +7,16 @@ const s = require('./servico');
 
 const publicoUsuario = (u, cfg) => u && ({
   id: u.id, nome: u.nome, papel: u.papel, papelNome: NOMES_PAPEIS[u.papel], equipe: u.equipe_nome, equipeCodigo: u.equipe_codigo,
-  organizacao: u.tenant_nome, permissoes: permissoesDe(u.papel), demo: cfg.demo && u.demonstracao,
+  organizacao: u.tenant_nome, permissoes: permissoesDe(u.papel), demo: cfg.demo && u.demonstracao, marca: marcaSegura(u.marca),
 });
+
+/** Marca da organização (white-label): só cores hex, nome curto e logo servido pelo próprio sistema. */
+function marcaSegura(m) {
+  if (!m || typeof m !== 'object') return null;
+  const cor = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
+  return { nome: typeof m.nome === 'string' ? m.nome.slice(0, 40) : undefined, corPrimaria: cor(m.corPrimaria), corDestaque: cor(m.corDestaque),
+    logo: typeof m.logo === 'string' && /^\/marca\/[\w.-]+$/.test(m.logo) ? m.logo : undefined };
+}
 
 module.exports = [
   { metodo: 'GET', caminho: '/api/health', publica: true,

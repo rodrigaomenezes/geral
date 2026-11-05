@@ -10,6 +10,8 @@ const { hashSenha } = require('../identidade/servico');
 const ocorrencias = require('../ocorrencias/servico');
 const rodadas = require('../rodadas/servico');
 const entrada = require('../entrada/servico');
+const processos = require('../processos/servico');
+const padroes = require('../processos/padroes');
 
 const EQUIPES = [
   ['triagem', 'Triagem', false], ['suporte', 'Suporte', false], ['cs', 'Customer Success', false], ['operacoes', 'Operações', false],
@@ -26,6 +28,9 @@ const PESSOAS = [
   ['lucas', 'Lucas Ferreira', 'lucas@sinapse.demo', 'dev', 'dev'],
   ['carla', 'Carla Mendes', 'carla@sinapse.demo', 'financeiro', 'financeiro'],
 ];
+
+// Grupo de WhatsApp do cliente (id fictício do grupo no provedor).
+const GRUPOS = { rotasul: '120363000000000001@g.us', horizonte: '120363000000000002@g.us', transminas: '120363000000000005@g.us', litoral: '120363000000000006@g.us' };
 
 // [chave, nome, cnpj, segmento, vip, idOmie, situacaoOmie, excecao]
 const CONTAS = [
@@ -94,6 +99,9 @@ async function criarTenantBase(db, { slug, nome }, equipes) {
     const ctx = ctxSistema(t.id, 'implantação');
     await enfileirar(c, ctx, { tipo: 'supervisor.varrer', chave: 'recorrente:supervisor', maxTentativas: 1000 });
     await enfileirar(c, ctx, { tipo: 'omie.sincronizar', chave: 'recorrente:omie', maxTentativas: 1000 });
+    await enfileirar(c, ctx, { tipo: 'processos.despachar', chave: 'recorrente:processos', maxTentativas: 1000 });
+    await enfileirar(c, ctx, { tipo: 'processos.agenda', chave: 'recorrente:agenda', maxTentativas: 1000 });
+    await padroes.garantir(c, ctx, processos);
   });
   return t.id;
 }
@@ -119,6 +127,7 @@ async function semearTenant(db, cfg, base) {
         [tenantId, nome, cnpj, seg, vip, vip ? 'Frota acima de 400 veículos' : null, vip ? 'Diretoria de CS' : null, vip ? '2027-06-30' : null,
           `PLT-${cnpj.slice(0, 4)}`, idOmie, excecao, excecao ? 'Conta em recuperação: acompanhamento do CS até dez/2026' : null])).rows[0];
       if (situacao) await c.query('INSERT INTO demo_omie (tenant_id, id_omie, situacao) VALUES ($1,$2,$3)', [tenantId, idOmie, situacao]);
+      if (GRUPOS[k]) await c.query('UPDATE contas SET grupo_whatsapp = $2 WHERE id = $1', [ids.conta[k].id, GRUPOS[k]]);
     }
     for (const [conta, papel, nome, tel, email, consent] of PONTOS_FOCAIS) {
       ids.pf[`${conta}:${papel}`] = (await c.query(

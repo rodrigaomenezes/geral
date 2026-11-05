@@ -1,31 +1,28 @@
 'use strict';
 // Pré-rodada e pós-rodada (PRE-001 a PRE-012, POS-001 a POS-010, RN-003 a RN-006, AT-008, AT-009).
-// Linha do tempo de uma rodada agendada para D0:
-//   D-4 job `rodada.pre_rodada`: teste na Platform → pendências (sem duplicar) → ocorrência com itens → contatos
-//   D-3 aviso · D-2 ligação intermediária (tarefa) · D-1 lembrete — cada contato só sai se ainda houver pendência
-//   D0  job `rodada.executar`: resultado oficial → compara com a pré-rodada → comunicado + acompanhamento D+3.
-// Correção confirmada tecnicamente fecha a pendência e cancela os contatos futuros (RN-005).
+// Este módulo faz a parte técnica e publica os fatos; a cadência de contatos é um PROCESSO editável
+// (modulos/processos/padroes.js), não código fixo:
+//   D-4 job `rodada.pre_rodada`: teste na Platform → pendências (sem duplicar) → ocorrência com itens
+//       → evento `rodada.pendencias_detectadas` (dispara "Pré-rodada: cadência de credenciais")
+//   D0  job `rodada.executada`: resultado oficial → compara com a pré-rodada → evento `rodada.executada`
+//       (dispara "Pós-rodada: comunicado no grupo + follow-up D+3").
+// Correção confirmada tecnicamente fecha a pendência e encerra na hora os processos que "param sozinhos quando as
+// pendências forem corrigidas" — os contatos futuros não saem (RN-005).
 
 const { uma } = require('../../db');
 const { erro } = require('../../nucleo/erros');
 const { publicar, auditar } = require('../../nucleo/registro');
-const { relogio, DIA, HORA } = require('../../nucleo/relogio');
-const { enfileirar, cancelarPorChave } = require('../../jobs/fila');
+const { relogio, DIA } = require('../../nucleo/relogio');
+const { enfileirar } = require('../../jobs/fila');
+const motor = require('../processos/motor');
 const { normalizarErro } = require('./erros');
 const platform = require('../integracoes/platform-demo');
 const clientes = require('../clientes/servico');
 const ocorrencias = require('../ocorrencias/servico');
 const tarefas = require('../ocorrencias/tarefas');
-const comunicacao = require('../comunicacao/servico');
 
-const MARCOS = [
-  { marco: 'D-3', dias: -3, canal: 'whatsapp', modelo: 'pre_rodada_d3' },
-  { marco: 'intermediaria', dias: -2, canal: 'telefone' },
-  { marco: 'D-1', dias: -1, canal: 'whatsapp', modelo: 'pre_rodada_d1' },
-];
 const ABERTAS = "estado IN ('aberta','persistente')";
 const dataBr = (d) => new Date(d).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-const chaveContato = (rodadaId, marco) => `contato:${rodadaId}:${marco}`;
 
 /** PRE-001: agenda os jobs de uma rodada conhecida (D-4 e D0). Idempotente por chave. */
 async function agendar(c, ctx, rodada) {
@@ -84,7 +81,7 @@ async function jobPreRodada(c, ctx, { rodadaId }) {
     [r.id, doCliente.length ? 'com_pendencias' : 'pronta', relogio.agora(), resultado.length, pend.length]);
 
   const prioridade = r.vip ? 'alta' : 'media';
-  await criarOcorrenciaDePendencias(c, ctx, r, doCliente, { tipo: 'pre_rodada', prioridade,
+  const oc = await criarOcorrenciaDePendencias(c, ctx, r, doCliente, { tipo: 'pre_rodada', prioridade,
     titulo: `Pré-rodada ${r.produto} ${dataBr(r.agendada_para)}: ${doCliente.length} pendência(s) do cliente` });
   // REC-004: erro de consulta/indisponibilidade vai para o Desenvolvimento, não para o cliente.
   await criarOcorrenciaDePendencias(c, ctx, r, tecnicas, { tipo: 'tecnica', prioridade: 'alta', equipeCodigo: 'dev',
@@ -97,13 +94,8 @@ async function jobPreRodada(c, ctx, { rodadaId }) {
       await tarefas.criar(c, ctx, { tipo: 'geral', equipeCodigo: clientes.equipeDaConta(r), chave: `pf:${r.id}`,
         titulo: `Cadastrar ponto focal de ${r.conta_nome} antes do aviso D-3`, prazoEm: new Date(new Date(r.agendada_para) - 3 * DIA) });
     }
-    for (const m of MARCOS) {
-      const quando = new Date(new Date(r.agendada_para).getTime() + m.dias * DIA);
-      const ct = uma(await c.query(
-        `INSERT INTO contatos_programados (tenant_id, conta_id, rodada_id, marco, canal, programado_para) VALUES ($1,$2,$3,$4,$5,$6)
-         ON CONFLICT (tenant_id, rodada_id, marco) DO NOTHING RETURNING id`, [ctx.tenantId, r.conta_id, r.id, m.marco, m.canal, quando]));
-      if (ct) await enfileirar(c, ctx, { tipo: 'rodada.contato', chave: chaveContato(r.id, m.marco), executarEm: quando, payload: { contatoId: ct.id } });
-    }
+    await publicar(c, ctx, { tipo: 'rodada.pendencias_detectadas', agregado: 'rodada', agregadoId: r.id, chave: `pendencias:${r.id}`,
+      payload: { contaId: r.conta_id, ocorrenciaId: oc?.id || null, qtd: doCliente.length } });
   }
   await auditar(c, ctx, { acao: 'rodada.pre_rodada_executada', entidade: 'rodada', entidadeId: r.id,
     depois: { veiculos: resultado.length, pendenciasCliente: doCliente.length, pendenciasTecnicas: tecnicas.length } });
@@ -114,41 +106,6 @@ async function jobPreRodada(c, ctx, { rodadaId }) {
 
 async function pendenciasAbertas(c, rodadaOuConta, porConta = false) {
   return (await c.query(`SELECT * FROM pendencias WHERE ${porConta ? 'conta_id' : 'rodada_id'} = $1 AND ${ABERTAS} ORDER BY placa`, [rodadaOuConta])).rows;
-}
-
-const listaTexto = (ps) => ps.map((p) => `• ${p.placa}: ${normalizarErro(p.erro_codigo).descricao} — ${normalizarErro(p.erro_codigo).instrucao}`).join('\n');
-
-/** D-3, intermediária, D-1, pós-rodada inicial e D+3. Só age se ainda houver pendência (PRE-008). */
-async function jobContato(c, ctx, { contatoId }) {
-  const ct = uma(await c.query('SELECT * FROM contatos_programados WHERE id = $1 FOR UPDATE', [contatoId]));
-  if (!ct || ct.estado !== 'programado') return {};
-  const r = await buscarRodada(c, ct.rodada_id);
-  const pend = (await pendenciasAbertas(c, r.conta_id, true)).filter((p) => normalizarErro(p.erro_codigo).doCliente);
-  if (!pend.length) {
-    await c.query("UPDATE contatos_programados SET estado = 'cancelado', motivo = 'Pendências já corrigidas', atualizado_em = now() WHERE id = $1", [ct.id]);
-    return {};
-  }
-  const oc = uma(await c.query(
-    `SELECT id, protocolo FROM ocorrencias WHERE rodada_id = $1 AND tipo IN ('pre_rodada','pos_rodada') ORDER BY criado_em DESC LIMIT 1`, [r.id]));
-  if (ct.marco === 'intermediaria') {
-    // PRE-007: ligação é tarefa humana com resultado registrado.
-    const t = await tarefas.criar(c, ctx, { tipo: 'ligacao', equipeCodigo: clientes.equipeDaConta(r), ocorrenciaId: oc?.id, rodadaId: r.id,
-      chave: `ligacao:${r.id}`, titulo: `Ligar para ${r.conta_nome}: ${pend.length} pendência(s) da rodada ${dataBr(r.agendada_para)}`,
-      prazoEm: new Date(relogio.agora().getTime() + 8 * HORA) });
-    await c.query("UPDATE contatos_programados SET tarefa_id = $2, motivo = 'Tarefa de ligação criada: aguardando o resultado', atualizado_em = now() WHERE id = $1", [ct.id, t?.id || null]);
-    return {};
-  }
-  const pfs = await clientes.pontosFocaisVigentes(c, r.conta_id);
-  const pf = pfs.find((p) => p.papel === 'principal') || pfs[0];
-  const modelo = { 'D-3': 'pre_rodada_d3', 'D-1': 'pre_rodada_d1', pos_inicial: 'pos_rodada_inicial', 'D+3': 'pos_rodada_d3' }[ct.marco];
-  const vars = { nome: pf?.nome || 'cliente', conta: r.conta_nome, produto: r.produto, data: dataBr(r.agendada_para), qtd: pend.length,
-    lista: listaTexto(pend), protocolo: oc?.protocolo || '-', sucesso: r.veiculos_sucesso ?? 0, total: r.veiculos_total ?? 0 };
-  const it = await comunicacao.programarEnvio(c, ctx, { contaId: r.conta_id, ocorrenciaId: oc?.id, pontoFocal: pf, modelo, variaveis: vars,
-    contatoProgramadoId: ct.id });
-  if (it.status_entrega === 'bloqueada') {
-    await c.query("UPDATE contatos_programados SET estado = 'falhou', motivo = $2, atualizado_em = now() WHERE id = $1", [ct.id, it.motivoBloqueio]);
-  }
-  return {};
 }
 
 /**
@@ -179,20 +136,16 @@ async function marcarCorrigida(c, ctx, p, evidencia) {
     "UPDATE pendencias SET estado = 'corrigida', corrigida_em = $2, evidencia_correcao = $3 WHERE id = $1 RETURNING *", [p.id, relogio.agora(), evidencia]));
   await auditar(c, ctx, { acao: 'pendencia.corrigida', entidade: 'pendencia', entidadeId: p.id, depois: { placa: p.placa, evidencia } });
   await publicar(c, ctx, { tipo: 'pendencia.corrigida', agregado: 'pendencia', agregadoId: p.id, chave: `pendencia.corrigida:${p.id}`,
-    payload: { placa: p.placa, erro: p.erro_codigo } });
-  let contatosCancelados = 0;
+    payload: { placa: p.placa, erro: p.erro_codigo, contaId: p.conta_id } });
+  let processosEncerrados = 0;
   const restantes = (await pendenciasAbertas(c, p.conta_id, true)).filter((x) => normalizarErro(x.erro_codigo).doCliente);
   if (!restantes.length) {
-    const futuros = (await c.query(
-      `UPDATE contatos_programados SET estado = 'cancelado', motivo = 'Correção confirmada tecnicamente', atualizado_em = now()
-       WHERE conta_id = $1 AND estado = 'programado' RETURNING rodada_id, marco, tarefa_id`, [p.conta_id])).rows;
-    contatosCancelados = futuros.length;
-    await cancelarPorChave(c, futuros.map((f) => chaveContato(f.rodada_id, f.marco)));
-    await c.query("UPDATE tarefas SET estado = 'cancelada' WHERE id = ANY($1) AND estado = 'aberta'", [futuros.map((f) => f.tarefa_id).filter(Boolean)]);
     await c.query("UPDATE rodadas SET estado = 'pronta' WHERE conta_id = $1 AND estado = 'com_pendencias'", [p.conta_id]);
-    if (futuros.length) {
+    // RN-005: encerra na hora os processos da conta que param quando as pendências acabam (contatos futuros não saem).
+    processosEncerrados = await motor.reavaliar(c, ctx, { conta_id: p.conta_id });
+    if (processosEncerrados) {
       await auditar(c, ctx, { acao: 'rodada.contatos_cancelados', entidade: 'conta', entidadeId: p.conta_id,
-        depois: { marcos: futuros.map((f) => f.marco) }, motivo: 'Correção confirmada tecnicamente (RN-005)' });
+        depois: { processosEncerrados }, motivo: 'Correção confirmada tecnicamente (RN-005)' });
     }
   }
   if (p.ocorrencia_id) {
@@ -204,7 +157,7 @@ async function marcarCorrigida(c, ctx, p, evidencia) {
       }, 'ocorrencia.resolvida', 'Correção confirmada tecnicamente em todas as pendências');
     }
   }
-  return { pendencia: atual, contatosCancelados };
+  return { pendencia: atual, processosEncerrados };
 }
 
 /** D0 (POS-001 a POS-005, POS-010): resultado oficial e comparação com a pré-rodada. */
@@ -224,9 +177,6 @@ async function jobExecutar(c, ctx, { rodadaId }) {
   await c.query(`UPDATE rodadas SET estado = 'executada', executada_em = $2, veiculos_total = $3, veiculos_sucesso = $4, veiculos_falha = $5,
       pendencias_corrigidas_ate_d0 = $6 WHERE id = $1`,
   [r.id, relogio.agora(), resultado.length, resultado.length - falhas.length, falhas.length, corrigidasAteD0]);
-  // Contatos de pré-rodada que ainda não saíram perdem o sentido depois do D0.
-  const velhos = (await c.query("UPDATE contatos_programados SET estado = 'cancelado', motivo = 'Rodada já executada', atualizado_em = now() WHERE rodada_id = $1 AND estado = 'programado' RETURNING marco", [r.id])).rows;
-  await cancelarPorChave(c, velhos.map((v) => chaveContato(r.id, v.marco)));
 
   const doCliente = pend.filter((p) => p.normalizado.doCliente);
   const novas = doCliente.filter((p) => p.nova);
@@ -244,19 +194,13 @@ async function jobExecutar(c, ctx, { rodadaId }) {
     const semOcorrencia = doCliente.filter((p) => !ativas.has(p.ocorrencia_id));
     await criarOcorrenciaDePendencias(c, ctx, { ...r }, semOcorrencia, { tipo: 'pos_rodada', prioridade: r.vip ? 'alta' : 'media',
       titulo: `Pós-rodada ${r.produto} ${dataBr(r.agendada_para)}: ${semOcorrencia.length} veículo(s) sem consulta` });
-    const agora = relogio.agora();
-    for (const m of [{ marco: 'pos_inicial', em: agora }, { marco: 'D+3', em: new Date(agora.getTime() + 3 * DIA) }]) {
-      const ct = uma(await c.query(
-        `INSERT INTO contatos_programados (tenant_id, conta_id, rodada_id, marco, canal, programado_para) VALUES ($1,$2,$3,$4,'whatsapp',$5)
-         ON CONFLICT (tenant_id, rodada_id, marco) DO NOTHING RETURNING id`, [ctx.tenantId, r.conta_id, r.id, m.marco, m.em]));
-      if (ct) await enfileirar(c, ctx, { tipo: 'rodada.contato', chave: chaveContato(r.id, m.marco), executarEm: m.em, payload: { contatoId: ct.id } });
-    }
   }
   const tecnicas = pend.filter((p) => !p.normalizado.doCliente && p.nova);
   await criarOcorrenciaDePendencias(c, ctx, r, tecnicas, { tipo: 'tecnica', prioridade: 'alta', equipeCodigo: 'dev',
     titulo: `Rodada ${r.produto}: ${tecnicas.length} erro(s) técnico(s) de consulta` });
   await publicar(c, ctx, { tipo: 'rodada.executada', agregado: 'rodada', agregadoId: r.id, chave: `d0:${r.id}`,
-    payload: { total: resultado.length, sucesso: resultado.length - falhas.length, falha: falhas.length, novas: novas.length, corrigidasAteD0 } });
+    payload: { contaId: r.conta_id, total: resultado.length, sucesso: resultado.length - falhas.length, falha: falhas.length, novas: novas.length,
+      pendenciasCliente: doCliente.length, corrigidasAteD0 } });
   await auditar(c, ctx, { acao: 'rodada.executada', entidade: 'rodada', entidadeId: r.id,
     depois: { total: resultado.length, falha: falhas.length, persistentes: doCliente.length - novas.length, novas: novas.length } });
   return {};
@@ -276,10 +220,9 @@ async function detalhe(c, id) {
   const r = await buscarRodada(c, id);
   if (!r) throw erro.naoEncontrado('Rodada');
   const pend = (await c.query('SELECT * FROM pendencias WHERE rodada_id = $1 OR (conta_id = $2 AND ' + ABERTAS + ') ORDER BY estado, placa', [id, r.conta_id])).rows;
-  const contatos = (await c.query('SELECT * FROM contatos_programados WHERE rodada_id = $1 ORDER BY programado_para', [id])).rows;
   const ocs = (await c.query('SELECT id, protocolo, titulo, estado, tipo FROM ocorrencias WHERE rodada_id = $1 ORDER BY criado_em', [id])).rows;
-  return { ...r, pendencias: pend.map((p) => ({ ...p, ...pick(normalizarErro(p.erro_codigo)) })), contatos, ocorrencias: ocs };
+  return { ...r, pendencias: pend.map((p) => ({ ...p, ...pick(normalizarErro(p.erro_codigo)) })), ocorrencias: ocs };
 }
 const pick = (n) => ({ instrucao: n.instrucao, doCliente: n.doCliente });
 
-module.exports = { agendar, jobPreRodada, jobContato, jobExecutar, revalidar, listar, detalhe, MARCOS };
+module.exports = { agendar, jobPreRodada, jobExecutar, revalidar, listar, detalhe };

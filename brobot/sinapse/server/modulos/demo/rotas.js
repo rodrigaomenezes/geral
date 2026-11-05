@@ -120,7 +120,7 @@ module.exports = [
       reiniciando = true;
       deps.worker.parar();
       try {
-        await voltar(db);
+        while (await voltar(db)); // desfaz todas as migrações (só com dados de demonstração)
         await migrar(db);
         await relogio.salvar(db, 0);
         await seed.semearSeVazio(db, cfg);

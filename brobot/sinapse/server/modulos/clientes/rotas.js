@@ -19,6 +19,11 @@ module.exports = [
       if (d.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) d.email = undefined;
       return com(201, await comAuditoriaDeAcesso(db, ctx, 'conta', params.id, (c) => s.definirPontoFocal(c, ctx, params.id, d)));
     } },
+  { metodo: 'POST', caminho: '/api/contas/:id/grupo', permissao: 'conta.editar', descricao: 'alterar o grupo do cliente',
+    handler: async ({ db, ctx, corpo, params }) => {
+      const d = validar(corpo, { grupo: { tipo: 'texto', max: 120 } });
+      return comAuditoriaDeAcesso(db, ctx, 'conta', params.id, (c) => s.definirGrupo(c, ctx, params.id, d.grupo));
+    } },
   { metodo: 'POST', caminho: '/api/contas/:id/bloqueio', permissao: 'financeiro.bloqueio', descricao: 'pedir bloqueio por inadimplência',
     handler: async ({ db, ctx, corpo, params }) => {
       const d = validar(corpo, { motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 } });

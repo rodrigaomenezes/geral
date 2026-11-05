@@ -70,8 +70,9 @@ module.exports = [
     handler: ({ db, ctx, usuario, query }) => db.comoTenant(ctx.tenantId, (c) => tarefas.listar(c, usuario, { minhas: query.minhas === '1', pagina: Number(query.pagina) || 1 })) },
   { metodo: 'POST', caminho: '/api/tarefas/:id/concluir', permissao: 'ocorrencia.atender', descricao: 'concluir tarefas',
     handler: async ({ db, ctx, corpo, params }) => {
-      const d = validar(corpo, { resultado: { obrigatorio: true, tipo: 'texto', min: 3, max: 1000 } });
-      return db.comoTenant(ctx.tenantId, (c) => tarefas.concluir(c, ctx, params.id, d.resultado));
+      const d = validar(corpo, { resultado: { obrigatorio: true, tipo: 'texto', min: 3, max: 1000 },
+        resultadoCodigo: { tipo: 'texto', em: ['atendeu', 'nao_atendeu', 'feito', 'nao_feito'] } });
+      return db.comoTenant(ctx.tenantId, (c) => tarefas.concluir(c, ctx, params.id, d.resultado, d.resultadoCodigo));
     } },
 ];
 

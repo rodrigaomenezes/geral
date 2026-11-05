@@ -15,10 +15,12 @@ const TODAS = {
   'supervisor.ver': 'ver o supervisor',
   'supervisor.reprocessar': 'reprocessar itens da fila de falhas',
   'auditoria.ver': 'ver a auditoria',
+  'processo.ver': 'ver os processos automáticos',
+  'processo.editar': 'criar, editar e ativar processos automáticos',
   'demo.simular': 'usar o simulador',
 };
 
-const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver'];
+const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver', 'processo.ver'];
 
 const PAPEIS = {
   admin: Object.keys(TODAS),
@@ -26,7 +28,7 @@ const PAPEIS = {
   suporte: [...OPERACIONAL, 'conta.editar', 'rodada.operar'],
   cs: [...OPERACIONAL, 'conta.editar', 'rodada.operar'],
   operacoes: [...OPERACIONAL, 'rodada.operar', 'conta.editar'],
-  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver'],
+  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver', 'processo.ver'],
   financeiro: ['ocorrencia.ver', 'conta.ver', 'financeiro.detalhe', 'financeiro.bloqueio'],
 };
 

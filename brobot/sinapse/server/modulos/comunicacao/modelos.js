@@ -22,6 +22,26 @@ const MODELOS = {
     texto: 'Olá, {nome}. A rodada {produto} da {conta} foi concluída: {sucesso} de {total} veículos consultados com sucesso.\n'
       + 'Veículos com pendência:\n{lista}\nProtocolo {protocolo}.',
   },
+  formalizacao_ligacao: {
+    versao: 1, nome: 'Formalização: tentamos ligar', variaveis: ['nome', 'conta', 'qtd', 'lista', 'protocolo'],
+    texto: 'Olá, {nome}. Tentamos falar com você por telefone sobre {qtd} pendência(s) da {conta} que impedem a consulta:\n{lista}\n'
+      + 'Pode nos responder por aqui? Assim que corrigir, avise e nós revalidamos. Protocolo {protocolo}.',
+  },
+  comunicado_rodada: {
+    versao: 1, nome: 'Comunicado da rodada (sucesso e falha por veículo)', variaveis: ['nome', 'conta', 'produto', 'sucesso', 'total', 'lista_sucesso', 'lista', 'protocolo'],
+    texto: 'Olá, {nome}. A rodada {produto} da {conta} foi concluída: {sucesso} de {total} veículos consultados com sucesso.\n'
+      + 'Consultados com sucesso: {lista_sucesso}\nNão consultados (pendência do cadastro):\n{lista}\n'
+      + 'Quando corrigir, por favor nos avise por aqui para revalidarmos. Protocolo {protocolo}.',
+  },
+  lembrete_cliente: {
+    versao: 1, nome: 'Lembrete: aguardamos seu retorno', variaveis: ['nome', 'conta', 'protocolo'],
+    texto: 'Olá, {nome}. Ainda aguardamos o seu retorno sobre o atendimento {protocolo} da {conta}. Se já resolveu, é só nos avisar por aqui.',
+  },
+  insights_caca_condutores: {
+    versao: 1, nome: 'Insights do CaçaCondutores', variaveis: ['nome', 'conta'],
+    texto: 'Olá, {nome}! Dica da semana para a {conta}: com o CaçaCondutores você identifica o condutor de cada multa e faz a indicação '
+      + 'dentro do prazo, sem perder pontos nem pagar a mais. Quer que a gente mostre em 10 minutos? Responda SAIR para não receber estas dicas.',
+  },
   pos_rodada_d3: {
     versao: 1, nome: 'Pós-rodada · acompanhamento D+3', variaveis: ['nome', 'conta', 'qtd', 'lista', 'protocolo'],
     texto: 'Olá, {nome}. Seguimos acompanhando {qtd} pendência(s) da {conta}:\n{lista}\n'
