@@ -1,4 +1,5 @@
 'use strict';
+const { garantirUsuariosTeste } = require('../identidade/usuarios-teste');
 // Simulador da apresentação: dispara os cenários da matriz de aceite (AT-001 a AT-015) pelos mesmos serviços
 // que a operação real usa. Só existe com SINAPSE_DEMO ligado e só para quem tem `demo.simular`.
 
@@ -124,6 +125,7 @@ module.exports = [
         await migrar(db);
         await relogio.salvar(db, 0);
         await seed.semearSeVazio(db, cfg);
+        await garantirUsuariosTeste(db, cfg, deps.log); // os usuários de teste voltam junto
       } finally {
         reiniciando = false;
         if (cfg.worker) deps.worker.iniciar(cfg.cicloWorkerMs);

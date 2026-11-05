@@ -27,7 +27,7 @@ responsável, "minhas", VIP, vencidas. Paginação por coluna (limite por coluna
 Acessível: além de arrastar, menu "Mover para…" (teclado e celular). Testes: rota agregada respeita RLS e escopo;
 mover inválido → 409; contagem de tarefas sem N+1.
 
-## F2 · Integração CSV com lotes, confirmação e mapeamento de colunas (adendo CSV) — amostras reais indisponíveis (DP-05)
+## F2 · Integração CSV com lotes, confirmação e mapeamento de colunas (adendo CSV) — ✔ FEITA em 05/11 (amostras reais indisponíveis, DP-05; falta reprocessamento e retorno automático)
 Estados de lote (RECEBIDO … CONFIRMADO/FALHOU), manifesto com hash e correlação nas exportações, AGUARDANDO_CONFIRMACAO
 com prazo e ocorrência quando o retorno não chega, rejeição por linha, reprocessamento autorizado, contratos
 versionados por fluxo, **mapeamento de colunas salvo por fluxo** (o primeiro arquivo real é ligado aos campos na prévia, sem código), modelos de arquivo para download, central de integração com frescor. Migração aditiva `importacoes`/`lotes`.

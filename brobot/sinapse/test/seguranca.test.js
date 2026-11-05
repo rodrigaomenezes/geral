@@ -73,3 +73,23 @@ test('R-01: com o modo demonstração desligado, entrar sem senha é recusado', 
     assert.equal((await (await fetch(`${t.base}/api/sessao`)).json()).demo, false);
   } finally { t.cfg.demo = true; }
 });
+
+test('usuários de teste: um por perfil com a senha de SINAPSE_SENHA_TESTE; entram por e-mail e senha; nunca em produção', async () => {
+  const { garantirUsuariosTeste, USUARIOS_TESTE } = require('../server/modulos/identidade/usuarios-teste');
+  const senha = 'senha-de-teste-longa-123';
+  assert.throws(() => carregarConfig({ SINAPSE_SENHA_TESTE: 'curta' }), /12 caracteres/);
+  assert.deepEqual(await garantirUsuariosTeste(t.app.db, { senhaTeste: senha, ambiente: 'producao' }), { criados: 0, atualizados: 0 });
+  const r1 = await garantirUsuariosTeste(t.app.db, { senhaTeste: senha, ambiente: 'desenvolvimento' });
+  assert.equal(r1.criados, USUARIOS_TESTE.length);
+  const r2 = await garantirUsuariosTeste(t.app.db, { senhaTeste: senha, ambiente: 'desenvolvimento' });
+  assert.deepEqual(r2, { criados: 0, atualizados: USUARIOS_TESTE.length }, 'repetir não duplica');
+  const entrar = (email, s) => fetch(`${t.base}/api/sessao/entrar`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, senha: s }) });
+  for (const [email, , papel] of USUARIOS_TESTE.slice(0, 4)) {
+    const r = await entrar(email, senha);
+    assert.equal(r.status, 200, email);
+    assert.equal((await r.json()).usuario.papel, papel);
+  }
+  assert.equal((await entrar('comercial@brobot.com.br', 'outra-senha-errada')).status, 422);
+  const [h] = await t.sql("SELECT senha_hash FROM usuarios WHERE email = 'gestor@brobot.com.br'");
+  assert.doesNotMatch(h.senha_hash, /senha-de-teste/, 'só o hash fica no banco');
+});
