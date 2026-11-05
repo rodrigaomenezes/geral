@@ -113,40 +113,53 @@ test('AT-007: WhatsApp falha → retentativas registradas e canal alternativo (e
   await t.sql("UPDATE integracoes SET disponivel = true WHERE nome = 'whatsapp'");
 });
 
-test('AT-008: correção confirmada no D-3 cancela os contatos futuros e resolve a ocorrência com evidência', async () => {
+const execucoes = (contaNome, processo) => t.sql(`SELECT e.id, e.estado, e.motivo, e.passo_atual FROM processo_execucoes e JOIN processos p ON p.id = e.processo_id
+  JOIN contas c ON c.id = e.conta_id WHERE c.nome = $1 AND p.nome LIKE $2 ORDER BY e.iniciada_em`, [contaNome, `${processo}%`]);
+
+test('AT-008: correção confirmada no D-3 encerra o processo de cadência (contatos futuros não saem) e resolve a ocorrência', async () => {
   const pedro = await t.entrarComo('Pedro Santos');
   const [conta] = await t.sql("SELECT id FROM contas WHERE nome = 'Logística Horizonte'");
-  const programados = await t.sql("SELECT marco FROM contatos_programados WHERE conta_id = $1 AND estado = 'programado'", [conta.id]);
-  assert.ok(programados.length >= 1, 'há contatos futuros antes da correção');
+  const [antes] = await execucoes('Logística Horizonte', 'Pré-rodada');
+  assert.equal(antes.estado, 'aguardando', 'cadência esperando o próximo marco');
+  const d3 = await t.sql("SELECT count(*)::int AS n FROM interacoes WHERE conta_id = $1 AND modelo = 'pre_rodada_d3@1'", [conta.id]);
+  assert.equal(d3[0].n, 1, 'aviso D-3 saiu');
   const pend = await t.sql("SELECT id, placa FROM pendencias WHERE conta_id = $1 AND estado <> 'corrigida'", [conta.id]);
-  // Revalidar sem corrigir: continua aberta.
   const sem = await pedro.post(`/pendencias/${pend[0].id}/revalidar`);
-  assert.equal(sem.corpo.corrigida, false);
+  assert.equal(sem.corpo.corrigida, false, 'sem correção na Platform, continua aberta');
+  let ultimo;
   for (const p of pend) {
     await t.sql('UPDATE demo_platform_veiculos SET erro_codigo = NULL WHERE conta_id = $1 AND placa = $2', [conta.id, p.placa]);
-    const r = await pedro.post(`/pendencias/${p.id}/revalidar`);
-    assert.equal(r.status, 200);
-    assert.equal(r.corpo.corrigida, true);
+    ultimo = await pedro.post(`/pendencias/${p.id}/revalidar`);
+    assert.equal(ultimo.corpo.corrigida, true);
   }
-  const restantes = await t.sql("SELECT count(*)::int AS n FROM contatos_programados WHERE conta_id = $1 AND estado = 'programado'", [conta.id]);
-  assert.equal(restantes[0].n, 0);
-  const jobs = await t.sql("SELECT count(*)::int AS n FROM jobs WHERE tipo = 'rodada.contato' AND estado = 'pendente' AND payload->>'contatoId' IN (SELECT id::text FROM contatos_programados WHERE conta_id = $1)", [conta.id]);
-  assert.equal(jobs[0].n, 0);
+  assert.ok(ultimo.corpo.processosEncerrados >= 1);
+  const [depois] = await execucoes('Logística Horizonte', 'Pré-rodada');
+  assert.equal(depois.estado, 'encerrada');
+  assert.match(depois.motivo, /Pendências do cliente em aberto é 0/);
+  const jobs = await t.sql("SELECT count(*)::int AS n FROM jobs WHERE chave LIKE $1 AND estado = 'pendente'", [`proc:${depois.id}:%`]);
+  assert.equal(jobs[0].n, 0, 'nenhum passo futuro agendado');
+  await t.avancar(72);
+  const d1 = await t.sql("SELECT count(*)::int AS n FROM interacoes WHERE conta_id = $1 AND modelo = 'pre_rodada_d1@1'", [conta.id]);
+  assert.equal(d1[0].n, 0, 'lembrete D-1 não saiu');
   const [oc] = await t.sql("SELECT estado, evidencia FROM ocorrencias WHERE conta_id = $1 AND tipo = 'pre_rodada'", [conta.id]);
   assert.equal(oc.estado, 'resolvida');
   assert.match(oc.evidencia, /Platform/);
 });
 
-test('AT-009: pós-rodada sem correção após D+3 → contato sai, pendência continua visível', async () => {
-  const [conta] = await t.sql("SELECT id FROM contas WHERE nome = 'TransMinas Fretes'");
-  const [d3] = await t.sql("SELECT estado FROM contatos_programados WHERE conta_id = $1 AND marco = 'D+3'", [conta.id]);
-  assert.equal(d3.estado, 'programado');
-  await t.avancar(73);
-  const [depois] = await t.sql("SELECT estado FROM contatos_programados WHERE conta_id = $1 AND marco = 'D+3'", [conta.id]);
-  assert.equal(depois.estado, 'enviado');
+test('AT-009: pós-rodada sem correção → comunicado no grupo, follow-up D+3 ao ponto focal, processo encerra e a pendência continua', async () => {
+  const [conta] = await t.sql("SELECT id, grupo_whatsapp FROM contas WHERE nome = 'TransMinas Fretes'");
+  await t.avancar(1); // junto com os avanços anteriores, já passaram mais de 72 h desde a rodada oficial
+  const [pre] = await execucoes('TransMinas Fretes', 'Pré-rodada');
+  assert.equal(pre.estado, 'encerrada', 'cadência de pré-rodada para sozinha: a rodada já foi executada');
+  const [com] = await t.sql("SELECT destinatario FROM interacoes WHERE conta_id = $1 AND modelo = 'comunicado_rodada@1'", [conta.id]);
+  assert.equal(com.destinatario, conta.grupo_whatsapp, 'comunicado vai para o grupo do cliente');
+  const fup = await t.sql("SELECT destinatario FROM interacoes WHERE conta_id = $1 AND modelo = 'pos_rodada_d3@1'", [conta.id]);
+  assert.equal(fup.length, 1);
+  assert.notEqual(fup[0].destinatario, conta.grupo_whatsapp, 'follow-up é com o ponto focal');
+  const [pos] = await execucoes('TransMinas Fretes', 'Pós-rodada');
+  assert.equal(pos.estado, 'concluida');
   const pend = await t.sql("SELECT estado FROM pendencias WHERE conta_id = $1 AND estado <> 'corrigida'", [conta.id]);
-  assert.ok(pend.length >= 1, 'pendência técnica continua aberta');
-  assert.equal(pend[0].estado, 'persistente');
+  assert.equal(pend[0].estado, 'persistente', 'pendência técnica continua visível');
 });
 
 test('AT-010: transferência sem aceite no prazo → fila de contingência e escalonamento', async () => {
@@ -225,7 +238,10 @@ test('AT-016: migração desfeita e reaplicada volta íntegra; migração com er
   const { abrirBanco } = require('../server/db');
   const db = await abrirBanco({});
   await migrar(db);
-  assert.equal((await db.query('SELECT count(*)::int AS n FROM schema_migracoes')).rows[0].n, 1);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM schema_migracoes')).rows[0].n, 2);
+  assert.equal(await voltar(db), '002_processos.sql');
+  assert.equal((await db.query("SELECT to_regclass('processos') AS t")).rows[0].t, null);
+  assert.ok((await db.query("SELECT to_regclass('ocorrencias') AS t")).rows[0].t, '001 continua');
   assert.equal(await voltar(db), '001_fundacao.sql');
   assert.equal((await db.query("SELECT to_regclass('ocorrencias') AS t")).rows[0].t, null);
   await migrar(db);
