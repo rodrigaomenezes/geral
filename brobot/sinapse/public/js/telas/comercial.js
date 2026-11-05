@@ -4,6 +4,7 @@ import { api, textoErro } from '../api.js';
 import { formulario } from './ocorrencias.js';
 import { secaoAutomacoes } from './processos.js';
 import { novoLembrete } from './meu-dia.js';
+import { ligar } from '../telefone.js';
 
 let CAT = null;
 const catalogo = async () => (CAT ||= await api.get('/comercial/catalogo'));
@@ -124,6 +125,7 @@ async function detalhe(el, ctx, id) {
         campo('O teste foi', opcoes(h('select', { name: 'resultado', required: true }), { aprovado: 'Aprovado (critério atingido)', reprovado: 'Reprovado' }, 'Escolha')),
         campo('Parecer', h('textarea', { name: 'parecer', rows: 3, required: true, minlength: 5 }), `Critério combinado: ${o.teste_criterio}`),
       ], 'Registrar', async (d) => { await api.post(`/comercial/oportunidades/${id}/teste`, { ...d, versao: o.version }); fechar(); aviso('Resultado registrado.'); recarregar(); })) }, 'Registrar resultado do teste') : null,
+      o.contato_telefone && ctx.pode('telefonia.usar') ? h('button', { class: 'btn', onclick: () => ligar({ oportunidadeId: id, aoEncerrar: recarregar }) }, '📞 Ligar') : null,
       h('button', { class: 'btn', onclick: () => novoLembrete(ctx, recarregar, { oportunidadeId: id }) }, '+ Lembrete'),
       h('button', { class: 'btn btn-fantasma', onclick: () => perder(o, recarregar) }, 'Marcar perdida')) : null,
     o.conta_id ? h('p', {}, 'Conta criada: ', h('a', { href: `#/contas/${o.conta_id}` }, o.conta_nome || 'abrir')) : null,

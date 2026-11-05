@@ -76,7 +76,8 @@ function montarCasca() {
     onclick: (e) => { const aberto = nav.classList.toggle('aberto'); e.currentTarget.setAttribute('aria-expanded', String(aberto)); } }, '☰');
   const topo = h('header', { class: 'topo' },
     botaoMenu,
-    h('a', { class: 'marca', href: '#/' }, h('img', { src: logo, alt: '', height: 28 }), h('span', {}, 'Sinapse'), h('small', {}, `ERP Operacional ${ctx.usuario.marca?.nome || ctx.usuario.organizacao}`)),
+    h('a', { class: 'marca', href: '#/', 'aria-label': 'Início' }, ctx.usuario.marca?.logo ? h('img', { src: logo, alt: '', height: 28 }) : h('span', { class: 'wordmark' }, h('b', {}, 'b'), 'robot'),
+      h('small', {}, `Sinapse · ${ctx.usuario.marca?.nome || ctx.usuario.organizacao}`)),
     h('div', { class: 'quem' },
       h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}`),
     ),

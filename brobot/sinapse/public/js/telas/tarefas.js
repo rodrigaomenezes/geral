@@ -1,6 +1,7 @@
 import { h, trocar, dataHora, relativo, selo, campo, opcoes, aviso, modal, vazio } from '../dom.js';
 import { api } from '../api.js';
 import { formulario } from './ocorrencias.js';
+import { ligar } from '../telefone.js';
 
 export async function telaTarefas(el, ctx) {
   let minhas = true;
@@ -16,7 +17,9 @@ export async function telaTarefas(el, ctx) {
       h('div', { class: 'linha-titulo' }, t.titulo),
       h('div', { class: 'linha-meta' }, h('span', {}, t.equipe_nome), h('span', {}, t.responsavel_nome || 'Fila da equipe'),
         t.protocolo ? h('a', { href: `#/ocorrencias/${t.ocorrencia_id}` }, t.protocolo) : null, t.conta_nome ? h('span', {}, t.conta_nome) : null),
-      ctx.pode('ocorrencia.atender') ? h('div', { class: 'form-acoes' }, h('button', { class: `btn ${t.tipo === 'ligacao' ? 'btn-primario' : ''}`, onclick: () => concluir(t) }, t.tipo === 'ligacao' ? 'Registrar ligação' : 'Concluir')) : null))
+      ctx.pode('ocorrencia.atender') ? h('div', { class: 'form-acoes' },
+        t.tipo === 'ligacao' && ctx.pode('telefonia.usar') ? h('button', { class: 'btn btn-primario', onclick: () => ligar({ tarefaId: t.id, aoEncerrar: carregar }) }, '📞 Ligar agora') : null,
+        h('button', { class: 'btn', onclick: () => concluir(t) }, t.tipo === 'ligacao' ? 'Registrar sem ligar' : 'Concluir')) : null))
       : vazio(minhas ? 'Nenhuma tarefa sua ou da sua equipe.' : 'Nenhuma tarefa aberta.'));
   }
 

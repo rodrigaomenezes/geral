@@ -1,6 +1,7 @@
 import { h, trocar, dataHora, relativo, selo, campo, opcoes, aviso, modal, vazio } from '../dom.js';
 import { api, textoErro } from '../api.js';
 import { secaoAutomacoes } from './processos.js';
+import { ligar } from '../telefone.js';
 
 const COR_ESTADO = { triagem: 'alerta', aberta: 'info', em_atendimento: 'ativo', aguardando_cliente: 'neutro', aguardando_terceiro: 'neutro',
   em_handoff: 'alerta', resolvida: 'ok', encerrada_sem_resolucao: 'neutro' };
@@ -134,6 +135,7 @@ export async function telaOcorrencia(el, ctx, id) {
   const acoes = h('div', { class: 'acoes' }, o.acoes.map((a) => h('button', {
     class: `btn ${['resolver', 'assumir', 'classificar', 'aceitar_handoff'].includes(a.acao) ? 'btn-primario' : ''}`, onclick: () => executar(a.acao, a.rotulo),
   }, a.rotulo)),
+  o.conta_id && ctx.pode('telefonia.usar') ? h('button', { class: 'btn', onclick: () => ligar({ ocorrenciaId: o.id, aoEncerrar: recarregar }) }, '📞 Ligar') : null,
   ctx.pode('ocorrencia.intervir') && !['resolvida', 'encerrada_sem_resolucao'].includes(o.estado) ? h('button', { class: 'btn btn-fantasma', onclick: () => reatribuir(ctx, o, recarregar) }, 'Reatribuir (intervenção)') : null);
 
   const conversa = h('div', { class: 'conversa' }, o.interacoes.length ? o.interacoes.map((i) => h('div', { class: `msg msg-${i.direcao}` },

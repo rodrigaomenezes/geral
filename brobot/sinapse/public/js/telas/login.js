@@ -14,8 +14,11 @@ export async function telaLogin(raiz, { demo, aoEntrar }) {
 
   const personas = h('div', { class: 'personas' });
   trocar(raiz, h('div', { class: 'login' },
-    h('div', { class: 'login-marca' }, h('img', { src: '/icon.svg', alt: '', width: 56, height: 56 }),
-      h('h1', {}, 'Sinapse'), h('p', {}, 'ERP Operacional da Brobot: Operações, Suporte e Customer Success num só fluxo, auditável de ponta a ponta.')),
+    h('div', { class: 'login-marca' },
+      h('div', { class: 'wordmark login-logo' }, h('b', {}, 'b'), 'robot'),
+      h('span', { class: 'login-selo' }, h('i', {}), 'Sinapse · gestão operacional'),
+      h('h1', {}, 'Operação, Suporte, CS e Comercial sob controle'),
+      h('p', {}, 'Cada pendência com dono, prazo e próxima ação. Processos que o sistema segue sozinho, do D-4 ao pós-rodada, e tudo auditável.')),
     h('div', { class: 'cartao login-cartao' },
       demo ? [h('h2', {}, 'Demonstração: entre como'), h('p', { class: 'suave' }, 'Escolha uma pessoa fictícia para ver o sistema pelo perfil dela.'), personas,
         h('details', {}, h('summary', {}, 'Entrar com e-mail e senha'), form)] : [h('h2', {}, 'Entrar'), form])));

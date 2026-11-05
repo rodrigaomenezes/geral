@@ -1,16 +1,20 @@
-/* Sinapse · celular primeiro (360 px), depois tela larga. */
+/* Sinapse · identidade visual Brobot (azul, Montserrat, botões em pílula) · celular primeiro (360 px). */
+@font-face { font-family: Montserrat; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/montserrat-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: Montserrat; font-style: normal; font-weight: 600; font-display: swap; src: url(/fonts/montserrat-latin-600-normal.woff2) format('woff2'); }
+@font-face { font-family: Montserrat; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/montserrat-latin-700-normal.woff2) format('woff2'); }
+@font-face { font-family: Montserrat; font-style: normal; font-weight: 800; font-display: swap; src: url(/fonts/montserrat-latin-800-normal.woff2) format('woff2'); }
 :root {
-  --fundo: #f4f7f9; --cartao: #ffffff; --texto: #13222e; --suave: #5b6b78; --borda: #dde4ea;
-  --marca: #0f2a3d; --destaque: #0f8f7b; --destaque-claro: #e3f6f2;
-  --info: #1d5fa8; --info-f: #e7f0fb; --ok: #1b7a43; --ok-f: #e5f5ec; --alerta: #8a5a00; --alerta-f: #fff3d6;
+  --fundo: #f3f7fb; --cartao: #ffffff; --texto: #0d2236; --suave: #55697d; --borda: #d8e3ee;
+  --marca: #1478c8; --marca-clara: #1f95de; --marca-escura: #0e5a9c; --destaque: #1683d2; --destaque-claro: #e4f1fb;
+  --info: #1366b3; --info-f: #e6f1fb; --ok: #1b7a43; --ok-f: #e5f5ec; --alerta: #8a5a00; --alerta-f: #fff3d6;
   --perigo: #b42318; --perigo-f: #fde8e6; --vip: #6b3fa0; --vip-f: #f1e9fb; --neutro: #4b5965; --neutro-f: #eef1f4;
   --raio: 10px; --sombra: 0 1px 2px rgba(16, 34, 46, .06), 0 1px 8px rgba(16, 34, 46, .04);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--texto); background: var(--fundo);
+  font-family: Montserrat, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--texto); background: var(--fundo);
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-size: 15px; line-height: 1.45; }
 a { color: var(--info); }
-h1 { font-size: 1.3rem; margin: 0; }
+h1 { font-size: 1.3rem; margin: 0; font-weight: 800; letter-spacing: -.01em; }
 h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
 h3 { font-size: .95rem; margin: 1rem 0 .5rem; }
 code { font-size: .85em; }
@@ -18,8 +22,10 @@ code { font-size: .85em; }
 .carregando, .vazio { color: var(--suave); padding: .75rem 0; }
 
 /* Casca */
-.topo { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem; background: var(--marca); color: #fff; }
-.marca { display: flex; align-items: center; gap: .45rem; color: #fff; text-decoration: none; font-weight: 700; font-size: 1.05rem; }
+.topo { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem; color: #fff;
+  background: linear-gradient(120deg, var(--marca-clara), var(--marca) 60%, var(--marca-escura)); box-shadow: 0 2px 10px rgba(14, 90, 156, .25); }
+.marca { display: flex; align-items: center; gap: .45rem; color: #fff; text-decoration: none; font-weight: 800; font-size: 1.1rem; letter-spacing: -.01em; }
+.marca img { border-radius: 8px; }
 .marca small { display: none; font-weight: 400; opacity: .75; font-size: .8rem; }
 .quem { margin-left: auto; display: flex; flex-direction: column; text-align: right; line-height: 1.15; min-width: 0; }
 .quem-nome { font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -107,7 +113,7 @@ input, select, textarea { font: inherit; padding: .55rem .6rem; border: 1px soli
 .campo small { color: var(--suave); font-size: .75rem; }
 .form-acoes, .acoes { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
 .form-acoes { justify-content: flex-end; margin: .5rem 0 0; }
-.btn { font: inherit; font-weight: 600; padding: .55rem .9rem; border-radius: 8px; border: 1px solid var(--borda); background: #fff; color: var(--texto); cursor: pointer; min-height: 40px; }
+.btn { font: inherit; font-weight: 600; padding: .55rem 1.1rem; border-radius: 999px; border: 1px solid var(--borda); background: #fff; color: var(--texto); cursor: pointer; min-height: 40px; }
 .btn:hover { border-color: var(--destaque); }
 .btn:disabled { opacity: .55; cursor: default; }
 .btn-primario { background: var(--destaque); border-color: var(--destaque); color: #fff; }
@@ -135,9 +141,17 @@ input, select, textarea { font: inherit; padding: .55rem .6rem; border: 1px soli
 
 /* Login */
 .login { min-height: 100vh; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem .75rem; max-width: 980px; margin: 0 auto; }
-.login-marca { text-align: center; }
-.login-marca h1 { font-size: 1.8rem; color: var(--marca); margin-top: .4rem; }
-.login-marca p { color: var(--suave); max-width: 32rem; margin: .4rem auto 0; }
+body:has(.login) { background:
+  linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px) 0 0 / 32px 32px,
+  linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px) 0 0 / 32px 32px,
+  linear-gradient(160deg, var(--marca-clara), var(--marca) 55%, var(--marca-escura)); }
+.login-marca { text-align: left; color: #fff; padding: .5rem .25rem; }
+.login-marca h1 { font-size: 2.2rem; color: #fff; margin-top: .6rem; line-height: 1.1; }
+.login-marca p { color: rgba(255,255,255,.9); max-width: 34rem; margin: .6rem 0 0; }
+.login-selo { display: inline-flex; align-items: center; gap: .4rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem;
+  letter-spacing: .06em; text-transform: uppercase; color: #fff; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.1); border-radius: 999px; padding: .3rem .8rem; }
+.login-selo i { width: .45rem; height: .45rem; border-radius: 50%; background: #3ee07a; }
+.login-cartao { border: 0; box-shadow: 0 20px 60px rgba(8, 50, 90, .35); }
 .personas h3 { font-size: .85rem; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
 .personas-grade { display: grid; grid-template-columns: 1fr; gap: .5rem; }
 .persona { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: .1rem; padding: .7rem .85rem; border: 1px solid var(--borda); border-radius: var(--raio); background: #fff; font: inherit; cursor: pointer; }
@@ -232,3 +246,23 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .arquivo-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
 label.btn { display: inline-flex; align-items: center; position: relative; }
 label.btn:focus-within { outline: 2px solid var(--destaque); outline-offset: 2px; }
+
+/* Marca Brobot: wordmark e acentos */
+.wordmark { font-weight: 800; letter-spacing: -.02em; }
+.wordmark b { display: inline-flex; align-items: center; justify-content: center; border: 2px solid currentColor; border-radius: 6px; padding: 0 .18em; margin-right: .04em; line-height: 1.15; }
+.kpi-valor { font-weight: 800; color: var(--marca-escura); }
+.menu a.ativo { border-left: 3px solid var(--destaque); }
+.btn-primario:hover { background: var(--marca-escura); border-color: var(--marca-escura); }
+@media (min-width: 960px) { .login-marca h1 { font-size: 3rem; } }
+.login-logo { color: #fff; font-size: 2rem; }
+
+/* Softphone */
+.telefone { position: fixed; right: .75rem; bottom: .75rem; z-index: 60; width: min(340px, calc(100vw - 1.5rem)); background: #fff; border-radius: 16px;
+  box-shadow: 0 16px 50px rgba(8, 50, 90, .35); padding: .9rem; border-top: 5px solid var(--marca); }
+.telefone-topo { display: flex; flex-direction: column; }
+.telefone-estado { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; font-weight: 600; color: var(--marca-escura); }
+.telefone-tempo { font-family: ui-monospace, Menlo, monospace; }
+.opcao-canal { display: flex; flex-direction: column; align-items: flex-start; gap: .2rem; text-align: left; font: inherit; padding: .8rem 1rem; border: 1px solid var(--borda); border-radius: 12px; background: #fff; cursor: pointer; margin-bottom: .5rem; width: 100%; }
+.opcao-canal:hover { border-color: var(--destaque); background: var(--destaque-claro); }
+.opcao-canal span { font-size: .85rem; color: var(--suave); }
+.wordmark { display: inline-flex; align-items: center; white-space: nowrap; }

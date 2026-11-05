@@ -1,6 +1,7 @@
 import { h, trocar, data, dataHora, cnpj, selo, campo, opcoes, aviso, modal, vazio } from '../dom.js';
 import { api, textoErro } from '../api.js';
 import { formulario } from './ocorrencias.js';
+import { ligar } from '../telefone.js';
 
 const COR_FIN = { ok: 'ok', alerta: 'alerta', neutro: 'neutro' };
 const COR_CRED = { ok: 'ok', ausente: 'perigo', invalida: 'perigo', expirada: 'perigo', '2fa_pendente': 'alerta', vinculo_sne: 'alerta' };
@@ -78,7 +79,8 @@ export async function telaConta(el, ctx, id) {
         ...par('Situação financeira (OMIE)', `${c.financeiro.rotulo}${c.financeiro.sincronizadoEm ? ` · sincronizado ${dataHora(c.financeiro.sincronizadoEm)}` : ''}`))),
       h('section', { class: 'cartao' }, h('h2', {}, 'Pontos focais'), vigentes.length ? h('ul', { class: 'itens' }, vigentes.map((p) => h('li', {},
         h('strong', {}, `${p.papel === 'principal' ? 'Principal' : 'Suplente'}: ${p.nome}`), h('div', { class: 'suave' }, [p.telefone, p.email].filter(Boolean).join(' · ')),
-        p.consentimento_whatsapp ? selo('WhatsApp autorizado', 'ok') : selo('Sem consentimento de WhatsApp', 'alerta'), p.opt_out ? selo('Opt-out', 'perigo') : null)))
+        p.consentimento_whatsapp ? selo('WhatsApp autorizado', 'ok') : selo('Sem consentimento de WhatsApp', 'alerta'), p.opt_out ? selo('Opt-out', 'perigo') : null,
+        p.telefone && ctx.pode('telefonia.usar') && ctx.pode('conta.editar') ? h('div', {}, h('button', { class: 'btn btn-pequeno', onclick: () => ligar({ contaId: id, numero: p.telefone, nome: `${p.nome} (${c.nome})`, aoEncerrar: recarregar }) }, '📞 Ligar')) : null)))
         : vazio('Nenhum ponto focal vigente.'),
       historico.length ? h('details', {}, h('summary', {}, `Histórico (${historico.length})`), h('ul', { class: 'itens' }, historico.map((p) => h('li', { class: 'suave' },
         `${p.papel}: ${p.nome} · até ${dataHora(p.encerrado_em)}`)))) : null)),
