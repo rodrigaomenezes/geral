@@ -105,6 +105,8 @@ async function criarTenantBase(db, { slug, nome }, equipes) {
     await enfileirar(c, ctx, { tipo: 'processos.despachar', chave: 'recorrente:processos', maxTentativas: 1000 });
     await enfileirar(c, ctx, { tipo: 'processos.agenda', chave: 'recorrente:agenda', maxTentativas: 1000 });
     await enfileirar(c, ctx, { tipo: 'lembretes.avisar', chave: 'recorrente:lembretes', maxTentativas: 1000 });
+    await enfileirar(c, ctx, { tipo: 'telefonia.manutencao', chave: 'recorrente:telefonia', maxTentativas: 1000 });
+    await c.query("INSERT INTO telefonia_config (tenant_id, provedor, celular) VALUES ($1, 'treino', true) ON CONFLICT DO NOTHING", [t.id]);
     await padroes.garantir(c, ctx, processos);
   });
   return t.id;

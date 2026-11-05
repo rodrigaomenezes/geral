@@ -21,10 +21,13 @@ const TODAS = {
   'comercial.ver': 'ver o funil comercial',
   'comercial.editar': 'cadastrar e mover oportunidades',
   'integracao.usar': 'importar e exportar arquivos da Platform e do OMIE',
+  'telefonia.usar': 'ligar pelo sistema',
+  'telefonia.gerir': 'configurar a telefonia e ver o painel de ligações',
+  'canais.gerir': 'conectar o número de WhatsApp da organização',
   'demo.simular': 'usar o simulador',
 };
 
-const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar'];
+const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar', 'telefonia.usar'];
 
 const PAPEIS = {
   admin: Object.keys(TODAS),
@@ -32,8 +35,8 @@ const PAPEIS = {
   suporte: [...OPERACIONAL, 'conta.editar', 'rodada.operar'],
   cs: [...OPERACIONAL, 'conta.editar', 'rodada.operar', 'comercial.ver'],
   operacoes: [...OPERACIONAL, 'rodada.operar', 'conta.editar', 'integracao.usar'],
-  comercial: ['comercial.ver', 'comercial.editar', 'conta.ver', 'agenda.usar', 'processo.ver', 'ocorrencia.ver'],
-  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar'],
+  comercial: ['comercial.ver', 'comercial.editar', 'conta.ver', 'agenda.usar', 'processo.ver', 'ocorrencia.ver', 'telefonia.usar'],
+  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar', 'telefonia.usar'],
   financeiro: ['ocorrencia.ver', 'conta.ver', 'financeiro.detalhe', 'financeiro.bloqueio', 'agenda.usar', 'integracao.usar', 'comercial.ver'],
 };
 

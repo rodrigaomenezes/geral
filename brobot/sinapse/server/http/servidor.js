@@ -16,13 +16,14 @@ const COOKIE = 'sinapse_sessao';
 const LIMITE_CORPO = 1024 * 1024;
 const LIMITE_ARQUIVO = 5 * 1024 * 1024; // CSV de integração: upload próprio, não JSON
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon' };
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 
 const CABECALHOS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
   'X-Frame-Options': 'DENY',
-  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' wss:; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
 };
 
 function compilar(rotas) {
@@ -127,9 +128,11 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
         if (rota.permissao && !pode(usuario, rota.permissao)) throw erro.semPermissao(rota.descricao || 'esta ação');
         if (rota.demo && !cfg.demo) throw new ErroNegocio(404, 'rota_inexistente', 'O simulador está desligado neste ambiente.');
       }
-      const corpo = req.method === 'GET' ? {} : await lerCorpo(req, { texto: !!rota.texto });
+      let corpo = req.method === 'GET' ? {} : await lerCorpo(req, { texto: !!(rota.texto || rota.cru) });
+      let bruto = null;
+      if (rota.cru && req.method !== 'GET') { bruto = corpo; try { corpo = JSON.parse(bruto || '{}'); } catch { throw erro.entrada('JSON inválido.'); } }
       const ctx = usuario ? { tenantId: usuario.tenant_id, usuario, correlacao } : { correlacao };
-      const r = await rota.handler({ req, res, params, query: Object.fromEntries(url.searchParams), corpo, usuario, ctx, token, db, cfg, deps });
+      const r = await rota.handler({ req, res, params, query: Object.fromEntries(url.searchParams), corpo, bruto, usuario, ctx, token, db, cfg, deps });
       if (r && r.__bruto) { registrar(r.status); return; }
       const status = r && r.__status ? r.__status : 200;
       responder(res, status, r && r.__status ? r.corpo : r ?? { ok: true }, r && r.__cabecalhos);
