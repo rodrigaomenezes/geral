@@ -11,21 +11,30 @@ import { telaSupervisor } from './telas/supervisor.js';
 import { telaAuditoria } from './telas/auditoria.js';
 import { telaSimulador } from './telas/simulador.js';
 import { telaProcessos, editorRota } from './telas/processos.js';
+import { telaMeuDia, sinoNotificacoes } from './telas/meu-dia.js';
+import { telaComercial } from './telas/comercial.js';
+import { telaIntegracoes } from './telas/integracoes.js';
 
 const MENU = [
+  { rota: 'meu-dia', rotulo: 'Meu dia', perm: 'agenda.usar' },
   { rota: 'painel', rotulo: 'Painel', perm: 'ocorrencia.ver' },
   { rota: 'ocorrencias', rotulo: 'Ocorrências', perm: 'ocorrencia.ver' },
   { rota: 'triagem', rotulo: 'Triagem', perm: 'ocorrencia.triar' },
   { rota: 'tarefas', rotulo: 'Tarefas', perm: 'ocorrencia.ver' },
+  { rota: 'comercial', rotulo: 'Comercial', perm: 'comercial.ver' },
   { rota: 'processos', rotulo: 'Processos', perm: 'processo.ver' },
   { rota: 'rodadas', rotulo: 'Rodadas', perm: 'rodada.ver' },
   { rota: 'contas', rotulo: 'Carteira', perm: 'conta.ver' },
+  { rota: 'integracoes', rotulo: 'Integrações', perm: 'integracao.usar' },
   { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', perm: 'auditoria.ver' },
   { rota: 'simulador', rotulo: 'Simulador', perm: 'demo.simular', demo: true },
 ];
 
 const ROTAS = {
+  'meu-dia': telaMeuDia,
+  comercial: telaComercial,
+  integracoes: telaIntegracoes,
   painel: telaPainel,
   ocorrencias: (el, ctx, id) => (id ? telaOcorrencia(el, ctx, id) : telaOcorrencias(el, ctx)),
   triagem: (el, ctx) => telaOcorrencias(el, ctx, { estado: 'triagem', titulo: 'Triagem' }),
@@ -67,10 +76,11 @@ function montarCasca() {
     onclick: (e) => { const aberto = nav.classList.toggle('aberto'); e.currentTarget.setAttribute('aria-expanded', String(aberto)); } }, '☰');
   const topo = h('header', { class: 'topo' },
     botaoMenu,
-    h('a', { class: 'marca', href: '#/painel' }, h('img', { src: logo, alt: '', height: 28 }), h('span', {}, 'Sinapse'), h('small', {}, `ERP Operacional ${ctx.usuario.marca?.nome || ctx.usuario.organizacao}`)),
+    h('a', { class: 'marca', href: '#/' }, h('img', { src: logo, alt: '', height: 28 }), h('span', {}, 'Sinapse'), h('small', {}, `ERP Operacional ${ctx.usuario.marca?.nome || ctx.usuario.organizacao}`)),
     h('div', { class: 'quem' },
       h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}`),
     ),
+    ctx.pode('agenda.usar') ? sinoNotificacoes() : null,
     h('button', { class: 'btn btn-fantasma', type: 'button', onclick: sair }, 'Sair'));
   const conteudo = h('main', { id: 'conteudo', tabindex: '-1' });
   trocar(raiz, topo, h('div', { class: 'corpo' }, nav, conteudo));
@@ -85,8 +95,10 @@ async function sair() {
 
 async function rotear() {
   if (!ctx.usuario) return;
-  const [rota = 'painel', id, extra] = location.hash.replace(/^#\/?/, '').split('/');
-  const fn = ROTAS[rota] || ROTAS.painel;
+  const inicial = ctx.pode('agenda.usar') ? 'meu-dia' : 'painel';
+  const [rotaHash, id, extra] = location.hash.replace(/^#\/?/, '').split('/');
+  const rota = rotaHash || inicial;
+  const fn = ROTAS[rota] || ROTAS[inicial];
   document.querySelectorAll('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === rota));
   const el = document.getElementById('conteudo');
   trocar(el, carregando());

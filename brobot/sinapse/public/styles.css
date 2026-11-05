@@ -189,3 +189,46 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .passos-lidos { list-style: none; padding-left: 0; }
 .passos-lidos li { padding: .35rem 0; border-top: 1px solid var(--borda); }
 .passos-lidos li:first-child { border-top: 0; font-weight: 600; }
+
+/* Meu dia */
+.chips-resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+.chip-resumo { display: flex; align-items: baseline; gap: .4rem; background: var(--cartao); border: 1px solid var(--borda); border-left: 4px solid var(--neutro); border-radius: var(--raio); padding: .6rem .75rem; }
+.chip-resumo strong { font-size: 1.4rem; }
+.chip-resumo span { font-size: .82rem; color: var(--suave); }
+.chip-perigo { border-left-color: var(--perigo); } .chip-perigo strong { color: var(--perigo); }
+.chip-ok { border-left-color: var(--ok); } .chip-info { border-left-color: var(--info); } .chip-alerta { border-left-color: #e0a000; }
+.cartao.destaque { border-color: #e0a000; background: var(--alerta-f); }
+@media (min-width: 720px) { .chips-resumo { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Sino */
+.sino { position: relative; }
+.btn-sino { position: relative; background: none; border: 0; font-size: 1.25rem; cursor: pointer; padding: .2rem .4rem; }
+.sino-contador { position: absolute; top: -2px; right: -2px; background: var(--perigo); color: #fff; border-radius: 999px; font-size: .65rem; font-weight: 700; padding: 0 .35rem; line-height: 1.3rem; min-width: 1.3rem; text-align: center; }
+.sino-painel { position: absolute; right: 0; top: 2.4rem; width: min(360px, calc(100vw - 1.5rem)); max-height: 70vh; overflow-y: auto; background: #fff; color: var(--texto); border-radius: var(--raio); box-shadow: 0 10px 40px rgba(0,0,0,.25); z-index: 40; padding: .5rem; }
+.sino-topo { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .25rem .25rem .5rem; }
+.sino-item { display: flex; flex-direction: column; gap: .1rem; padding: .5rem; border-radius: 8px; text-decoration: none; color: inherit; border-left: 3px solid transparent; }
+.sino-item:hover { background: var(--fundo); }
+.sino-item.nao-lida { background: var(--info-f); }
+.sino-item span { font-size: .85rem; } .sino-item small { color: var(--suave); font-size: .72rem; }
+.sino-item.grav-critica { border-left-color: var(--perigo); } .sino-item.grav-alerta { border-left-color: #e0a000; }
+
+/* Comercial */
+.quadro { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 82vw); gap: .75rem; overflow-x: auto; padding-bottom: .75rem; scroll-snap-type: x mandatory; }
+.coluna { background: var(--neutro-f); border-radius: var(--raio); padding: .5rem; scroll-snap-align: start; min-height: 6rem; }
+.coluna-topo { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; padding: .25rem .25rem .5rem; }
+.coluna-teste { background: var(--info-f); } .coluna-ganha { background: var(--ok-f); }
+.cartao-op { display: block; background: #fff; border: 1px solid var(--borda); border-radius: 8px; padding: .55rem .6rem; margin-bottom: .5rem; text-decoration: none; color: inherit; box-shadow: var(--sombra); }
+.cartao-op:hover { border-color: var(--destaque); }
+.op-vencida { border-left: 4px solid var(--perigo); }
+.op-acao { font-size: .78rem; margin-top: .25rem; }
+.etapas-trilha { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .75rem; align-items: center; }
+.etapa-passo { font-size: .75rem; padding: .2rem .55rem; border-radius: 999px; background: var(--neutro-f); color: var(--suave); }
+.etapa-passo.feito { background: var(--ok-f); color: var(--ok); } .etapa-passo.atual { background: var(--destaque); color: #fff; font-weight: 700; }
+@media (min-width: 960px) { .quadro { grid-auto-columns: minmax(200px, 1fr); } }
+
+/* Integrações */
+.exemplo-csv { display: block; white-space: pre-wrap; background: var(--fundo); padding: .5rem; border-radius: 6px; font-size: .78rem; margin: .4rem 0; overflow-wrap: anywhere; }
+.cartao input[type=file] { margin-top: .5rem; }
+.arquivo-oculto { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+label.btn { display: inline-flex; align-items: center; position: relative; }
+label.btn:focus-within { outline: 2px solid var(--destaque); outline-offset: 2px; }

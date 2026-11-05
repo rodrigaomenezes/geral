@@ -17,7 +17,7 @@ const COR_LOG = { executado: 'ok', pulado: 'neutro', aguardando: 'info', encerra
 
 function rotulosValores(ctx) {
   return { ...ctx.catalogos.tipos, ...ctx.catalogos.prioridades, ...ctx.catalogos.estados, ...CAT.modelos, ...DESTINOS, ...TIPOS_TAREFA, ...ORIGENS,
-    ...STATUS_CONTA, texto_livre: 'Texto livre', da_conta: 'Da conta (VIP → CS, demais → Suporte)',
+    ...STATUS_CONTA, texto_livre: 'Texto livre', responsavel: 'O responsável (dono da oportunidade ou da ocorrência)', da_conta: 'Da conta (VIP → CS, demais → Suporte)',
     ...Object.fromEntries(ctx.equipes.equipes.map((e) => [e.codigo, e.nome])) };
 }
 
@@ -165,7 +165,7 @@ async function editor(el, ctx, id) {
     const params = Object.entries(pd.params).map(([nome, pr]) => {
       let ent;
       if (pr.tipo === 'lista') ent = selectDe(pr.valores, p[nome], (v) => { p[nome] = v; desenhar(); }, pr.obrigatorio ? 'Escolha' : '—');
-      else if (pr.tipo === 'equipe') ent = selectDe(['da_conta', ...ctx.equipes.equipes.map((e) => e.codigo)], p[nome], (v) => { p[nome] = v; }, 'Escolha');
+      else if (pr.tipo === 'equipe') ent = selectDe(['da_conta', ...(p.tipo === 'lembrete' ? ['responsavel'] : []), ...ctx.equipes.equipes.map((e) => e.codigo)], p[nome], (v) => { p[nome] = v; }, 'Escolha');
       else if (pr.tipo === 'numero') { ent = h('input', { type: 'number', step: 'any', value: p[nome] ?? '', inputmode: 'decimal' }); ent.oninput = () => { p[nome] = ent.value === '' ? undefined : Number(ent.value); }; }
       else { ent = h('textarea', { rows: 2, value: p[nome] ?? '' }); ent.value = p[nome] ?? ''; ent.oninput = () => { p[nome] = ent.value; }; }
       if (p.tipo === 'enviar_mensagem' && nome === 'texto' && p.modelo !== 'texto_livre') return null;
