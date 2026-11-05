@@ -97,6 +97,8 @@ function servirEstatico(req, res, urlPath) {
 
 function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
   const tabela = compilar(rotas);
+  // HSTS só em produção (HTTPS garantido pelo Railway); em desenvolvimento quebraria o http://localhost.
+  if (cfg.producao) CABECALHOS['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
 
   async function tratar(req, res) {
     const inicio = Date.now();

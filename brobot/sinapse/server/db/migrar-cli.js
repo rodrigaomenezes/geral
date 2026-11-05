@@ -7,7 +7,7 @@ const { carregarConfig } = require('../config');
 
 (async () => {
   const cfg = carregarConfig();
-  const db = await abrirBanco({ url: cfg.databaseUrl, dir: cfg.dirDados });
+  const db = await abrirBanco({ url: cfg.databaseUrl, dir: cfg.dirDados, tls: cfg.dbTls });
   try {
     if (process.argv[2] === 'voltar') {
       if (process.env.SINAPSE_CONFIRMAR_VOLTA !== 'sim') {

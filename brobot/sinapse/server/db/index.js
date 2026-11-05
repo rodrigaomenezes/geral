@@ -8,9 +8,19 @@
 
 const PAPEL_APP = 'sinapse_app';
 
-function criarAdaptadorPg(url) {
+/** TLS (R-03): com sslmode na URL, o certificado do servidor é verificado (CA própria em SINAPSE_DB_CA ou as do sistema).
+ *  Desligar a verificação só com SINAPSE_DB_TLS_INSEGURO=1, escolha explícita que fica no log. */
+function opcoesTls(url, tls = {}, log = console.log) {
+  if (!/sslmode=(require|verify-ca|verify-full)/.test(url) && !tls.ca) return undefined;
+  if (tls.inseguro) { log('AVISO: conexão TLS com o PostgreSQL SEM verificar o certificado (SINAPSE_DB_TLS_INSEGURO=1).'); return { rejectUnauthorized: false }; }
+  return tls.ca ? { rejectUnauthorized: true, ca: tls.ca } : { rejectUnauthorized: true };
+}
+
+function criarAdaptadorPg(url, tls, log) {
   const { Pool } = require('pg');
-  const ssl = /sslmode=require/.test(url) ? { rejectUnauthorized: false } : undefined;
+  const ssl = opcoesTls(url, tls, log);
+  // O pg trata sslmode da URL por conta própria e sobrepõe `ssl`: tiramos da URL para valer a regra acima.
+  if (ssl) url = url.replace(/([?&])sslmode=[^&]*&?/, '$1').replace(/[?&]$/, '');
   const pool = new Pool({ connectionString: url, max: Number(process.env.SINAPSE_DB_POOL || 10), ssl });
   return {
     motor: 'postgresql',
@@ -57,8 +67,8 @@ async function criarAdaptadorPglite(dir) {
   };
 }
 
-async function abrirBanco({ url, dir } = {}) {
-  const base = url ? criarAdaptadorPg(url) : await criarAdaptadorPglite(dir);
+async function abrirBanco({ url, dir, tls, log } = {}) {
+  const base = url ? criarAdaptadorPg(url, tls, log) : await criarAdaptadorPglite(dir);
 
   /** Executa `fn(c)` numa transação restrita à organização `tenantId` (RLS). */
   async function comoTenant(tenantId, fn) {
@@ -81,4 +91,4 @@ async function abrirBanco({ url, dir } = {}) {
 /** Linha única ou null. */
 const uma = (r) => (r.rows && r.rows[0]) || null;
 
-module.exports = { abrirBanco, uma, PAPEL_APP };
+module.exports = { abrirBanco, uma, PAPEL_APP, opcoesTls };

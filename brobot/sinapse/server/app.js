@@ -80,7 +80,8 @@ function ligarWhatsappQr(db, cfg, log) {
 }
 
 async function criarApp(cfg, { log = console.log } = {}) {
-  const db = await abrirBanco({ url: cfg.databaseUrl, dir: cfg.dirDados });
+  const db = await abrirBanco({ url: cfg.databaseUrl, dir: cfg.dirDados, tls: cfg.dbTls, log });
+  if (cfg.demo) log('Modo DEMONSTRAÇÃO ligado: login por persona sem senha e dados fictícios. Não use com dados reais.');
   await migrar(db, log);
   await relogio.carregar(db);
   if (cfg.demo) await seed.semearSeVazio(db, cfg, log);

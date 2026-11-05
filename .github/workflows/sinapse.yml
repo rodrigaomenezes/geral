@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - run: npm run verificar
       - run: npm test
 
   postgresql:
@@ -43,4 +44,5 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - run: npm run verificar
       - run: npm test

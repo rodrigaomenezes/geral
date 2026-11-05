@@ -90,7 +90,8 @@ function montarCasca() {
     ctx.pode('agenda.usar') ? sinoNotificacoes() : null,
     h('button', { class: 'btn btn-fantasma', type: 'button', onclick: sair }, 'Sair'));
   const conteudo = h('main', { id: 'conteudo', tabindex: '-1' });
-  trocar(raiz, topo, h('div', { class: 'corpo' }, nav, conteudo));
+  const faixa = ctx.usuario.demo ? h('div', { class: 'faixa-demo', role: 'note' }, 'DEMONSTRAÇÃO · dados fictícios · login sem senha. Não cadastre dados reais neste ambiente.') : null;
+  trocar(raiz, faixa, topo, h('div', { class: 'corpo' }, nav, conteudo));
   nav.addEventListener('click', () => { nav.classList.remove('aberto'); botaoMenu.setAttribute('aria-expanded', 'false'); });
 }
 
