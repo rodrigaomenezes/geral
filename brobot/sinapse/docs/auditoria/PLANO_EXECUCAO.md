@@ -5,9 +5,9 @@ Commits pequenos e reversíveis; nada vai para a `main`/deploy sem aprovação. 
 
 ## Estado do branch `claude/keen-albattani-fpgfyt` (não publicado)
 - `c8d606b` correção dos testes que dependiam do relógio real (sem efeito no produto).
-- `528bcf2` WhatsApp por QR Code (backend + migração 006 aditiva com volta) — pedido de 05/11, **aguarda DP-03**.
+- `528bcf2` + tela Canais: WhatsApp por QR Code (migração 006 aditiva com volta) — aprovado em 05/11 (DP-03 = os dois).
 
-## F0 · Segurança urgente (sem mudança de schema) — proposta como primeira fatia
+## F0 · Segurança urgente (sem mudança de schema) — ✔ FEITA em 05/11 (aprovada)
 | Item | Mudança | Teste | Volta |
 | --- | --- | --- | --- |
 | R-01 | Em `NODE_ENV=production`, `SINAPSE_DEMO` obrigatório e explícito; `SINAPSE_AMBIENTE=producao` recusa demo; faixa "DEMONSTRAÇÃO — dados fictícios" na tela | config recusa; rota `/api/sessao/demo` 403 com demo desligado | variável |
@@ -18,7 +18,7 @@ Commits pequenos e reversíveis; nada vai para a `main`/deploy sem aprovação. 
 | R-17 | `npm run verificar` (`node --check` em tudo) no CI | CI | — |
 Critério de aceite: testes atuais verdes nos dois motores + novos testes; README com as variáveis. Risco: baixo (padrões compatíveis com o deploy atual de demonstração).
 
-## F1 · Kanban de ocorrências e tarefas com responsáveis (pedido de 05/11) — depende de DP-11
+## F1 · Kanban de ocorrências e tarefas com responsáveis (pedido de 05/11) — ✔ FEITA em 05/11 (DP-11 = opção a)
 Opção (a), sem schema: colunas = estados da máquina (triagem, aberta, em atendimento, aguardando cliente,
 aguardando terceiro/dev, em validação, resolvida). Cartão: protocolo, conta (VIP), responsável, prazo/SLA, próxima
 ação, tarefas abertas (x/y). Arrastar chama a **mesma** transição da máquina (`/transicoes`), que pede evidência ou

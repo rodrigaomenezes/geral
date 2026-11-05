@@ -57,6 +57,10 @@ test('máquina: fora da equipe não assume; Desenvolvimento não resolve demanda
   assert.throws(() => planejar({ estado: 'em_atendimento', equipe_id: 'e1', tipo: 'tecnica' }, 'resolver',
     { codigoDesfecho: 'corrigido_tecnico', evidencia: 'deploy feito e testado' }, ctxM(usuario('dev'))), /validada/);
   assert.equal(acoesPermitidas({ estado: 'triagem' }, usuario('financeiro')).length, 0, 'Financeiro não atende');
+  const acoes = (oc, u) => acoesPermitidas(oc, u).map((a) => a.acao);
+  assert.ok(!acoes({ estado: 'aberta', equipe_id: 'outra' }, usuario('suporte')).includes('assumir'), 'fora da equipe a tela não oferece assumir');
+  assert.ok(acoes({ estado: 'aberta', equipe_id: 'e1' }, usuario('suporte')).includes('assumir'));
+  assert.ok(acoes({ estado: 'aberta', equipe_id: 'outra' }, usuario('supervisor')).includes('assumir'), 'gestão assume de qualquer fila');
 });
 
 test('classificação: um assunto = certa; nenhum ou vários = triagem (INT-005)', () => {

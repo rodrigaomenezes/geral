@@ -29,3 +29,11 @@ Verificados sem problema: senha com scrypt e sal; token de sessão guardado só 
 origem verificada nos POST (CSRF); CSP sem inline; RLS com papel sem privilégio (`sinapse_app`) e teste A×B (AT-014);
 `db.sistema` usado só em login, fila, supervisor e migração (4 arquivos); segredos AES-256-GCM; auditoria só anexação
 no banco; `npm audit` sem vulnerabilidades.
+
+## Situação depois das fatias aprovadas em 05/11
+- **Mitigados (com teste):** R-01, R-02 (sem demonstração, nada é semeado), R-03, R-04, R-10, R-14, R-17 — commit F0 (T-019).
+- **Aceito pelo cliente:** R-13 (WhatsApp por QR, com aviso na tela; T-020).
+- **Encontrado e corrigido durante a F1:** processo padrão com definição inválida era pulado em silêncio na criação da
+  organização (`processos/padroes.js`); agora só a falta de equipe é tolerada e há teste de guarda.
+- **Em aberto:** R-05 (MFA), R-06/R-07/R-08 (banco de produção, papéis, monitor externo), R-09, R-11, R-12, R-15, R-16,
+  R-18, R-19, R-20 — ver o plano.

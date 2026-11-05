@@ -2,7 +2,7 @@ id;requisito (resumo);status;evidencia_codigo;teste;lacuna_ou_dependencia
 GOV-001;Cadastrar organizações, unidades, equipes e perfis com isolamento de acesso.;PARCIAL;"identidade/permissoes.js; 001 tenants/equipes/usuarios";"regras API 401/403; AT-014";"""unidades"" não existem; cadastro de usuário/equipe só por seed (sem tela)"
 GOV-002;Configurar perfis VIP com critérios, validade, aprovador e histórico.;PARCIAL;"contas.vip_* (001); clientes/servico.js";—;"critério/aprovador/validade gravados; sem tela de aprovação nem teste"
 GOV-003;Manter matriz de responsáveis por processo, carteira, horário e substituto.;PARCIAL;"usuarios.substituto_id; identidade.resolverResponsavel";AT-003;"sem matriz por processo/horário; substituto único"
-GOV-004;Impedir tarefas ativas sem dono ou fila de contingência.;IMPLEMENTADO E TESTADO;"CHECK tarefas.equipe_id NOT NULL; supervisor";"AT-010; regras painel sem órfãs";
+GOV-004;Impedir tarefas ativas sem dono ou fila de contingência.;IMPLEMENTADO E TESTADO;"CHECK tarefas.equipe_id; supervisor; quadro mostra fila sem responsável";"AT-010; quadro.test";
 GOV-005;Aplicar regras VIP→CS e demais→Suporte, com exceções justificadas.;IMPLEMENTADO E TESTADO;"clientes.equipeDaConta; CHECK justificativa";regras roteamento RN-001;
 GOV-006;Cadastrar ponto focal principal e suplente com canais válidos e histórico.;IMPLEMENTADO E TESTADO;pontos_focais (vigente, histórico);regras ponto focal histórico;
 GOV-007;Alertar e bloquear marcos críticos quando faltar ponto focal obrigatório.;PARCIAL;"alertas sem_ponto_focal; tarefa antes do D-3";processos força-tarefa;"alerta sim; bloqueio de marco crítico não comprovado por teste"
@@ -90,7 +90,7 @@ COM-003;Personalizar mensagens com dados estruturados e validação.;IMPLEMENTAD
 COM-004;Controlar horários, consentimento, opt-out e política de canais.;IMPLEMENTADO E TESTADO;"escolherCanal; opt_out; janela";regras canal COM-004;
 COM-005;Registrar envio, entrega, falha, resposta e correlação.;IMPLEMENTADO E TESTADO;status_entrega;WhatsApp oficial/QR;
 COM-006;Aplicar retentativa e canal alternativo quando permitido.;IMPLEMENTADO E TESTADO;retentativa + e-mail;AT-007;
-COM-007;Permitir comunicação humana sem perder trilha do atendimento.;IMPLEMENTADO E TESTADO;"responder; eco do celular";WhatsApp QR;
+COM-007;Permitir comunicação humana sem perder trilha do atendimento.;IMPLEMENTADO E TESTADO;"responder; eco do celular (QR)";WhatsApp QR;
 COM-008;Oferecer central de pendências na experiência do cliente por integração à Platform.;BLOQUEADO POR API/DECISÃO;—;—;central do cliente fica na Platform
 COM-009;"Evitar alertas incessantes; aplicar severidade, frequência e acessibilidade.";PARCIAL;sino sem repetição;meu dia notificação uma vez;severidade/acessibilidade parcial
 COM-010;Publicar campanhas de adoção de produto com controle de frequência.;PARCIAL;processo semanal (desligado);—;sem teste
@@ -155,7 +155,7 @@ RNF-001;Disponibilidade Meta inicial sugerida 99,9% mensal do ERP, com janelas e
 RNF-002;"Durabilidade Nenhum evento confirmado ao emissor deve ser descartado; backups e recuperação testados.";PARCIAL;entrada antes de 202;AT-002;backup/restauração não testados
 RNF-003;Performance P95 de páginas operacionais até 2 s em carga nominal, a validar em dimensionamento.;AUSENTE;—;—;sem teste de carga
 RNF-004;Processamento Eventos críticos reconhecidos em até 60 s em condições normais, salvo dependência externa.;PARCIAL;ciclo 2 s;—;sem medição
-RNF-005;Segurança TLS, criptografia em repouso, MFA administrativo, segregação por tenant, secrets manager.;PARCIAL;"RLS; AES-GCM; scrypt";"AT-014; cifra";"MFA ausente; TLS do PG sem verificação"
+RNF-005;Segurança TLS, criptografia em repouso, MFA administrativo, segregação por tenant, secrets manager.;PARCIAL;"RLS; AES-GCM; scrypt; TLS do banco verificado; limite de login";"AT-014; cifra; seguranca.test";MFA ausente
 RNF-006;Privacidade LGPD, minimização, base legal, retenção, consentimento quando aplicável, logs protegidos.;AUSENTE;—;—;LGPD
 RNF-007;Auditabilidade 100% de transições críticas com ator, data, motivo, correlação e evidência.;IMPLEMENTADO E TESTADO;auditoria + eventos;AT-002/014;
 RNF-008;"Recuperação RPO/RTO a homologar por criticidade; exercícios de restauração regulares.";AUSENTE;—;—;RPO/RTO

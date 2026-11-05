@@ -237,6 +237,64 @@ async function listar(c, usuario, f = {}) {
   return { itens: r.rows.map(({ total, ...o }) => ({ ...o, sla: situacaoSla(o, agora) })), total: r.rows[0]?.total || 0, pagina, porPagina: POR_PAGINA };
 }
 
+// Quadro (Kanban) de ocorrências com tarefas e responsáveis (pedido de 05/11). Uma consulta só: cada coluna traz o
+// total e os primeiros cartões (por prazo); as tarefas vêm agregadas só para os cartões exibidos (sem consulta por
+// cartão). As colunas finais mostram só os últimos 7 dias. As ações possíveis de cada cartão vêm da máquina de estados,
+// então a tela só oferece colunas para onde o cartão pode ir — e o servidor confere de novo na transição.
+const COLUNAS_QUADRO = ['triagem', 'aberta', 'em_atendimento', 'aguardando_cliente', 'aguardando_terceiro', 'em_handoff', 'resolvida', 'encerrada_sem_resolucao'];
+const POR_COLUNA = 25;
+
+async function quadro(c, usuario, f = {}) {
+  const params = [relogio.agora()];
+  const onde = ["(o.estado NOT IN ('resolvida','encerrada_sem_resolucao') OR o.encerrada_em >= $1::timestamptz - interval '7 days')"];
+  const add = (sql, v) => { params.push(v); onde.push(sql.replace('?', `$${params.length}`)); };
+  if (f.equipe) add('e.codigo = ?', f.equipe);
+  if (f.responsavel === 'eu') add('o.responsavel_id = ?', usuario.id);
+  else if (f.responsavel === 'ninguem') onde.push('o.responsavel_id IS NULL');
+  else if (f.responsavel) add('o.responsavel_id = ?', f.responsavel);
+  if (f.vip) onde.push('c.vip');
+  if (f.vencidas) onde.push("o.estado NOT IN ('resolvida','encerrada_sem_resolucao') AND o.prazo_em < $1::timestamptz");
+  if (f.q) {
+    params.push(`%${f.q}%`);
+    const n = `$${params.length}`;
+    onde.push(`(o.protocolo ILIKE ${n} OR o.titulo ILIKE ${n} OR c.nome ILIKE ${n} OR c.cnpj LIKE ${n})`);
+  }
+  params.push(POR_COLUNA);
+  const r = await c.query(
+    `WITH base AS (
+       SELECT o.id, o.protocolo, o.titulo, o.tipo, o.estado, o.prioridade, o.prazo_em, o.proxima_acao, o.proxima_acao_em,
+         o.nivel_escalonamento, o.version, o.equipe_id, o.responsavel_id, o.encerrada_em, c.nome AS conta_nome, c.vip,
+         e.nome AS equipe_nome, e.codigo AS equipe_codigo, u.nome AS responsavel_nome,
+         count(*) OVER (PARTITION BY o.estado)::int AS total_coluna,
+         row_number() OVER (PARTITION BY o.estado ORDER BY
+           CASE WHEN o.estado IN ('resolvida','encerrada_sem_resolucao') THEN NULL ELSE o.prazo_em END NULLS LAST,
+           o.encerrada_em DESC NULLS LAST, o.criado_em) AS n
+       FROM ocorrencias o JOIN equipes e ON e.id = o.equipe_id LEFT JOIN contas c ON c.id = o.conta_id
+       LEFT JOIN usuarios u ON u.id = o.responsavel_id
+       WHERE ${onde.join(' AND ')}
+     ), vis AS (SELECT * FROM base WHERE n <= $${params.length})
+     SELECT vis.*, coalesce(t.abertas, 0)::int AS tarefas_abertas, coalesce(t.total, 0)::int AS tarefas_total, t.proxima_tarefa_em,
+       coalesce(t.responsaveis_tarefas, '{}') AS responsaveis_tarefas
+     FROM vis LEFT JOIN (
+       SELECT ta.ocorrencia_id, count(*) FILTER (WHERE ta.estado = 'aberta') AS abertas,
+         count(*) FILTER (WHERE ta.estado <> 'cancelada') AS total,
+         min(ta.prazo_em) FILTER (WHERE ta.estado = 'aberta') AS proxima_tarefa_em,
+         array_agg(DISTINCT ut.nome) FILTER (WHERE ta.estado = 'aberta' AND ut.nome IS NOT NULL) AS responsaveis_tarefas
+       FROM tarefas ta LEFT JOIN usuarios ut ON ut.id = ta.responsavel_id
+       WHERE ta.ocorrencia_id IN (SELECT id FROM vis) GROUP BY ta.ocorrencia_id
+     ) t ON t.ocorrencia_id = vis.id
+     ORDER BY vis.n`, params,
+  );
+  const agora = relogio.agora();
+  const colunas = Object.fromEntries(COLUNAS_QUADRO.map((e) => [e, { estado: e, nome: maquina.ESTADOS[e], total: 0, cartoes: [] }]));
+  for (const { n, total_coluna: total, equipe_id: equipeId, ...o } of r.rows) {
+    const col = colunas[o.estado];
+    col.total = total;
+    col.cartoes.push({ ...o, sla: situacaoSla(o, agora), acoes: maquina.acoesPermitidas({ ...o, equipe_id: equipeId }, usuario), daMinhaEquipe: equipeId === usuario.equipe_id });
+  }
+  return { colunas: COLUNAS_QUADRO.map((e) => colunas[e]), porColuna: POR_COLUNA };
+}
+
 async function detalhe(c, usuario, id) {
   const o = uma(await c.query(
     `SELECT o.*, c.nome AS conta_nome, c.vip, e.nome AS equipe_nome, e.codigo AS equipe_codigo, u.nome AS responsavel_nome,
@@ -267,5 +325,5 @@ async function detalhe(c, usuario, id) {
     acoes: maquina.acoesPermitidas(o, usuario) };
 }
 
-module.exports = { criar, transicionar, alterarComMotivo, reatribuir, responder, anotar, listar, detalhe, carregarCalendario,
+module.exports = { criar, transicionar, alterarComMotivo, reatribuir, responder, anotar, listar, quadro, detalhe, carregarCalendario,
   idEquipe, situacaoSla };

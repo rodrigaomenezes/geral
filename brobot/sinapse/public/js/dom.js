@@ -60,10 +60,10 @@ export function aviso(texto, tipo = 'ok') {
   setTimeout(() => el.remove(), tipo === 'erro' ? 9000 : 5000);
 }
 
-/** Janela modal simples (dialog nativo). `montar(fechar)` devolve o conteúdo. */
-export function modal(titulo, montar) {
+/** Janela modal simples (dialog nativo). `montar(fechar)` devolve o conteúdo; `aoFechar` roda ao fechar (opcional). */
+export function modal(titulo, montar, aoFechar) {
   const dlg = h('dialog', { class: 'modal', 'aria-label': titulo });
-  const fechar = () => { dlg.close(); dlg.remove(); };
+  const fechar = () => { if (!dlg.isConnected) return; dlg.close(); dlg.remove(); if (aoFechar) aoFechar(); };
   dlg.append(h('div', { class: 'modal-topo' }, h('h2', {}, titulo), h('button', { class: 'btn-icone', type: 'button', 'aria-label': 'Fechar', onclick: fechar }, '×')),
     montar(fechar));
   dlg.addEventListener('cancel', (e) => { e.preventDefault(); fechar(); });

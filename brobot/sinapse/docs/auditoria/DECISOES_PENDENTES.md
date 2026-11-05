@@ -1,5 +1,9 @@
 # Decisões pendentes (bloqueantes primeiro)
 
+**Respondidas em 05/11 ("tudo sim"):** DP-03 = os dois provedores (QR implementado com aviso de risco); DP-08b = opção (a);
+DP-11 = opção (a), colunas pelos estados; F0 aprovada. DP-01: segue **demonstração** até haver banco gerenciado e MFA
+(a pergunta era a/b; "sim" foi lido como manter a apresentação).
+
 | # | Decisão | Origem | Opções | Consequência de cada uma |
 | --- | --- | --- | --- | --- |
 | DP-01 | **Ambiente que a Brobot vai acessar agora é demonstração ou produção?** | Diretriz §4; R-01 | (a) demonstração com dados fictícios e aviso fixo; (b) produção com dados reais | (a) mantém o login por persona; (b) exige DP-02, MFA, `SINAPSE_DEMO=0`, banco gerenciado e backup **antes** do primeiro dado real |
