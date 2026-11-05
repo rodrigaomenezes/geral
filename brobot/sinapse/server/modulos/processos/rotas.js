@@ -44,7 +44,7 @@ module.exports = [
     handler: ({ db, ctx, params }) => comAuditoriaDeAcesso(db, ctx, 'processo', params.id, (c) => motor.executarAgora(c, ctx, params.id)) },
   { metodo: 'GET', caminho: '/api/execucoes', permissao: 'processo.ver',
     handler: ({ db, ctx, query }) => db.comoTenant(ctx.tenantId, async (c) => ({
-      itens: await s.listarExecucoes(c, { ocorrenciaId: query.ocorrencia, rodadaId: query.rodada, contaId: query.conta, limite: 20 }) })) },
+      itens: await s.listarExecucoes(c, { ocorrenciaId: query.ocorrencia, rodadaId: query.rodada, contaId: query.conta, oportunidadeId: query.oportunidade, limite: 20 }) })) },
   { metodo: 'POST', caminho: '/api/execucoes/:id/cancelar', permissao: 'processo.editar', descricao: 'cancelar execuções',
     handler: ({ db, ctx, corpo, params }) => {
       const d = validar(corpo, { motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 300 } });

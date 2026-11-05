@@ -19,6 +19,7 @@ const contexto = require('./contexto');
 const ocorrencias = require('../ocorrencias/servico');
 const tarefas = require('../ocorrencias/tarefas');
 const comunicacao = require('../comunicacao/servico');
+const agenda = require('../agenda/servico');
 
 const INTERVALO_DESPACHO_MS = 5e3;
 const LIMITE_POR_ALVO_24H = 5;
@@ -33,10 +34,11 @@ async function registrar(c, ctx, exe, passo, tipo, resultado, detalhe) {
 /** Alvo (ocorrência, rodada, conta) de um evento do outbox. */
 async function alvoDoEvento(c, ev) {
   const p = ev.payload || {};
-  const alvo = { ocorrencia_id: null, rodada_id: null, conta_id: p.contaId || null, execucao_id: p.execucaoId || null };
+  const alvo = { ocorrencia_id: null, rodada_id: null, oportunidade_id: null, conta_id: p.contaId || null, execucao_id: p.execucaoId || null };
   if (ev.aggregate_type === 'ocorrencia') alvo.ocorrencia_id = ev.aggregate_id;
   if (ev.aggregate_type === 'rodada') alvo.rodada_id = ev.aggregate_id;
   if (ev.aggregate_type === 'conta') alvo.conta_id = alvo.conta_id || ev.aggregate_id;
+  if (ev.aggregate_type === 'oportunidade') alvo.oportunidade_id = ev.aggregate_id;
   if (p.ocorrenciaId) alvo.ocorrencia_id = alvo.ocorrencia_id || p.ocorrenciaId;
   if (p.rodadaId) alvo.rodada_id = alvo.rodada_id || p.rodadaId;
   if (!alvo.conta_id && alvo.ocorrencia_id) alvo.conta_id = uma(await c.query('SELECT conta_id FROM ocorrencias WHERE id = $1', [alvo.ocorrencia_id]))?.conta_id || null;
@@ -57,15 +59,29 @@ async function versoesAtivas(c) {
     WHERE v.estado = 'ativa' AND p.arquivado_em IS NULL`)).rows;
 }
 
+/**
+ * Situação no momento do evento: um evento de "mudou para X" é avaliado como X, mesmo que o item já tenha andado
+ * (vários eventos processados juntos não podem todos parecer o estado final).
+ */
+function fotoDoEvento(ev) {
+  const para = ev?.payload?.para;
+  if (!para) return {};
+  if (ev.aggregate_type === 'oportunidade') return { 'oportunidade.etapa': para };
+  if (ev.aggregate_type === 'ocorrencia') return { 'ocorrencia.estado': para };
+  return {};
+}
+
 /** Inicia uma execução se as condições valem. Devolve a execução criada ou null (com o motivo). */
-async function iniciar(c, ctx, versao, alvo, chave, eventoId = null) {
+async function iniciar(c, ctx, versao, alvo, chave, eventoId = null, foto = {}) {
   const def = versao.definicao;
-  const { vars, contaId } = await contexto.carregar(c, alvo);
+  const carregado = await contexto.carregar(c, alvo);
+  const { contaId } = carregado;
+  const vars = { ...carregado.vars, ...foto };
   if (!todas(def.condicoes, vars)) return { execucao: null, motivo: 'condições não atendidas' };
   const recentes = uma(await c.query(
     `SELECT count(*)::int AS n FROM processo_execucoes WHERE processo_id = $1 AND iniciada_em > now() - interval '24 hours'
-     AND coalesce(ocorrencia_id::text, rodada_id::text, conta_id::text) = coalesce($2::text, $3::text, $4::text)`,
-    [versao.processo_id, alvo.ocorrencia_id, alvo.rodada_id, contaId]));
+     AND coalesce(oportunidade_id::text, ocorrencia_id::text, rodada_id::text, conta_id::text) = coalesce($5::text, $2::text, $3::text, $4::text)`,
+    [versao.processo_id, alvo.ocorrencia_id, alvo.rodada_id, contaId, alvo.oportunidade_id || null]));
   if (recentes.n >= LIMITE_POR_ALVO_24H) {
     await c.query(`INSERT INTO divergencias (tenant_id, tipo, descricao, entidade_id, chave) VALUES ($1, 'processo_em_laco', $2, $3, $4)
       ON CONFLICT (tenant_id, chave) DO NOTHING`, [ctx.tenantId,
@@ -74,9 +90,9 @@ async function iniciar(c, ctx, versao, alvo, chave, eventoId = null) {
     return { execucao: null, motivo: 'contido: possível laço' };
   }
   const exe = uma(await c.query(
-    `INSERT INTO processo_execucoes (tenant_id, processo_id, versao_id, evento_id, chave, ocorrencia_id, rodada_id, conta_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (tenant_id, chave) DO NOTHING RETURNING *`,
-    [ctx.tenantId, versao.processo_id, versao.id, eventoId, chave, alvo.ocorrencia_id, alvo.rodada_id, contaId]));
+    `INSERT INTO processo_execucoes (tenant_id, processo_id, versao_id, evento_id, chave, ocorrencia_id, rodada_id, conta_id, oportunidade_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (tenant_id, chave) DO NOTHING RETURNING *`,
+    [ctx.tenantId, versao.processo_id, versao.id, eventoId, chave, alvo.ocorrencia_id, alvo.rodada_id, contaId, alvo.oportunidade_id || null]));
   if (!exe) return { execucao: null, motivo: 'já iniciado para este gatilho' };
   await enfileirar(c, ctx, { tipo: 'processo.avancar', chave: `proc:${exe.id}:inicio`, payload: { execucaoId: exe.id } });
   return { execucao: exe };
@@ -98,12 +114,12 @@ async function jobDespachar(c, ctx) {
       for (const v of versoes) {
         if (!casa(v.definicao.gatilho, ev) || new Date(ev.received_at) < new Date(v.ativada_em)) continue;
         if (ev.causation_id && origemDe.get(ev.causation_id) === v.processo_id) continue; // não dispara a si mesmo
-        await iniciar(c, ctx, v, alvo, `ev:${ev.event_id}:${v.processo_id}`, ev.event_id);
+        await iniciar(c, ctx, v, alvo, `ev:${ev.event_id}:${v.processo_id}`, ev.event_id, fotoDoEvento(ev));
       }
       if (ev.event_type === 'tarefa.concluida' && alvo.execucao_id) {
         await enfileirar(c, ctx, { tipo: 'processo.avancar', chave: `proc:${alvo.execucao_id}:tarefa:${ev.aggregate_id}`, payload: { execucaoId: alvo.execucao_id } });
       }
-      if (alvo.conta_id || alvo.ocorrencia_id) await reavaliar(c, ctx, alvo);
+      if (alvo.conta_id || alvo.ocorrencia_id || alvo.oportunidade_id) await reavaliar(c, ctx, alvo);
     }
     await c.query('UPDATE eventos SET publicado_em = now() WHERE event_id = ANY($1)', [eventos.map((e) => e.event_id)]);
   }
@@ -114,7 +130,7 @@ async function jobDespachar(c, ctx) {
 async function reavaliar(c, ctx, alvo) {
   const vivas = (await c.query(
     `SELECT e.*, v.definicao FROM processo_execucoes e JOIN processo_versoes v ON v.id = e.versao_id
-     WHERE e.${VIVAS} AND (e.conta_id = $1 OR e.ocorrencia_id = $2) FOR UPDATE OF e`, [alvo.conta_id || null, alvo.ocorrencia_id || null])).rows;
+     WHERE e.${VIVAS} AND (e.conta_id = $1 OR e.ocorrencia_id = $2 OR e.oportunidade_id = $3) FOR UPDATE OF e`, [alvo.conta_id || null, alvo.ocorrencia_id || null, alvo.oportunidade_id || null])).rows;
   let encerradas = 0;
   for (const e of vivas) {
     if (!e.definicao.encerrarSe?.length) continue;
@@ -174,6 +190,18 @@ async function efeito(c, ctx, e, i, p, cx) {
       const t = await tarefas.criar(c, ctx, { tipo: p.tipoTarefa || 'geral', equipeCodigo: equipe, ocorrenciaId: oc?.id, rodadaId: e.rodada_id,
         titulo: preencher(p.titulo, vars), prazoEm: new Date(relogio.agora().getTime() + p.prazoHoras * HORA), chave: `proc:${e.id}:${i}`, execucaoId: e.id });
       return t ? `Tarefa criada para ${equipe}: ${t.titulo}` : 'Tarefa já existia (repetição ignorada)';
+    }
+    case 'lembrete': {
+      const quando = new Date(relogio.agora().getTime() + p.emHoras * HORA);
+      const base = { titulo: preencher(p.texto, vars), quando, ocorrenciaId: oc?.id, contaId: cx.contaId, oportunidadeId: e.oportunidade_id,
+        execucaoId: e.id, chave: `proc:${e.id}:${i}` };
+      if (p.para === 'responsavel') {
+        if (!vars.responsavel_id) pular('sem responsável definido');
+        await agenda.criarLembrete(c, ctx, { ...base, usuarioId: vars.responsavel_id });
+      } else {
+        await agenda.criarLembrete(c, ctx, { ...base, equipeCodigo: p.para === 'da_conta' ? vars.equipe_da_conta || 'suporte' : p.para });
+      }
+      return `Lembrete criado para ${p.para === 'responsavel' ? 'o responsável' : p.para} em ${p.emHoras} h`;
     }
     case 'mudar_prioridade':
       if (!ATIVA(oc)) pular('sem ocorrência ativa');

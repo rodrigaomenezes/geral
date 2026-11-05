@@ -16,6 +16,7 @@ const padroes = require('../processos/padroes');
 const EQUIPES = [
   ['triagem', 'Triagem', false], ['suporte', 'Suporte', false], ['cs', 'Customer Success', false], ['operacoes', 'Operações', false],
   ['dev', 'Desenvolvimento', false], ['supervisao', 'Supervisão', false], ['contingencia', 'Contingência', true], ['financeiro', 'Financeiro', false],
+  ['comercial', 'Comercial', false],
 ];
 
 const PESSOAS = [
@@ -27,6 +28,8 @@ const PESSOAS = [
   ['pedro', 'Pedro Santos', 'pedro@sinapse.demo', 'operacoes', 'operacoes'],
   ['lucas', 'Lucas Ferreira', 'lucas@sinapse.demo', 'dev', 'dev'],
   ['carla', 'Carla Mendes', 'carla@sinapse.demo', 'financeiro', 'financeiro'],
+  ['patricia', 'Patrícia Gomes', 'patricia@sinapse.demo', 'comercial', 'comercial'],
+  ['diego', 'Diego Araújo', 'diego@sinapse.demo', 'comercial', 'comercial'],
 ];
 
 // Grupo de WhatsApp do cliente (id fictício do grupo no provedor).
@@ -101,6 +104,7 @@ async function criarTenantBase(db, { slug, nome }, equipes) {
     await enfileirar(c, ctx, { tipo: 'omie.sincronizar', chave: 'recorrente:omie', maxTentativas: 1000 });
     await enfileirar(c, ctx, { tipo: 'processos.despachar', chave: 'recorrente:processos', maxTentativas: 1000 });
     await enfileirar(c, ctx, { tipo: 'processos.agenda', chave: 'recorrente:agenda', maxTentativas: 1000 });
+    await enfileirar(c, ctx, { tipo: 'lembretes.avisar', chave: 'recorrente:lembretes', maxTentativas: 1000 });
     await padroes.garantir(c, ctx, processos);
   });
   return t.id;
@@ -151,6 +155,7 @@ async function semearTenant(db, cfg, base) {
     }
   });
   await semearOcorrencias(db, tenantId, ids);
+  await semearComercial(db, tenantId, ids);
   return tenantId;
 }
 
@@ -189,6 +194,51 @@ async function semearOcorrencias(db, tenantId, ids) {
     texto: 'Bom dia, preciso de ajuda com o sistema' }, 'demonstração');
   await entrada.receber(db, tenantId, 'email', { idMensagem: '<demo-0002@horizonte.example>', de: 'henrique@horizonte.example', nome: 'Henrique Dias',
     assunto: 'Dúvida: onde vejo o comprovante de indicação de condutor?', texto: 'Olá, onde vejo o comprovante da indicação de condutor feita ontem?' }, 'demonstração');
+}
+
+// Funil comercial: [empresa, cnpj, contato, telefone, email, origem, produtos, frota, valor, etapa, responsavel, extra]
+const OPORTUNIDADES = [
+  ['Rodoviário Serra Azul', null, 'Paulo Henrique', '(47) 99812-3344', null, 'site', ['multas'], 120, null, 'novo', 'patricia'],
+  ['Translog Cerrado', null, 'Ana Beatriz', '(62) 99733-2211', 'ana@translogcerrado.example', 'evento', ['multas', 'indicacao_condutores'], 260, null, 'qualificacao', 'diego'],
+  ['Frigorífico Boa Terra', null, 'Marcos Vinícius', '(65) 99654-1100', 'marcos@boaterra.example', 'indicacao', ['multas', 'licenciamento'], 340, 6800, 'demonstracao', 'patricia'],
+  ['Locadora Via Rápida', '11222333000181', 'Carolina Prates', '(11) 98877-6655', 'carolina@viarapida.example', 'outbound', ['multas', 'indicacao_condutores', 'caca_condutores'], 900, 15900, 'proposta', 'diego'],
+  ['Distribuidora Litoral Norte', '22333444000192', 'Ricardo Alves', '(12) 99665-4433', 'ricardo@dlnorte.example', 'parceiro', ['multas', 'indicacao_condutores'], 180, 4200, 'teste', 'patricia', { teste: 'em_andamento' }],
+  ['Agro Transportes Paraná', '33444555000103', 'Simone Kruger', '(43) 99554-3322', 'simone@agrotp.example', 'indicacao', ['multas', 'licenciamento'], 410, 8900, 'teste', 'diego', { teste: 'aprovado' }],
+  ['Cargas Pampa', '44555666000114', 'Eduardo Lima', '(51) 99443-2211', 'eduardo@cargaspampa.example', 'site', ['multas'], 75, 1900, 'negociacao', 'patricia', { teste: 'aprovado' }],
+  ['Expresso Centro-Oeste', '55666777000125', 'Fábio Rocha', '(67) 99332-1100', null, 'outbound', ['multas'], 60, 1500, 'perdida', 'diego', { motivo: 'preco' }],
+];
+
+async function semearComercial(db, tenantId, ids) {
+  const comercial = require('../comercial/servico');
+  await db.comoTenant(tenantId, async (c) => {
+    const hoje = relogio.agora();
+    const dia = (n) => new Date(hoje.getTime() + n * DIA).toISOString().slice(0, 10);
+    for (const [empresa, cnpj, contato, tel, email, origem, produtos, frota, valor, etapa, resp, extra = {}] of OPORTUNIDADES) {
+      const ctx = { tenantId, usuario: ids.u[resp], correlacao: null };
+      const op = await comercial.criar(c, ctx, { empresa, cnpj, contatoNome: contato, contatoTelefone: tel, contatoEmail: email, origem, produtos, frota, valorMensal: valor });
+      const caminho = ['qualificacao', 'demonstracao', 'proposta', 'teste', 'negociacao'];
+      const alvo = etapa === 'perdida' ? 'qualificacao' : etapa;
+      let atual = op;
+      for (const e of caminho) {
+        if (caminho.indexOf(e) > caminho.indexOf(alvo) || alvo === 'novo') break;
+        const dadosTeste = e === 'teste' ? { testeInicio: dia(-5), testeFim: dia(extra.teste === 'em_andamento' ? 2 : 1), testeCriterio: 'Consultar 100% da frota sem erro de credencial em 7 dias' } : {};
+        if (e === 'negociacao' && atual.teste_resultado !== 'aprovado') break;
+        atual = await comercial.mover(c, ctx, op.id, e, dadosTeste);
+        if (e === 'teste' && extra.teste === 'aprovado') atual = await comercial.registrarTeste(c, ctx, op.id, { resultado: 'aprovado', parecer: 'Frota inteira consultada; cliente satisfeito com o painel de multas.' });
+      }
+      if (etapa === 'perdida') await comercial.mover(c, ctx, op.id, 'perdida', { motivoPerda: extra.motivo, detalhePerda: 'Achou caro para a frota atual; retomar em 6 meses.' });
+    }
+    // Uso da Platform (como se viesse do CSV): último login para o CS.
+    const uso = [['rotasul', -1, 14, 9100], ['horizonte', -9, 3, 820], ['valeverde', -2, 8, 5400], ['transminas', -21, 1, 310], ['litoral', -4, 5, 1900]];
+    for (const [k, dias, usuarios, consultas] of uso) {
+      await c.query('INSERT INTO uso_contas (tenant_id, conta_id, ultimo_login, usuarios_ativos, consultas_30d, modulos_usados) VALUES ($1,$2,$3,$4,$5,$6)',
+        [tenantId, ids.conta[k].id, new Date(hoje.getTime() + dias * DIA), usuarios, consultas, ['multas']]);
+    }
+    const agenda = require('../agenda/servico');
+    await agenda.criarLembrete(c, { tenantId, usuario: ids.u.juliana }, { titulo: 'Ligar para a Rota Sul: revisão trimestral da conta', quando: new Date(hoje.getTime() + 2 * HORA), contaId: ids.conta.rotasul.id });
+    await agenda.criarLembrete(c, { tenantId, usuario: ids.u.marina }, { titulo: 'Revisar indicadores da semana com as equipes', quando: new Date(hoje.getTime() + 1 * HORA), recorrencia: 'semanal' });
+    await agenda.criarLembrete(c, { tenantId, usuario: ids.u.rafael }, { titulo: 'Conferir pré-rodadas do dia (Suporte)', quando: new Date(hoje.getTime() - 1 * HORA), recorrencia: 'dias_uteis', equipeCodigo: 'suporte' });
+  });
 }
 
 async function semearParceiro(db) {

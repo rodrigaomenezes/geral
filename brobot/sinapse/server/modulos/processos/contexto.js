@@ -36,6 +36,18 @@ async function carregar(c, alvo) {
       });
     }
   }
+  if (alvo.oportunidade_id) {
+    const op = uma(await c.query('SELECT * FROM oportunidades WHERE id = $1', [alvo.oportunidade_id]));
+    if (op) {
+      contaId = contaId || op.conta_id;
+      Object.assign(vars, {
+        'oportunidade.etapa': op.etapa, 'oportunidade.teste_resultado': op.teste_resultado || 'pendente', 'oportunidade.valor_mensal': Number(op.valor_mensal || 0),
+        'oportunidade.dias_na_etapa': Math.floor((Date.now() - new Date(op.etapa_desde).getTime()) / 864e5), empresa: op.empresa, codigo: op.codigo,
+        responsavel_id: op.responsavel_id, conta: op.empresa, nome: op.contato_nome || 'cliente',
+      });
+    }
+  }
+  if (oc && oc.responsavel_id && !vars.responsavel_id) vars.responsavel_id = oc.responsavel_id;
   let conta = null;
   if (contaId) {
     conta = uma(await c.query('SELECT * FROM contas WHERE id = $1', [contaId]));

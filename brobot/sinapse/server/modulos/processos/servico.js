@@ -116,9 +116,9 @@ async function detalhe(c, id) {
   return { ...p, versoes: versoes.map((v) => ({ ...v, resumo: descrever(v.definicao) })), execucoes };
 }
 
-async function listarExecucoes(c, { processoId, ocorrenciaId, rodadaId, contaId, limite = 30 }) {
+async function listarExecucoes(c, { processoId, ocorrenciaId, rodadaId, contaId, oportunidadeId, limite = 30 }) {
   const onde = []; const params = [];
-  for (const [col, v] of [['e.processo_id', processoId], ['e.ocorrencia_id', ocorrenciaId], ['e.rodada_id', rodadaId], ['e.conta_id', contaId]]) {
+  for (const [col, v] of [['e.processo_id', processoId], ['e.ocorrencia_id', ocorrenciaId], ['e.rodada_id', rodadaId], ['e.conta_id', contaId], ['e.oportunidade_id', oportunidadeId]]) {
     if (v) { params.push(v); onde.push(`${col} = $${params.length}`); }
   }
   params.push(Math.min(limite, 100));

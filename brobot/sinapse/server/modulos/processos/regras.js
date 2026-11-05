@@ -58,7 +58,7 @@ function validarDefinicao(d, { equipes = [] } = {}) {
       if (pd.tipo === 'numero') { v = Number(v); if (!Number.isFinite(v)) { problemas.push({ campo: `${aqui}.${nome}`, problema: 'deve ser número' }); continue; } }
       if (pd.tipo === 'texto') { v = String(v).trim().slice(0, 1000); }
       if (pd.tipo === 'lista' && !pd.valores.includes(v)) { problemas.push({ campo: `${aqui}.${nome}`, problema: 'valor fora da lista' }); continue; }
-      if (pd.tipo === 'equipe' && v !== 'da_conta' && !equipes.includes(v)) { problemas.push({ campo: `${aqui}.${nome}`, problema: `equipe inexistente: ${v}` }); continue; }
+      if (pd.tipo === 'equipe' && !['da_conta', 'responsavel'].includes(v) && !equipes.includes(v)) { problemas.push({ campo: `${aqui}.${nome}`, problema: `equipe inexistente: ${v}` }); continue; }
       n[nome] = v;
     }
     if (p.tipo === 'esperar') {

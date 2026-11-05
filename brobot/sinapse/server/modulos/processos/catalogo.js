@@ -12,6 +12,8 @@ const GATILHOS = {
   'ocorrencia.reaberta': { rotulo: 'Uma ocorrência é reaberta', entidade: 'ocorrencia', eventos: ['ocorrencia.reaberta'] },
   'rodada.pendencias': { rotulo: 'A pré-rodada (D-4) encontra pendências do cliente', entidade: 'rodada', eventos: ['rodada.pendencias_detectadas'] },
   'rodada.executada': { rotulo: 'A rodada oficial (D0) é executada', entidade: 'rodada', eventos: ['rodada.executada'] },
+  'oportunidade.etapa': { rotulo: 'Uma oportunidade do Comercial muda de etapa', entidade: 'oportunidade', eventos: ['oportunidade.etapa'] },
+  'oportunidade.ganha': { rotulo: 'Uma venda é fechada (oportunidade ganha)', entidade: 'oportunidade', eventos: ['oportunidade.ganha'] },
   'contas.manual': { rotulo: 'Ao clicar em "Executar agora", para cada conta que atende às condições', entidade: 'conta', eventos: [] },
   'contas.semanal': { rotulo: 'Toda semana, para cada conta que atende às condições', entidade: 'conta', eventos: [], agenda: true },
 };
@@ -30,6 +32,10 @@ const CAMPOS = {
   'conta.status': { rotulo: 'Situação da conta', tipo: 'lista', valores: ['onboarding', 'ativa', 'suspensa', 'encerrada'] },
   'conta.tem_grupo': { rotulo: 'Cliente tem grupo de WhatsApp', tipo: 'booleano' },
   'ligacao.atendeu': { rotulo: 'A última ligação do processo foi atendida', tipo: 'booleano' },
+  'oportunidade.etapa': { rotulo: 'Etapa da oportunidade', tipo: 'lista', valores: ['novo', 'qualificacao', 'demonstracao', 'proposta', 'teste', 'negociacao', 'ganha', 'perdida'] },
+  'oportunidade.teste_resultado': { rotulo: 'Resultado do teste', tipo: 'lista', valores: ['pendente', 'aprovado', 'reprovado'] },
+  'oportunidade.valor_mensal': { rotulo: 'Valor mensal da oportunidade (R$)', tipo: 'numero' },
+  'oportunidade.dias_na_etapa': { rotulo: 'Dias na etapa atual', tipo: 'numero' },
   'cliente.respondeu': { rotulo: 'Cliente respondeu depois do início', tipo: 'booleano' },
   'pendencias.abertas': { rotulo: 'Pendências do cliente em aberto', tipo: 'numero' },
   'rodada.executada': { rotulo: 'Rodada oficial já executada', tipo: 'booleano' },
@@ -67,6 +73,11 @@ const PASSOS = {
     tipoTarefa: { tipo: 'lista', rotulo: 'Tipo de tarefa', valores: ['geral', 'ligacao', 'validar_correcao', 'revisar_espera'] },
     prazoHoras: { tipo: 'numero', rotulo: 'Prazo em horas', obrigatorio: true },
   } },
+  lembrete: { rotulo: 'Criar lembrete', params: {
+    para: { tipo: 'equipe', rotulo: 'Para quem ("responsável" = dono da oportunidade/ocorrência; "da conta" = VIP→CS, demais→Suporte)', obrigatorio: true },
+    texto: { tipo: 'texto', rotulo: 'Texto do lembrete (aceita {conta}, {empresa}, {protocolo})', obrigatorio: true },
+    emHoras: { tipo: 'numero', rotulo: 'Lembrar daqui a quantas horas', obrigatorio: true },
+  } },
   mudar_prioridade: { rotulo: 'Mudar a prioridade da ocorrência', params: {
     prioridade: { tipo: 'lista', rotulo: 'Nova prioridade', valores: ['baixa', 'media', 'alta', 'critica'], obrigatorio: true },
   } },
@@ -86,6 +97,7 @@ const ROTULO_VALOR = {
   tecnica: 'técnica', solicitacao: 'solicitação', nao_classificada: 'não classificada', media: 'média', critica: 'crítica',
   aguardando_cliente: 'aguardando cliente', aguardando_terceiro: 'aguardando terceiro', em_atendimento: 'em atendimento',
   em_handoff: 'em transferência', encerrada_sem_resolucao: 'encerrada sem resolução', da_conta: 'da conta (VIP→CS, demais→Suporte)',
+  responsavel: 'o responsável', novo: 'novo lead', qualificacao: 'qualificação', demonstracao: 'demonstração', negociacao: 'negociação', pendente: 'pendente',
   ponto_focal: 'o ponto focal', grupo: 'o grupo do cliente', grupo_e_ponto_focal: 'o grupo e o ponto focal',
 };
 const rv = (v) => (Array.isArray(v) ? v.map(rv).join(' ou ') : typeof v === 'boolean' ? (v ? 'sim' : 'não') : ROTULO_VALOR[v] || String(v));
@@ -106,6 +118,7 @@ function descreverPasso(p) {
     case 'enviar_mensagem': return p.modelo === 'texto_livre' ? `Enviar para ${rv(p.destino)}: "${p.texto}"` : `Enviar para ${rv(p.destino)} a mensagem "${NOMES_MODELO[p.modelo] || p.modelo}"`;
     case 'ligar': return `Ligar para o ponto focal (${rv(p.equipe)}, prazo ${p.prazoHoras} h) e esperar o resultado`;
     case 'criar_tarefa': return `Criar tarefa "${p.titulo}" para ${rv(p.equipe)} com prazo de ${p.prazoHoras} h`;
+    case 'lembrete': return `Lembrar ${rv(p.para)} em ${p.emHoras} h: "${p.texto}"`;
     case 'mudar_prioridade': return `Mudar prioridade para ${rv(p.prioridade)}`;
     case 'transferir': return `Passar a ocorrência para a equipe ${rv(p.equipe)}`;
     case 'nota': return `Registrar nota: "${p.texto}"`;

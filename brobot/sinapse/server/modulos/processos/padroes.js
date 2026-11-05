@@ -97,6 +97,37 @@ const PADROES = [
     },
   },
   {
+    nome: 'Comercial: acompanhar a fase de teste',
+    descricao: 'Fase de teste antes do fechamento: o CS apoia o primeiro acesso, o Comercial é lembrado de acompanhar e de registrar o resultado. Para quando a oportunidade sai do Teste.',
+    definicao: {
+      gatilho: 'oportunidade.etapa',
+      condicoes: [{ campo: 'oportunidade.etapa', operador: 'igual', valor: 'teste' }],
+      encerrarSe: [{ campo: 'oportunidade.etapa', operador: 'diferente', valor: 'teste' }],
+      passos: [
+        { tipo: 'criar_tarefa', equipe: 'cs', tipoTarefa: 'geral', prazoHoras: 24, titulo: 'Apoiar o teste de {empresa}: acesso, primeira consulta e dúvidas' },
+        { tipo: 'esperar', horas: 72 },
+        { tipo: 'lembrete', para: 'responsavel', emHoras: 0.1, texto: 'Como está o teste de {empresa}? Converse com o cliente sobre o critério combinado.' },
+        { tipo: 'esperar', horas: 96 },
+        { tipo: 'lembrete', para: 'responsavel', emHoras: 0.1, texto: 'Registre o resultado do teste de {empresa} (aprovado ou reprovado).' },
+      ],
+    },
+  },
+  {
+    nome: 'Comercial: venda fechada → onboarding',
+    descricao: 'Reunião 03/11 (onboarding): o CS define o ponto focal (1 nome + 1 contato) e repassa ao Suporte; Operações provisiona a conta na Platform (exportação CSV de provisionamento).',
+    definicao: {
+      gatilho: 'oportunidade.ganha',
+      condicoes: [],
+      encerrarSe: [],
+      passos: [
+        { tipo: 'criar_tarefa', equipe: 'cs', tipoTarefa: 'geral', prazoHoras: 24, titulo: 'Definir o ponto focal de {conta} (1 nome + 1 contato) e repassar ao Suporte' },
+        { tipo: 'criar_tarefa', equipe: 'operacoes', tipoTarefa: 'geral', prazoHoras: 24, titulo: 'Provisionar {conta} na Platform (Integrações → exportar provisionamento)' },
+        { tipo: 'esperar', horas: 48 },
+        { tipo: 'escalar', motivo: '{conta}: onboarding sem ponto focal 48 h depois da venda', seCondicoes: [{ campo: 'conta.tem_ponto_focal', operador: 'igual', valor: false }] },
+      ],
+    },
+  },
+  {
     nome: 'Insights do CaçaCondutores (1x por semana)',
     descricao: 'Reunião 03/11 (melhoria 5): incentivar o uso do módulo com uma comunicação por semana. Respeita o opt-out do ponto focal. '
       + 'Começa desligado: ative quando o texto for revisado pelo Meira.',
@@ -116,7 +147,13 @@ async function garantir(c, ctx, servico) {
   const existentes = new Set((await c.query('SELECT nome FROM processos')).rows.map((r) => r.nome));
   for (const p of PADROES) {
     if (existentes.has(p.nome)) continue;
-    const criado = await servico.criar(c, ctx, { nome: p.nome, descricao: p.descricao, definicao: p.definicao, sistema: true });
+    let criado;
+    try {
+      criado = await servico.criar(c, ctx, { nome: p.nome, descricao: p.descricao, definicao: p.definicao, sistema: true });
+    } catch (e) {
+      if (e.code === 'entrada_invalida') continue; // organização sem as equipes que o processo usa (ex.: parceiro sem CS)
+      throw e;
+    }
     if (p.ativo !== false) await servico.ativar(c, ctx, criado.id, 'Processo padrão (reunião de 03/11/2026)');
   }
 }

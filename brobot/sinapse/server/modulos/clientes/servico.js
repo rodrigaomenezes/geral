@@ -66,6 +66,7 @@ async function detalhe(c, usuario, id) {
   const rodadas = await c.query('SELECT id, id_platform, produto, agendada_para, estado, pendencias_detectadas FROM rodadas WHERE conta_id = $1 ORDER BY agendada_para DESC LIMIT 10', [id]);
   const ocs = await c.query(`SELECT id, protocolo, titulo, estado, prioridade, criado_em FROM ocorrencias WHERE conta_id = $1
              ORDER BY criado_em DESC LIMIT 10`, [id]);
+  const uso = uma(await c.query('SELECT ultimo_login, usuarios_ativos, consultas_30d, modulos_usados, atualizado_em FROM uso_contas WHERE conta_id = $1', [id]));
   const vigentes = pfs.rows.filter((p) => p.vigente);
   const mostrarContato = pode(usuario, 'conta.editar');
   return {
@@ -77,6 +78,7 @@ async function detalhe(c, usuario, id) {
     financeiro: situacaoVisivel(fin.rows[0]?.situacao, fin.rows[0]?.sincronizado_em, usuario),
     rodadas: rodadas.rows,
     ocorrencias: ocs.rows,
+    uso,
   };
 }
 
