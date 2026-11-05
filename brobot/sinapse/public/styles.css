@@ -305,3 +305,9 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .dica-grafico { position: fixed; z-index: 80; pointer-events: none; background: #0d2236; color: #fff; padding: .45rem .6rem; border-radius: 8px; font-size: .8rem; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: 260px; }
 .dica-grafico strong { display: block; margin-bottom: .15rem; }
 @media (min-width: 960px) { .blocos { grid-template-columns: 1fr 1fr; } }
+
+/* Mensagens padrão */
+.chips-var { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin-bottom: .5rem; }
+.chip-var { font: inherit; font-size: .78rem; font-family: ui-monospace, Menlo, monospace; padding: .2rem .5rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--destaque-claro); color: var(--marca-escura); cursor: pointer; }
+.msg-bolha { background: #e7f8ee; border-radius: 12px 12px 12px 2px; padding: .75rem .9rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .92rem; margin-bottom: .5rem; }
+.msg-resumo { white-space: pre-line; }

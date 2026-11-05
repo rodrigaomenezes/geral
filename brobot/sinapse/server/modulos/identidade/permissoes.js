@@ -24,10 +24,12 @@ const TODAS = {
   'telefonia.usar': 'ligar pelo sistema',
   'telefonia.gerir': 'configurar a telefonia e ver o painel de ligações',
   'canais.gerir': 'conectar o número de WhatsApp da organização',
+  'modelo.editar': 'escrever as mensagens padrão',
+  'modelo.aprovar': 'aprovar as mensagens padrão',
   'demo.simular': 'usar o simulador',
 };
 
-const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar', 'telefonia.usar'];
+const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar', 'telefonia.usar', 'modelo.editar'];
 
 const PAPEIS = {
   admin: Object.keys(TODAS),

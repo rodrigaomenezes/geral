@@ -15,6 +15,7 @@ import { telaMeuDia, sinoNotificacoes } from './telas/meu-dia.js';
 import { telaComercial } from './telas/comercial.js';
 import { telaIntegracoes } from './telas/integracoes.js';
 import { telaDashboards } from './telas/dashboards.js';
+import { telaMensagens } from './telas/mensagens.js';
 
 const MENU = [
   { rota: 'meu-dia', rotulo: 'Meu dia', perm: 'agenda.usar' },
@@ -25,6 +26,7 @@ const MENU = [
   { rota: 'tarefas', rotulo: 'Tarefas', perm: 'ocorrencia.ver' },
   { rota: 'comercial', rotulo: 'Comercial', perm: 'comercial.ver' },
   { rota: 'processos', rotulo: 'Processos', perm: 'processo.ver' },
+  { rota: 'mensagens', rotulo: 'Mensagens', perm: 'modelo.editar' },
   { rota: 'rodadas', rotulo: 'Rodadas', perm: 'rodada.ver' },
   { rota: 'contas', rotulo: 'Carteira', perm: 'conta.ver' },
   { rota: 'integracoes', rotulo: 'Integrações', perm: 'integracao.usar' },
@@ -38,6 +40,7 @@ const ROTAS = {
   comercial: telaComercial,
   integracoes: telaIntegracoes,
   dashboards: telaDashboards,
+  mensagens: telaMensagens,
   painel: telaPainel,
   ocorrencias: (el, ctx, id) => (id ? telaOcorrencia(el, ctx, id) : telaOcorrencias(el, ctx)),
   triagem: (el, ctx) => telaOcorrencias(el, ctx, { estado: 'triagem', titulo: 'Triagem' }),

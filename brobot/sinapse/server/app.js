@@ -24,6 +24,7 @@ const ROTAS = [
   ...require('./modulos/entrada/rotas'),
   ...require('./modulos/supervisor/rotas'),
   ...require('./modulos/painel/rotas'),
+  ...require('./modulos/comunicacao/rotas'),
   ...require('./modulos/processos/rotas'),
   ...require('./modulos/agenda/rotas'),
   ...require('./modulos/comercial/rotas'),
