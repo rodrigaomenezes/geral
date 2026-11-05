@@ -238,7 +238,9 @@ test('AT-016: migração desfeita e reaplicada volta íntegra; migração com er
   const { abrirBanco } = require('../server/db');
   const db = await abrirBanco({});
   await migrar(db);
-  assert.equal((await db.query('SELECT count(*)::int AS n FROM schema_migracoes')).rows[0].n, 2);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM schema_migracoes')).rows[0].n, 3);
+  assert.equal(await voltar(db), '003_meu_dia_comercial_csv.sql');
+  assert.equal((await db.query("SELECT to_regclass('oportunidades') AS t")).rows[0].t, null);
   assert.equal(await voltar(db), '002_processos.sql');
   assert.equal((await db.query("SELECT to_regclass('processos') AS t")).rows[0].t, null);
   assert.ok((await db.query("SELECT to_regclass('ocorrencias') AS t")).rows[0].t, '001 continua');

@@ -113,7 +113,7 @@ test('força-tarefa por conta: "Executar agora" cria tarefa e para sozinho quand
 
 test('proteção contra laço: mais de 5 inícios em 24 h no mesmo item são contidos e viram divergência', async () => {
   const tid = await t.tenant();
-  const [v] = await t.sql("SELECT v.*, p.nome FROM processo_versoes v JOIN processos p ON p.id = v.processo_id WHERE p.nome LIKE 'VIP com prioridade%' AND v.estado = 'ativa'");
+  const [v] = await t.sql("SELECT v.*, p.nome FROM processo_versoes v JOIN processos p ON p.id = v.processo_id WHERE p.nome LIKE 'VIP com prioridade%' AND v.estado = 'ativa' AND v.tenant_id = $1", [tid]);
   v.definicao = { ...v.definicao, condicoes: [] };
   const [conta] = await t.sql("SELECT id FROM contas WHERE nome = 'Expresso Vale Verde'");
   const res = await t.app.db.comoTenant(tid, async (c) => {
