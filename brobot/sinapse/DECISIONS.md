@@ -82,3 +82,18 @@ permitindo outra marca por organização (white-label).
 Meta Cloud API para WhatsApp. Segredos (senha de ramal, token da Meta) cifrados com AES-256-GCM (`SINAPSE_CHAVE`);
 webhook validado por HMAC do corpo cru (`META_APP_SECRET`). CSP passa a permitir `wss:` (operadora SIP).
 **Não portado ainda:** WhatsApp por QR (Baileys: sessão em memória e risco de bloqueio do número), gravação de ligações.
+
+# T-016 — Dashboards sem biblioteca de gráficos
+**Decisão:** gráficos em SVG/HTML próprios (`public/js/graficos.js`): barras, agrupado, empilhado, funil, linha com cruz e dica.
+Paleta categórica validada para daltonismo (ordem fixa; status só para estado); toda visão tem "ver tabela" e CSV.
+**Por quê:** sem dependência nova, CSP sem exceção, carregamento leve no celular.
+
+# T-017 — Mensagens padrão com revisão e aprovação
+**Decisão:** texto padrão no código; versões da organização em `modelos_mensagem` (rascunho → revisão → aprovada, imutável
+depois). Quem escreve não aprova o próprio texto (salvo Administração). O envio usa sempre a versão aprovada e, se houver,
+o template da Meta com as variáveis na ordem indicada (resolve a janela de 24 h do WhatsApp).
+
+# T-018 — `rowCount` igual nos dois motores
+**Problema encontrado:** o PGlite devolve `affectedRows`, o `pg` devolve `rowCount`; com o banco embutido, checagens por
+`rowCount` (cancelar jobs, cadastro do número de WhatsApp, revisão de mensagem) falhavam em silêncio.
+**Correção:** o adaptador do PGlite preenche `rowCount`; teste de regressão em `test/regras.test.js`.

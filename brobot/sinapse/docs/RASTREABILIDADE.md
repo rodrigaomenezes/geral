@@ -58,10 +58,10 @@ Testes: `test/aceite.test.js` (AT-xxx) e `test/regras.test.js`.
 | REC | 002 (categorias), 003, 004 (erro técnico → Desenvolvimento) | 001, 005–008 ◐/○ (volumetria da Platform) |
 | CRE | 001, 002 (status), 005, 006, 007, 008 | 003 consultas não geradas ○, 004 alerta de expiração ◐ (data exibida) |
 | COM | 001, 003, 004, 005 (status de entrega real), 006, 007, 009, 010 (processo semanal com opt-out) | 002 aprovação de modelos ○, 008 central do cliente ○ (Platform) |
-| CS | 001 (carteira VIP), 003 ◐ (último login por CSV), 011 ◐ (Comercial no mesmo sistema), 010 (insights CaçaCondutores semanais, desligado até revisão) | 002–009, 011, 012 ○ (Fase 4) |
+| CS | 001 (carteira VIP), 002 (saúde da conta com motivos), 003 ◐ (último login por CSV), 011 ◐ (Comercial no mesmo sistema), 010 (insights CaçaCondutores semanais, desligado até revisão) | 002–009, 011, 012 ○ (Fase 4) |
 | DEV | 001, 002, 004, 005 | 003 sincronizar ferramenta técnica ○, 006 incidentes ○, 007 ◐, 008 ○ |
 | FIN | 001, 002, 003, 005, 006, 007, 008, 009, 010 | 004 eventos ao Financeiro ◐ (outbox gravado, sem envio) |
-| SUP | 001, 002, 003, 005, 006, 007, 009 (correlação por requisição), 010 (processos com simulação e restauração), 012 ◐ | 004 reconciliação Platform ◐ (OMIE pronto), 008 LGPD ○, 011 contingência de canal ◐ |
+| SUP | 001, 002, 003, 005, 006 (6 dashboards), 007, 009 (correlação por requisição), 010 (processos com simulação e restauração), 012 (automação × manual) | 004 reconciliação Platform ◐ (OMIE pronto), 008 LGPD ○, 011 contingência de canal ◐ |
 
 ## Não funcionais (seção 10)
 
@@ -101,3 +101,11 @@ dimensionamento e da infraestrutura definitiva.
 | WhatsApp oficial: envio, webhook assinado, deduplicação, status entregue/lida | ✔ | `integracoes/whatsapp-*` |
 | WhatsApp por QR, gravação, fila de ligações, templates fora da janela de 24 h | ○ | próximas entregas |
 | Identidade visual Brobot | ✔ | `public/styles.css`, `public/fonts` |
+
+## Entrega de 05/11/2026 (dashboards e mensagens)
+
+| Item | Situação | Onde |
+| --- | --- | --- |
+| Dashboards: operação, rodadas (sucesso pré/pós — melhoria 6), carteira/CS, comercial, pessoas, automação | ✔ | `modulos/painel/dashboards.js`, tela Dashboards |
+| Mensagens padrão editáveis com revisão (reunião 03/11: o Meira reescreve com as equipes) | ✔ | `comunicacao/modelos-servico.js`, tela Mensagens |
+| Template da Meta por mensagem (envio fora da janela de 24 h) | ✔ | aprovação da mensagem |

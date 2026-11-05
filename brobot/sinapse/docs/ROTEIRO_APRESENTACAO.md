@@ -59,6 +59,13 @@ certificado) e abriu **uma** ocorrência; o processo está "aguardando" o D-3 (v
   "Colunas esperadas"), veja a prévia e aplique: a rodada, as pendências e a cadência aparecem sozinhas. Baixe a
   carteira com a coluna VIP para a Platform.
 
+## 5c. Dashboards e mensagens (2 min)
+- **Dashboards → Rodadas**: o sucesso das correções da pré e da pós-rodada (melhoria 6). Troque o período e a carteira
+  (VIP/demais); clique numa rodada para abrir; "Ver tabela" e "CSV" em cada bloco. Mostre **Automação**: o quanto os
+  processos fizeram sozinhos e o que ainda é manual.
+- **Mensagens → Pré-rodada · aviso D-3** (como Rafael): edite com as variáveis, veja a prévia, envie para aprovação;
+  entre como Marina e aprove (opcionalmente com o template da Meta). Dali em diante é esse o texto que sai.
+
 ## 6. Segurança e governança (2 min)
 - **AT-014**: tentativa de ler um dado da organização "Parceiro White-label": o banco não devolve nada e a tentativa
   fica auditada.

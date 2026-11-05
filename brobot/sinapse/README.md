@@ -5,7 +5,7 @@ ocorrências com máquina de estados e SLA, transferências com aceite, pré-rod
 pós-rodada (D0 → D+3), carteira com VIP e pontos focais, supervisor independente e auditoria completa.
 **Processos automáticos:** a operação escreve, em formulário, processos que o sistema segue sozinho (gatilho → condições →
 passos → "para sozinho se"), com simulação, versões e restauração. Os processos da reunião de 03/11/2026 já vêm prontos.
-**Telefonia** pelo navegador (treino, operadora SIP/WebRTC ou celular) e **WhatsApp oficial** da Meta.
+**Dashboards** interativos por área e **mensagens padrão** editáveis com aprovação. **Telefonia** pelo navegador (treino, operadora SIP/WebRTC ou celular) e **WhatsApp oficial** da Meta.
 **Meu dia** (tela inicial de cada pessoa), **lembretes** e **avisos**; **Comercial** com funil de aquisição e teste antes do
 fechamento. A Platform Brobot continua dona das consultas e o OMIE, do financeiro: nesta fase os dados vão e voltam por
 **CSV** (Integrações), com prévia antes de gravar.
@@ -17,7 +17,7 @@ fechamento. A Platform Brobot continua dona das consultas e o OMIE, do financeir
 ```bash
 npm install
 npm start          # http://localhost:3000 — cria o banco embutido em ./data/pg e a demonstração
-npm test           # 46 testes: aceite AT-001 a AT-016, regras, processos, comercial, agenda, CSV e canais
+npm test           # 50 testes: aceite AT-001 a AT-016, regras, processos, comercial, agenda, CSV, canais, dashboards e mensagens
 ```
 
 Com PostgreSQL próprio: `DATABASE_URL=postgres://... npm start`. Testes contra um PostgreSQL de teste (o schema é
