@@ -40,6 +40,7 @@ function coletarProdutos(form) { return [...form.querySelectorAll('select[name=p
 function mover(o, para, aoMudar) {
   modal(`Mover para ${CAT.etapas[para].rotulo}`, (fechar) => {
     const f = formulario([...camposDaEtapa(o, para),
+      para !== 'ganha' ? campo('Fechamento previsto', h('input', { name: 'fechamentoPrevisto', type: 'date', value: o.fechamento_previsto || '' })) : null,
       campo('Próxima ação', h('input', { name: 'proximaAcao', maxlength: 200, placeholder: 'ex.: enviar proposta revisada' })),
       campo('Quando', h('input', { type: 'datetime-local', name: 'proximaAcaoEm' }))], 'Mover', async (d) => {
       const produtos = coletarProdutos(f);
@@ -59,15 +60,36 @@ function perder(o, aoMudar) {
   ], 'Marcar perdida', async (d) => { await api.post(`/comercial/oportunidades/${o.id}/etapa`, { ...d, para: 'perdida', versao: o.version }); fechar(); aviso('Oportunidade encerrada como perdida.'); aoMudar(); }));
 }
 
-function novaOportunidade(aoCriar) {
+function novaOportunidade(aoCriar, funilInicial = 'aquisicao') {
   modal('Nova oportunidade', (fechar) => {
+    const funil = opcoes(h('select', { name: 'funil' }), CAT.funis);
+    funil.value = funilInicial;
+    const empresa = h('input', { name: 'empresa', minlength: 2 });
+    const conta = h('select', { name: 'contaOrigemId', 'aria-label': 'Cliente da carteira' }, h('option', { value: '' }, 'Carregando clientes…'));
+    const campoEmpresa = campo('Empresa', empresa);
+    const campoConta = campo('Cliente da carteira', conta, 'Expansão e renovação são sempre de um cliente que já existe.');
+    let carregado = false;
+    const ajustar = async () => {
+      const deCarteira = funil.value !== 'aquisicao';
+      // O CSS do campo vence o atributo hidden: esconde pelo estilo.
+      campoEmpresa.style.display = deCarteira ? 'none' : ''; campoConta.style.display = deCarteira ? '' : 'none';
+      empresa.required = !deCarteira; conta.required = deCarteira;
+      if (deCarteira && !carregado) {
+        carregado = true;
+        try { const r = await api.get('/contas?pagina=1'); trocar(conta, h('option', { value: '' }, 'Escolha'), r.itens.map((c) => h('option', { value: c.id }, c.nome))); }
+        catch (e) { trocar(conta, h('option', { value: '' }, textoErro(e))); }
+      }
+    };
+    funil.onchange = ajustar;
     const f = formulario([
-      campo('Empresa', h('input', { name: 'empresa', required: true, minlength: 2 })),
+      campo('Funil', funil), campoEmpresa, campoConta,
       campo('Contato', h('input', { name: 'contatoNome' })), campo('Telefone', h('input', { name: 'contatoTelefone', inputmode: 'tel' })),
       campo('Origem', opcoes(h('select', { name: 'origem' }), CAT.origens)),
       campo('Produtos de interesse', h('select', { name: 'produtos', multiple: true, size: 4 }, Object.entries(CAT.produtos).map(([k, v]) => h('option', { value: k }, v)))),
       campo('Tamanho da frota', h('input', { name: 'frota', type: 'number', min: 0 })),
+      campo('Fechamento previsto (opcional)', h('input', { name: 'fechamentoPrevisto', type: 'date' }), 'Entra na previsão de vendas do mês.'),
     ], 'Criar', async (d) => { const o = await api.post('/comercial/oportunidades', { ...d, produtos: coletarProdutos(f) }); fechar(); aviso(`${o.codigo} criada.`); aoCriar(o); });
+    ajustar();
     return f;
   });
 }
@@ -79,9 +101,28 @@ export async function telaComercial(el, ctx, id) {
   const busca = h('input', { type: 'search', placeholder: 'Empresa, código ou CNPJ', 'aria-label': 'Buscar' });
   const quadro = h('div', { class: 'quadro' });
   const topo = h('div', { class: 'grade-kpi' });
+  const prev = h('section', { class: 'cartao' });
+  const aviso300 = h('p', { class: 'alerta', hidden: true });
+  let funilAtual = ctx.query?.get('funil') || '';
+  const abas = h('div', { class: 'abas', role: 'tablist', 'aria-label': 'Funil' });
+  const desenharAbas = () => trocar(abas, [['', 'Todos'], ...Object.entries(CAT.funis)].map(([k, r]) => h('button', { class: `aba${k === funilAtual ? ' ativa' : ''}`, type: 'button', role: 'tab',
+    'aria-selected': k === funilAtual ? 'true' : 'false', onclick: () => { funilAtual = k; desenharAbas(); carregar(); } }, r.split(' (')[0])));
+  desenharAbas();
   async function carregar() {
-    const qs = new URLSearchParams({ ...(minhas.checked ? { minhas: '1' } : {}), ...(busca.value.trim() ? { q: busca.value.trim() } : {}) });
-    const [{ itens }, ind] = await Promise.all([api.get(`/comercial/oportunidades?${qs}`), api.get('/comercial/indicadores')]);
+    const qs = new URLSearchParams({ ...(minhas.checked ? { minhas: '1' } : {}), ...(busca.value.trim() ? { q: busca.value.trim() } : {}), ...(funilAtual ? { funil: funilAtual } : {}) });
+    const [{ itens, total, limite }, ind] = await Promise.all([api.get(`/comercial/oportunidades?${qs}`), api.get('/comercial/indicadores')]);
+    aviso300.hidden = !(total > limite);
+    trocar(aviso300, `Mostrando ${limite} de ${total} oportunidades. Use a busca, o funil ou "Só as minhas" para ver as demais.`);
+    const maior = Math.max(1, ...ind.previsao.meses.map((m) => m.bruto));
+    const nomeMes = (k) => { const t = new Date(`${k}-15T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }); return t[0].toUpperCase() + t.slice(1); };
+    trocar(prev, h('h2', {}, 'Previsão de fechamento (mensal)'),
+      h('ul', { class: 'previsao' }, ind.previsao.meses.map((m) => h('li', {},
+        h('span', { class: 'previsao-mes' }, nomeMes(m.mes)),
+        h('span', { class: 'previsao-barra', 'aria-hidden': 'true' }, h('span', { class: 'previsao-bruto', style: { width: `${(m.bruto / maior) * 100}%` } },
+          h('span', { class: 'previsao-ponderado', style: { width: m.bruto ? `${(m.ponderado / m.bruto) * 100}%` : '0' } }))),
+        h('span', { class: 'previsao-valor' }, h('strong', {}, moeda(m.ponderado)), ` provável de ${moeda(m.bruto)} · ${m.oportunidades} oport.`)))),
+      h('p', { class: 'suave' }, ind.previsao.formula, ind.previsao.semData ? ` ${ind.previsao.semData} em andamento sem data prevista.` : '',
+        ind.previsao.atrasadas ? ` ${ind.previsao.atrasadas} com data prevista já passada.` : ''));
     const porEtapa = Object.fromEntries(ind.porEtapa.map((x) => [x.etapa, x]));
     const pipeline = ABERTAS.reduce((s, e) => s + (porEtapa[e]?.valor || 0), 0);
     const conv = ind.testes.aprovados + ind.testes.reprovados ? Math.round((ind.testes.aprovados / (ind.testes.aprovados + ind.testes.reprovados)) * 100) : null;
@@ -95,7 +136,7 @@ export async function telaComercial(el, ctx, id) {
       const cards = itens.filter((o) => o.etapa === e);
       return h('section', { class: `coluna coluna-${e}` }, h('div', { class: 'coluna-topo' }, h('strong', {}, CAT.etapas[e].rotulo), h('span', { class: 'suave' }, `${cards.length} · ${moeda(cards.reduce((s, o) => s + Number(o.valor_mensal || 0), 0))}`)),
         cards.length ? cards.map((o) => h('a', { class: `cartao-op ${o.proxima_acao_em && new Date(o.proxima_acao_em) < agora ? 'op-vencida' : ''}`, href: `#/comercial/${o.id}` },
-          h('div', { class: 'linha-topo' }, h('strong', {}, o.empresa), o.etapa === 'teste' ? selo(o.teste_resultado || `até ${data(o.teste_fim)}`, o.teste_resultado === 'aprovado' ? 'ok' : o.teste_resultado ? 'perigo' : 'info') : null),
+          h('div', { class: 'linha-topo' }, h('strong', {}, o.empresa), o.funil !== 'aquisicao' ? selo(o.funil === 'renovacao' ? 'renovação' : 'expansão', 'vip') : null, o.etapa === 'teste' ? selo(o.teste_resultado || `até ${data(o.teste_fim)}`, o.teste_resultado === 'aprovado' ? 'ok' : o.teste_resultado ? 'perigo' : 'info') : null),
           h('div', { class: 'linha-meta' }, h('span', {}, moeda(o.valor_mensal)), o.frota ? h('span', {}, `${o.frota} veíc.`) : null, h('span', {}, o.responsavel_nome || 'sem dono')),
           o.proxima_acao ? h('div', { class: 'suave op-acao' }, `${o.proxima_acao} · ${relativo(o.proxima_acao_em)}`) : null)) : h('p', { class: 'vazio' }, '—'));
     }));
@@ -104,10 +145,10 @@ export async function telaComercial(el, ctx, id) {
   let t; busca.oninput = () => { clearTimeout(t); t = setTimeout(carregar, 350); };
   trocar(el, h('div', { class: 'titulo-tela' }, h('h1', {}, 'Comercial'),
     ctx.pode('comercial.editar') ? h('button', { class: 'btn btn-primario', onclick: () => novaOportunidade((o) => { location.hash = `#/comercial/${o.id}`; }) }, 'Nova oportunidade') : null),
-  h('p', { class: 'suave' }, 'Funil de aquisição: Novo → Qualificação → Demonstração → Proposta → Teste → Negociação → Ganha. Sem teste aprovado não há fechamento, salvo produtos que o catálogo dispensa.'),
+  h('p', { class: 'suave' }, 'Etapas: Novo → Qualificação → Demonstração → Proposta → Teste → Negociação → Ganha. Sem teste aprovado não há fechamento, salvo produtos que o catálogo dispensa e renovações.'),
   ctx.pode('comercial.gerir') ? h('div', { class: 'acoes' }, h('button', { class: 'btn btn-fantasma', onclick: () => telaProdutos(() => { CAT = null; telaComercial(el, ctx); }) }, 'Catálogo de produtos'),
     h('a', { class: 'btn btn-fantasma', href: '#/integracoes' }, 'Migrar do Pipedrive (CSV)')) : null,
-  topo, h('div', { class: 'filtros' }, busca, h('label', { class: 'check' }, minhas, 'Só as minhas')), quadro);
+  topo, prev, abas, h('div', { class: 'filtros' }, busca, h('label', { class: 'check' }, minhas, 'Minhas e da fila')), aviso300, quadro);
   await carregar();
 }
 
@@ -126,8 +167,11 @@ async function detalhe(el, ctx, id) {
     h('div', { class: 'etapas-trilha' }, [...ABERTAS, 'ganha'].map((e, j) => h('span', { class: `etapa-passo ${e === o.etapa ? 'atual' : j < i || o.etapa === 'ganha' ? 'feito' : ''}` }, CAT.etapas[e].rotulo)),
       o.etapa === 'perdida' ? selo(`Perdida: ${CAT.motivosPerda[o.motivo_perda]}`, 'perigo') : null,
       o.etapa === 'suspensa' ? selo(`Suspensa (estava em ${CAT.etapas[o.suspensa_de]?.rotulo}): ${o.motivo_suspensao}`, 'alerta') : null,
-      o.fonte === 'pipedrive' ? selo('migrada do Pipedrive', 'neutro') : null, o.teste_dispensado ? selo('teste dispensado pelo catálogo', 'info') : null),
+      o.fonte === 'pipedrive' ? selo('migrada do Pipedrive', 'neutro') : null, selo(CAT.funis[o.funil]?.split(' (')[0] || o.funil, o.funil === 'aquisicao' ? 'neutro' : 'vip'), o.teste_dispensado ? selo('teste dispensado pelo catálogo', 'info') : null),
     aberta && pode ? h('div', { class: 'acoes' },
+      !o.responsavel_id ? h('button', { class: 'btn btn-primario', onclick: async () => {
+        try { await api.post(`/comercial/oportunidades/${id}`, { responsavelId: ctx.usuario.id, versao: o.version }); aviso('Oportunidade assumida.'); recarregar(); } catch (e) { aviso(textoErro(e), 'erro'); }
+      } }, 'Assumir') : null,
       proxima ? h('button', { class: 'btn btn-primario', onclick: () => mover(o, proxima, recarregar) }, proxima === 'ganha' ? 'Fechar venda' : `Avançar para ${CAT.etapas[proxima].rotulo}`) : null,
       o.etapa === 'teste' ? h('button', { class: `btn ${o.teste_resultado ? '' : 'btn-primario'}`, onclick: () => modal('Resultado do teste', (fechar) => formulario([
         campo('O teste foi', opcoes(h('select', { name: 'resultado', required: true }), { aprovado: 'Aprovado (critério atingido)', reprovado: 'Reprovado' }, 'Escolha')),
@@ -138,18 +182,37 @@ async function detalhe(el, ctx, id) {
       h('button', { class: 'btn btn-fantasma', onclick: () => suspender(o, recarregar) }, 'Suspender'),
       h('button', { class: 'btn btn-fantasma', onclick: () => perder(o, recarregar) }, 'Marcar perdida')) : null,
     pode && ['suspensa', 'perdida'].includes(o.etapa) ? h('div', { class: 'acoes' }, h('button', { class: 'btn btn-primario', onclick: () => retomar(o, recarregar) }, o.etapa === 'suspensa' ? 'Retomar agora' : 'Reabrir')) : null,
-    o.conta_id ? h('p', {}, 'Conta criada: ', h('a', { href: `#/contas/${o.conta_id}` }, o.conta_nome || 'abrir')) : null,
+    o.conta_origem_id ? h('p', {}, `${o.funil === 'renovacao' ? 'Renovação' : 'Expansão'} de `, h('a', { href: `#/contas/${o.conta_origem_id}` }, o.conta_origem_nome),
+      o.conta_origem_valor ? ` · contrato atual ${moeda(o.conta_origem_valor)}/mês` : '', o.encaminhada_por_nome ? ` · encaminhada por ${o.encaminhada_por_nome}` : '') : null,
+    o.conta_id && !o.conta_origem_id ? h('p', {}, 'Conta criada: ', h('a', { href: `#/contas/${o.conta_id}` }, o.conta_nome || 'abrir')) : null,
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Dados'), h('dl', { class: 'dados' },
         ...par('Contato', [o.contato_nome, o.contato_telefone, o.contato_email].filter(Boolean).join(' · ')), ...par('CNPJ', o.cnpj ? cnpj(o.cnpj) : null),
         ...par('Origem', CAT.origens[o.origem]), ...par('Produtos', (o.produtos || []).map((p) => CAT.produtos[p]).join(', ') || null),
-        ...par('Frota', o.frota ? `${o.frota} veículos` : null), ...par('Valor mensal', moeda(o.valor_mensal)), ...par('Responsável', o.responsavel_nome),
+        ...par('Frota', o.frota ? `${o.frota} veículos` : null), ...par('Valor mensal', moeda(o.valor_mensal)), ...par('Fechamento previsto', o.fechamento_previsto ? data(o.fechamento_previsto) : null), ...par('Responsável', o.responsavel_nome || 'na fila do Comercial'),
         ...par('Próxima ação', o.proxima_acao ? `${o.proxima_acao} · ${dataHora(o.proxima_acao_em)}` : null),
         ...(o.teste_inicio ? [...par('Teste', `${data(o.teste_inicio)} a ${data(o.teste_fim)} · ${o.teste_criterio}`), ...par('Resultado do teste', o.teste_resultado ? `${o.teste_resultado}: ${o.teste_parecer}` : 'pendente')] : []))),
       h('section', { class: 'cartao' }, h('h2', {}, 'Histórico'), h('ol', { class: 'tempo' }, o.historico.map((a) => h('li', {}, h('span', { class: 'tempo-data' }, dataHora(a.criado_em)),
         h('strong', {}, a.acao.replace('oportunidade.', '').replaceAll('_', ' ')), ` por ${a.ator_nome}`, a.depois?.etapa ? ` → ${CAT.etapas[a.depois.etapa]?.rotulo}` : '', a.motivo ? h('div', { class: 'suave' }, a.motivo) : null))))),
-    secaoPropostas(ctx, o, recarregar), secaoAtividades(ctx, o, recarregar),
+    secaoPropostas(ctx, o, recarregar), secaoPessoas(ctx, o, recarregar), secaoAtividades(ctx, o, recarregar),
     ctx.pode('processo.ver') ? await secaoAutomacoes(ctx, { oportunidade: id }) : null);
+}
+
+function secaoPessoas(ctx, o, recarregar) {
+  const pode = ctx.pode('comercial.editar') && !['ganha', 'perdida'].includes(o.etapa);
+  const nova = () => modal('Pessoa da negociação', (fechar) => formulario([
+    campo('Nome', h('input', { name: 'nome', required: true, minlength: 2, maxlength: 120 })), campo('Cargo', h('input', { name: 'cargo', maxlength: 80 })),
+    campo('Telefone', h('input', { name: 'telefone', inputmode: 'tel' })), campo('E-mail', h('input', { name: 'email', type: 'email' })),
+    campo('Papel na decisão', opcoes(h('select', { name: 'papel', required: true }), CAT.papeisPessoa)),
+    h('p', { class: 'suave' }, 'Se o telefone ou e-mail já for de uma pessoa cadastrada, ela é reaproveitada (sem duplicar).'),
+  ], 'Adicionar', async (d) => { const r = await api.post(`/comercial/oportunidades/${o.id}/pessoas`, d); fechar(); aviso(r.nova ? 'Pessoa cadastrada.' : `${r.nome} já estava cadastrada: vinculada.`); recarregar(); }));
+  return h('section', { class: 'cartao' }, h('div', { class: 'titulo-tela' }, h('h2', {}, 'Pessoas'), pode ? h('button', { class: 'btn btn-pequeno', onclick: nova }, 'Adicionar pessoa') : null),
+    o.contatos.length ? h('ul', { class: 'itens' }, o.contatos.map((p) => h('li', { class: 'linha-acao' },
+      h('span', {}, selo(CAT.papeisPessoa[p.papel], p.papel === 'decisor' ? 'vip' : 'neutro'), ' ', h('strong', {}, p.nome), p.cargo ? ` · ${p.cargo}` : '',
+        h('div', { class: 'suave' }, [p.telefone, p.email].filter(Boolean).join(' · '), p.oportunidades > 1 ? ` · em ${p.oportunidades} oportunidades` : '')),
+      pode ? h('button', { class: 'btn btn-pequeno btn-fantasma', type: 'button', onclick: async () => {
+        try { await api.post(`/comercial/oportunidades/${o.id}/pessoas/${p.id}/desvincular`); aviso('Pessoa desvinculada (o cadastro dela continua).'); recarregar(); } catch (e) { aviso(textoErro(e), 'erro'); }
+      } }, 'Desvincular') : null))) : vazio('Ninguém além do contato principal. Cadastre quem decide, quem influencia e quem vai usar.'));
 }
 
 function suspender(o, aoMudar) {

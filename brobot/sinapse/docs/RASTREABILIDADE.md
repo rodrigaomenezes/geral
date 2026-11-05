@@ -148,3 +148,12 @@ dimensionamento e da infraestrutura definitiva.
 | Migração dos negócios abertos do Pipedrive por CSV (CRM-018 parcial) | ✔ testado | `csv/importadores.js` `pipedrive_negocios` · `comercial-crm.test.js` |
 | Datas sem hora corretas na tela; layout do funil comercial restaurado | ✔ corrigido | `db/index.js`, `dom.js`, `styles.css` · `regras.test.js` |
 | Múltiplos funis, pessoas × organizações, renovação/expansão, previsão (CRM-001/003/014/015) | ○ | F3b |
+
+## Entrega de 05/11/2026 (F3b · funis, pessoas e previsão)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Funis de aquisição, expansão e renovação com regras próprias (CRM-003 parcial, CRM-014) | ✔ testado | `comercial/servico.js`, migração 009 · `test/comercial-funis.test.js` |
+| CS encaminha expansão/renovação ao Comercial pela Carteira (CS-011) | ✔ testado | rota `/api/comercial/encaminhar`, tela Carteira · `comercial-funis.test.js` |
+| Pessoas da negociação sem duplicar por telefone/e-mail (CRM-001) | ✔ testado | `comercial/contatos.js` · `comercial-funis.test.js` |
+| Previsão de fechamento ponderada por etapa e mês, com fórmula (CRM-015) | ✔ testado | `funil.previsao` · `comercial-funis.test.js` |

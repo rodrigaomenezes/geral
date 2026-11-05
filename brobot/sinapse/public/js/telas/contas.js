@@ -61,6 +61,12 @@ export async function telaConta(el, ctx, id) {
     campo('Motivo', h('textarea', { name: 'motivo', required: true, minlength: 5, rows: 2 })),
   ], 'Pedir bloqueio', async (d) => { await api.post(`/contas/${id}/bloqueio`, d); fechar(); }));
 
+  // CS-011: o CS percebe expansão ou renovação e encaminha ao Comercial (fica na fila, com a observação).
+  const encaminhar = () => modal('Encaminhar ao Comercial', (fechar) => formulario([
+    campo('Tipo', opcoes(h('select', { name: 'funil', required: true }), { expansao: 'Expansão (novo produto ou mais veículos)', renovacao: 'Renovação do contrato' })),
+    campo('O que o cliente disse', h('textarea', { name: 'observacao', rows: 3, required: true, minlength: 5, maxlength: 500 })),
+  ], 'Encaminhar', async (d) => { const o = await api.post('/comercial/encaminhar', { ...d, contaId: id }); fechar(); aviso(`${o.codigo} encaminhada ao Comercial.`); }));
+
   trocar(el,
     h('a', { class: 'voltar', href: '#/contas' }, '← Carteira'),
     h('div', { class: 'titulo-tela' }, h('h1', {}, c.nome)),
@@ -70,6 +76,7 @@ export async function telaConta(el, ctx, id) {
     h('div', { class: 'acoes' },
       ctx.pode('conta.editar') ? h('button', { class: 'btn btn-primario', onclick: novoPf }, 'Definir ponto focal') : null,
       ctx.pode('conta.editar') ? h('button', { class: 'btn', onclick: grupo }, c.grupo_whatsapp ? 'Alterar grupo do WhatsApp' : 'Cadastrar grupo do WhatsApp') : null,
+      ctx.pode('conta.editar') && !ctx.pode('comercial.editar') ? h('button', { class: 'btn', onclick: encaminhar }, 'Encaminhar ao Comercial') : null,
       ctx.pode('financeiro.bloqueio') ? h('button', { class: 'btn btn-fantasma', onclick: bloqueio }, 'Pedir bloqueio por inadimplência') : null),
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Cadastro'), h('dl', { class: 'dados' },

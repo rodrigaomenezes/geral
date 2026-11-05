@@ -4,16 +4,18 @@ const { pode } = require('../identidade/permissoes');
 const catalogo = require('./catalogo');
 const propostas = require('./propostas');
 const atividades = require('./atividades');
+const contatos = require('./contatos');
 const { com } = require('../../http/servidor');
 const { comAuditoriaDeAcesso } = require('../ocorrencias/rotas');
-const { ETAPAS, ORIGENS, MOTIVOS_PERDA } = require('./funil');
+const { ETAPAS, ORIGENS, MOTIVOS_PERDA, FUNIS, PROBABILIDADE } = require('./funil');
 const s = require('./servico');
 
 const CAMPOS = {
   empresa: { tipo: 'texto', max: 160 }, cnpj: { tipo: 'texto', max: 20 }, contatoNome: { tipo: 'texto', max: 120 }, contatoTelefone: { tipo: 'texto', max: 30 },
   contatoEmail: { tipo: 'texto', max: 200 }, origem: { tipo: 'texto', em: Object.keys(ORIGENS) }, frota: { tipo: 'inteiro' }, valorMensal: { tipo: 'texto', max: 20 },
   responsavelId: { tipo: 'uuid' }, proximaAcao: { tipo: 'texto', max: 200 }, proximaAcaoEm: { tipo: 'data' }, testeInicio: { tipo: 'texto', max: 10 },
-  testeFim: { tipo: 'texto', max: 10 }, testeCriterio: { tipo: 'texto', max: 500 }, versao: { tipo: 'inteiro' },
+  testeFim: { tipo: 'texto', max: 10 }, testeCriterio: { tipo: 'texto', max: 500 }, versao: { tipo: 'inteiro' }, fechamentoPrevisto: { tipo: 'texto', max: 10 },
+  funil: { tipo: 'texto', em: Object.keys(FUNIS) }, contaOrigemId: { tipo: 'uuid' },
 };
 const dados = (corpo) => {
   const d = validar(corpo, CAMPOS);
@@ -27,7 +29,8 @@ module.exports = [
     handler: ({ db, ctx }) => db.comoTenant(ctx.tenantId, async (c) => {
       const lista = await catalogo.listar(c, ctx);
       return { etapas: ETAPAS, produtos: Object.fromEntries(lista.filter((x) => x.ativo).map((x) => [x.codigo, x.nome])), catalogo: lista,
-        origens: ORIGENS, motivosPerda: MOTIVOS_PERDA, tiposAtividade: atividades.TIPOS, estadosProposta: propostas.ESTADOS };
+        origens: ORIGENS, motivosPerda: MOTIVOS_PERDA, tiposAtividade: atividades.TIPOS, estadosProposta: propostas.ESTADOS,
+        funis: FUNIS, probabilidade: PROBABILIDADE, papeisPessoa: contatos.PAPEIS };
     }) },
   { metodo: 'POST', caminho: '/api/comercial/produtos', permissao: 'comercial.gerir', descricao: 'gerir o catálogo de produtos',
     handler: ({ db, ctx, corpo }) => {
@@ -38,7 +41,7 @@ module.exports = [
       return db.comoTenant(ctx.tenantId, (c) => catalogo.salvar(c, ctx, d));
     } },
   { metodo: 'GET', caminho: '/api/comercial/oportunidades', permissao: 'comercial.ver',
-    handler: ({ db, ctx, usuario, query }) => db.comoTenant(ctx.tenantId, (c) => s.listar(c, { q: query.q, minhas: query.minhas === '1', usuario })) },
+    handler: ({ db, ctx, usuario, query }) => db.comoTenant(ctx.tenantId, (c) => s.listar(c, { q: query.q, minhas: query.minhas === '1', usuario, funil: query.funil })) },
   { metodo: 'GET', caminho: '/api/comercial/indicadores', permissao: 'comercial.ver',
     handler: ({ db, ctx }) => db.comoTenant(ctx.tenantId, (c) => s.indicadores(c)) },
   { metodo: 'POST', caminho: '/api/comercial/oportunidades', permissao: 'comercial.editar', descricao: 'cadastrar oportunidades',
@@ -98,4 +101,21 @@ module.exports = [
     } },
   { metodo: 'GET', caminho: '/api/comercial/oportunidades/:id/atividades', permissao: 'comercial.ver',
     handler: ({ db, ctx, params, query }) => comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => atividades.listar(c, params.id, query.pagina)) },
+  { metodo: 'POST', caminho: '/api/comercial/encaminhar', permissao: 'conta.editar', descricao: 'encaminhar clientes ao Comercial',
+    handler: ({ db, ctx, corpo }) => {
+      const d = validar(corpo, { contaId: { obrigatorio: true, tipo: 'uuid' }, funil: { obrigatorio: true, tipo: 'texto', em: ['expansao', 'renovacao'] },
+        observacao: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 } });
+      return comAuditoriaDeAcesso(db, ctx, 'conta', d.contaId, async (c) => com(201, await s.encaminhar(c, ctx, d)));
+    } },
+  { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id/pessoas', permissao: 'comercial.editar', descricao: 'cadastrar pessoas da negociação',
+    handler: ({ db, ctx, corpo, params }) => {
+      const d = validar(corpo, { nome: { obrigatorio: true, tipo: 'texto', min: 2, max: 120 }, cargo: { tipo: 'texto', max: 80 }, telefone: { tipo: 'texto', max: 30 },
+        email: { tipo: 'texto', max: 200 }, papel: { obrigatorio: true, tipo: 'texto', em: Object.keys(contatos.PAPEIS) } });
+      return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, async (c) => { await s.buscar(c, params.id); return com(201, await contatos.vincular(c, ctx, params.id, d)); });
+    } },
+  { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id/pessoas/:pessoa/desvincular', permissao: 'comercial.editar', descricao: 'cadastrar pessoas da negociação',
+    handler: ({ db, ctx, params }) => {
+      if (!/^[0-9a-f-]{36}$/i.test(params.pessoa)) throw new ErroNegocio(400, 'entrada_invalida', 'Pessoa inválida.');
+      return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => contatos.desvincular(c, ctx, params.id, params.pessoa));
+    } },
 ];
