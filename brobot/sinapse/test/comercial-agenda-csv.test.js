@@ -81,9 +81,9 @@ test('meu dia e lembretes: lembrete vence, vira notificação uma vez, adia e co
   assert.equal(dia.status, 200);
   assert.ok('resumo' in dia.corpo && Array.isArray(dia.corpo.lembretes));
   const l = (await marina.post('/lembretes', { titulo: 'Teste de lembrete', quando: new Date(new Date(dia.corpo.agora).getTime() - 60e3).toISOString() })).corpo;
-  await t.sql("UPDATE jobs SET executar_em = now() - interval '1 day' WHERE chave = 'recorrente:lembretes'");
+  await t.sql("UPDATE jobs SET executar_em = '2026-11-03T13:00:00Z'::timestamptz WHERE chave = 'recorrente:lembretes'");
   await t.processar();
-  await t.sql("UPDATE jobs SET executar_em = now() - interval '1 day' WHERE chave = 'recorrente:lembretes'");
+  await t.sql("UPDATE jobs SET executar_em = '2026-11-03T13:00:00Z'::timestamptz WHERE chave = 'recorrente:lembretes'");
   await t.processar();
   const n = await marina.get('/notificacoes');
   assert.equal(n.corpo.itens.filter((x) => x.titulo === '⏰ Teste de lembrete').length, 1, 'avisa uma vez só');
