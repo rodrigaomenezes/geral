@@ -311,3 +311,15 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .chip-var { font: inherit; font-size: .78rem; font-family: ui-monospace, Menlo, monospace; padding: .2rem .5rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--destaque-claro); color: var(--marca-escura); cursor: pointer; }
 .msg-bolha { background: #e7f8ee; border-radius: 12px 12px 12px 2px; padding: .75rem .9rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .92rem; margin-bottom: .5rem; }
 .msg-resumo { white-space: pre-line; }
+
+/* Canais: QR Code do WhatsApp e lista de ramais. */
+.alerta { background: var(--alerta-f); color: var(--alerta); padding: .55rem .75rem; border-radius: var(--raio); margin: 0 0 .5rem; }
+.alerta-perigo { background: var(--perigo-f); color: var(--perigo); }
+.qr-caixa { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin: .5rem 0; }
+.qr-caixa img { background: #fff; padding: 8px; border-radius: var(--raio); max-width: 100%; height: auto; }
+.qr-passos { margin: 0; padding-left: 1.2rem; font-size: .9rem; flex: 1 1 200px; }
+.linha-acao { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+
+/* Faixa fixa do modo demonstração (R-01): ninguém confunde com o ambiente real. */
+.faixa-demo { background: #fff4d6; color: #5c4300; border-bottom: 1px solid #e9c46a; padding: .35rem .75rem; font-size: .8rem; font-weight: 600; text-align: center; }
+@media (prefers-color-scheme: dark) { .faixa-demo { background: #3a2f10; color: #ffe39a; border-color: #6b5520; } }

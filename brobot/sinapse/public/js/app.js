@@ -14,6 +14,7 @@ import { telaProcessos, editorRota } from './telas/processos.js';
 import { telaMeuDia, sinoNotificacoes } from './telas/meu-dia.js';
 import { telaComercial } from './telas/comercial.js';
 import { telaIntegracoes } from './telas/integracoes.js';
+import { telaCanais } from './telas/canais.js';
 import { telaDashboards } from './telas/dashboards.js';
 import { telaMensagens } from './telas/mensagens.js';
 
@@ -30,6 +31,7 @@ const MENU = [
   { rota: 'rodadas', rotulo: 'Rodadas', perm: 'rodada.ver' },
   { rota: 'contas', rotulo: 'Carteira', perm: 'conta.ver' },
   { rota: 'integracoes', rotulo: 'Integrações', perm: 'integracao.usar' },
+  { rota: 'canais', rotulo: 'Canais', perm: 'canais.gerir' },
   { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', perm: 'auditoria.ver' },
   { rota: 'simulador', rotulo: 'Simulador', perm: 'demo.simular', demo: true },
@@ -39,6 +41,7 @@ const ROTAS = {
   'meu-dia': telaMeuDia,
   comercial: telaComercial,
   integracoes: telaIntegracoes,
+  canais: telaCanais,
   dashboards: telaDashboards,
   mensagens: telaMensagens,
   painel: telaPainel,
