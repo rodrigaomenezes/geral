@@ -118,3 +118,19 @@ recebido vira entrada deduplicada pelo id da mensagem; o que o celular manda dir
 duplicar); status entregue/lida pela mesma regra do oficial (não regride). Testado com simulador
 (`SINAPSE_WA_QR_FALSO=1`).
 **Riscos:** não é a API oficial — a Meta pode bloquear o número; sem Volume a sessão se perde a cada deploy.
+
+# T-021 — CSV com mapeamento de colunas e lote de exportação com confirmação (F2)
+**Contexto:** adendo CSV da diretriz; em 05/11 a Brobot informou que não consegue enviar amostras reais de Platform/OMIE.
+**Decisão:** os layouts continuam os propostos pelo Sinapse, marcados "pendente de validação"; quando o arquivo real vier
+com outros nomes, a prévia pede a ligação das colunas, que é salva por fluxo como versão (`mapas_csv`, uma ativa,
+auditada). Exportar cria um lote (`exportacoes`, hash, código no nome do arquivo) que fica "aguardando confirmação":
+baixar não é aplicar no destino. Confirmar ou dar como falho exige evidência; sem confirmação em 2 dias, o supervisor
+abre divergência e tarefa para a Supervisão, uma vez por lote. A checagem fica em `csv/lotes.js` para o supervisor
+não depender do módulo CSV inteiro.
+**Fora desta fatia:** reprocessar o mesmo arquivo (hoje recusado pelo hash), arquivo de retorno automático do destino.
+
+# T-022 — Usuários de teste com senha de variável de ambiente
+**Contexto:** pedido de 05/11 ("um usuário e senha para teste, vários níveis de acesso, nomes simples").
+**Decisão:** `SINAPSE_SENHA_TESTE` cria/atualiza na subida um usuário por perfil (`gestor@brobot.com.br`, `suporte1@…`),
+idempotente por e-mail; a senha não está no código (repositório público) nem no banco (só o hash scrypt). Recusado em
+`SINAPSE_AMBIENTE=producao`.

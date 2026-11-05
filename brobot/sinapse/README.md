@@ -45,10 +45,28 @@ apagado): `TESTE_DATABASE_URL=postgres://... npm test`.
 | `SINAPSE_DB_CA` | se o banco usar certificado próprio | Certificado da autoridade (PEM) do PostgreSQL; com `sslmode` na URL o certificado é sempre verificado |
 | `SINAPSE_DB_TLS_INSEGURO` | não | `1` aceita certificado sem verificação (só fora de produção; fica registrado no log) |
 | `SINAPSE_TOKEN_ENTRADA` | não | Token (24+ caracteres) do webhook `POST /api/entrada/{organização}/{canal}`; sem ele, a rota fica desligada |
+| `SINAPSE_SENHA_TESTE` | para testar com e-mail e senha | Senha (12+) dos usuários de teste abaixo; trocar a variável troca a senha de todos no próximo deploy. Recusada com `SINAPSE_AMBIENTE=producao` |
 | `SINAPSE_SENHA_ADMIN` | não | Senha (12+) do `admin@sinapse.demo`, usada só ao criar a demonstração |
 | `SINAPSE_CHAVE` | para guardar segredos | Chave (32+ caracteres) que cifra a senha dos ramais SIP e o token do WhatsApp |
 | `META_APP_SECRET` | para o WhatsApp oficial | App Secret do app da Meta: confere a assinatura do webhook |
 | `WA_VERIFY_TOKEN` | para o WhatsApp oficial | Texto que você inventa e repete no painel da Meta ao cadastrar o webhook `https://SEU-LINK/api/whatsapp/webhook` |
+
+### Usuários de teste (e-mail e senha)
+
+Com `SINAPSE_SENHA_TESTE` definida, a organização Brobot ganha um usuário por perfil, todos com essa senha:
+
+| E-mail | Perfil |
+| --- | --- |
+| `admin@brobot.com.br` | Administração |
+| `gestor@brobot.com.br` | Supervisão (gestão) |
+| `suporte1@brobot.com.br`, `suporte2@brobot.com.br` | Suporte |
+| `cs@brobot.com.br` | Customer Success |
+| `operacional@brobot.com.br` | Operações |
+| `comercial@brobot.com.br` | Comercial |
+| `financeiro@brobot.com.br` | Financeiro |
+| `dev@brobot.com.br` | Desenvolvimento |
+
+Entram por **Entrar com e-mail e senha** na tela inicial. Eles também voltam quando a demonstração é reiniciada.
 
 Segurança no login: 5 senhas erradas por e-mail (ou 30 por endereço) em 15 min bloqueiam novas tentativas até a janela vencer.
 

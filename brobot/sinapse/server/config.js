@@ -22,6 +22,8 @@ function carregarConfig(env = process.env) {
     tokenEntrada: env.SINAPSE_TOKEN_ENTRADA || null,
     // Senha inicial do administrador (só usada ao semear). Sem ela, só o login de demonstração funciona.
     senhaAdmin: env.SINAPSE_SENHA_ADMIN || null,
+    // Senha dos usuários de teste (gestor@brobot.com.br, suporte1@…); sem ela, eles não são criados.
+    senhaTeste: env.SINAPSE_SENHA_TESTE || null,
     // Intervalo do ciclo do worker (ms). Os jobs ficam no banco; o ciclo só verifica o que venceu.
     cicloWorkerMs: Number(env.SINAPSE_CICLO_MS || 2000),
     worker: env.SINAPSE_WORKER !== '0',
@@ -29,6 +31,7 @@ function carregarConfig(env = process.env) {
   if (cfg.tokenEntrada && cfg.tokenEntrada.length < 24) {
     throw new Error('SINAPSE_TOKEN_ENTRADA precisa ter pelo menos 24 caracteres.');
   }
+  if (cfg.senhaTeste && cfg.senhaTeste.length < 12) throw new Error('SINAPSE_SENHA_TESTE precisa ter pelo menos 12 caracteres.');
   if (cfg.senhaAdmin && cfg.senhaAdmin.length < 12) {
     throw new Error('SINAPSE_SENHA_ADMIN precisa ter pelo menos 12 caracteres.');
   }

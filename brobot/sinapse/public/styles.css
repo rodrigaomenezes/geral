@@ -348,3 +348,8 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .kmover { align-self: flex-start; }
 .btn-bloco { width: 100%; text-align: left; }
 .quadro-resumo { margin: .25rem 0 .75rem; }
+
+/* Integrações: mapeamento de colunas do CSV e frescor por fluxo. */
+.mapa-linhas { display: grid; grid-template-columns: 1fr; gap: 0 1rem; }
+@media (min-width: 700px) { .mapa-linhas { grid-template-columns: 1fr 1fr; } }
+.integra-frescor { font-size: .8rem; margin: .3rem 0; }

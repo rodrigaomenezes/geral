@@ -126,3 +126,13 @@ dimensionamento e da infraestrutura definitiva.
 | WhatsApp por QR Code: conectar, receber (dedup), responder, eco do celular, status, queda (INT-001, INT-007, COM-005, COM-007, BL-09) | ✔ testado com simulador | `integracoes/whatsapp-qr.js`, tela Canais · `canais.test.js` |
 | Pré-rodada: ligação atendida formaliza o combinado no grupo (DP-08b) | ✔ testado | processo padrão · `processos.test.js` |
 | Processo padrão inválido deixava de ser criado em silêncio | ✔ corrigido | `processos/padroes.js` · teste de guarda |
+
+## Entrega de 05/11/2026 (F2 · CSV com lotes e usuários de teste)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Mapeamento de colunas do arquivo real, versionado por fluxo e auditado (adendo CSV §2–3, §10) | ✔ testado | `integracoes/csv/mapa.js`, `servico.js` · `test/csv-lotes.test.js` |
+| Importação com estado completa/parcial e mapa usado; frescor por fluxo na tela | ✔ testado | migração 007 · `csv-lotes.test.js` |
+| Exportação = lote aguardando confirmação; confirmar/falhou com evidência; atraso → divergência + tarefa (adendo CSV §4–6, SUP-004 parcial) | ✔ testado | `exportacoes`, `csv/lotes.js`, supervisor · `csv-lotes.test.js` |
+| Usuários de teste por perfil com senha de variável de ambiente | ✔ testado | `identidade/usuarios-teste.js` · `seguranca.test.js` |
+| Reprocessamento autorizado do mesmo arquivo, retorno automático do destino | ○ | próxima fatia de CSV |

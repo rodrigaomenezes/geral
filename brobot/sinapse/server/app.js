@@ -17,6 +17,7 @@ const telefonia = require('./modulos/telefonia/servico');
 const path = require('node:path');
 const os = require('node:os');
 const whatsappQr = require('./modulos/integracoes/whatsapp-qr');
+const { garantirUsuariosTeste } = require('./modulos/identidade/usuarios-teste');
 const { aplicarStatus } = require('./modulos/integracoes/whatsapp-status');
 const { normalizarTelefone } = require('./nucleo/telefone');
 const seed = require('./modulos/demo/seed');
@@ -85,6 +86,7 @@ async function criarApp(cfg, { log = console.log } = {}) {
   await migrar(db, log);
   await relogio.carregar(db);
   if (cfg.demo) await seed.semearSeVazio(db, cfg, log);
+  await garantirUsuariosTeste(db, cfg, log);
   const worker = criarWorker(db, handlersDeJobs(db), { log });
   ligarWhatsappQr(db, cfg, log);
   const deps = { worker, log };
