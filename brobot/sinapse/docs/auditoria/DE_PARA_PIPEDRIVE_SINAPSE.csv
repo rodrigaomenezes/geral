@@ -6,8 +6,8 @@ Deal;id/title/value/currency (importador pipedrive_negocios: id, organizacao, st
 Deal;stage_id/pipeline_id;oportunidades.etapa;mapa etapa→etapa por pipeline;—;histórico de etapas se a exportação trouxer;AUSENTE: múltiplos pipelines (CRM-003);—;pendente
 Deal;status (open/won/lost) + lost_reason;oportunidades.etapa ganha/perdida + motivo;won exige teste aprovado hoje (DP-04);—;preservar;PARCIAL;—;pendente
 Deal;user_id (owner);oportunidades.responsavel_id;mapa usuário Pipedrive→usuário Sinapse;—;—;A VALIDAR;—;pendente
-Deal;products;oportunidades.produtos;catálogo (CRM-009);—;—;AUSENTE catálogo;—;pendente
-Activity;type/subject/due_date/done;lembretes ou tarefas comerciais;tipo ligação/reunião/e-mail;id externo;preservar autor e data;PARCIAL (CRM-005);—;pendente
+Deal;products;oportunidades.produtos;código do catálogo produtos_comerciais (CRM-009);—;—;A VALIDAR: mapear produto Pipedrive → código do catálogo;—;pendente
+Activity;type/subject/due_date/done;atividades_comerciais (tipo, assunto, quando, feita, resultado);tipo call→ligacao, meeting→reuniao, email→email;id_externo;preservar autor e data;PARCIAL: tabela pronta, importador de atividades aguarda exportação real;—;pendente
 Note;content;notas da oportunidade;texto puro (sem HTML);—;preservar autor/data;PARCIAL;—;pendente
 File;anexos;—;depende de anexos seguros (INT-009);—;—;AUSENTE;—;pendente
 Custom fields;todos;a mapear um a um;—;—;—;A VALIDAR;—;pendente
