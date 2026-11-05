@@ -14,10 +14,12 @@ import { telaProcessos, editorRota } from './telas/processos.js';
 import { telaMeuDia, sinoNotificacoes } from './telas/meu-dia.js';
 import { telaComercial } from './telas/comercial.js';
 import { telaIntegracoes } from './telas/integracoes.js';
+import { telaDashboards } from './telas/dashboards.js';
 
 const MENU = [
   { rota: 'meu-dia', rotulo: 'Meu dia', perm: 'agenda.usar' },
   { rota: 'painel', rotulo: 'Painel', perm: 'ocorrencia.ver' },
+  { rota: 'dashboards', rotulo: 'Dashboards', perm: 'agenda.usar' },
   { rota: 'ocorrencias', rotulo: 'Ocorrências', perm: 'ocorrencia.ver' },
   { rota: 'triagem', rotulo: 'Triagem', perm: 'ocorrencia.triar' },
   { rota: 'tarefas', rotulo: 'Tarefas', perm: 'ocorrencia.ver' },
@@ -35,6 +37,7 @@ const ROTAS = {
   'meu-dia': telaMeuDia,
   comercial: telaComercial,
   integracoes: telaIntegracoes,
+  dashboards: telaDashboards,
   painel: telaPainel,
   ocorrencias: (el, ctx, id) => (id ? telaOcorrencia(el, ctx, id) : telaOcorrencias(el, ctx)),
   triagem: (el, ctx) => telaOcorrencias(el, ctx, { estado: 'triagem', titulo: 'Triagem' }),
@@ -97,7 +100,9 @@ async function sair() {
 async function rotear() {
   if (!ctx.usuario) return;
   const inicial = ctx.pode('agenda.usar') ? 'meu-dia' : 'painel';
-  const [rotaHash, id, extra] = location.hash.replace(/^#\/?/, '').split('/');
+  const [caminho, qs = ''] = location.hash.replace(/^#\/?/, '').split('?');
+  ctx.query = new URLSearchParams(qs);
+  const [rotaHash, id, extra] = caminho.split('/');
   const rota = rotaHash || inicial;
   const fn = ROTAS[rota] || ROTAS[inicial];
   document.querySelectorAll('.menu a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === rota));

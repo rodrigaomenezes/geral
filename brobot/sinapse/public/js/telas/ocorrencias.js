@@ -12,13 +12,14 @@ export const seloEstado = (ctx, e) => selo(ctx.catalogos.estados[e] || e, COR_ES
 export const seloSla = (s) => (s ? selo(...SLA[s]) : null);
 
 export async function telaOcorrencias(el, ctx, fixo = {}) {
-  const filtros = { estado: fixo.estado || 'ativas', equipe: '', minhas: false, q: '', pagina: 1 };
+  const filtros = { estado: fixo.estado || 'ativas', equipe: ctx.query?.get('equipe') || '', minhas: false, q: '', pagina: 1 };
   const lista = h('div', { class: 'lista' });
   const rodape = h('div', { class: 'paginacao' });
 
   const estado = opcoes(h('select', { 'aria-label': 'Situação' }), { ativas: 'Ativas', encerradas: 'Encerradas', todas: 'Todas', ...ctx.catalogos.estados });
   estado.value = filtros.estado;
   const equipe = opcoes(h('select', { 'aria-label': 'Equipe' }), Object.fromEntries(ctx.equipes.equipes.map((e) => [e.codigo, e.nome])), 'Todas as equipes');
+  equipe.value = filtros.equipe;
   const busca = h('input', { type: 'search', placeholder: 'Protocolo, título, cliente ou CNPJ', 'aria-label': 'Buscar' });
   const minhas = h('input', { type: 'checkbox' });
   const aplicar = () => { Object.assign(filtros, { estado: estado.value, equipe: equipe.value, q: busca.value.trim(), minhas: minhas.checked, pagina: 1 }); carregar(); };
