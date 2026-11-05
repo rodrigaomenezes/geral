@@ -32,7 +32,7 @@ const CAMPOS = {
   'conta.status': { rotulo: 'Situação da conta', tipo: 'lista', valores: ['onboarding', 'ativa', 'suspensa', 'encerrada'] },
   'conta.tem_grupo': { rotulo: 'Cliente tem grupo de WhatsApp', tipo: 'booleano' },
   'ligacao.atendeu': { rotulo: 'A última ligação do processo foi atendida', tipo: 'booleano' },
-  'oportunidade.etapa': { rotulo: 'Etapa da oportunidade', tipo: 'lista', valores: ['novo', 'qualificacao', 'demonstracao', 'proposta', 'teste', 'negociacao', 'ganha', 'perdida'] },
+  'oportunidade.etapa': { rotulo: 'Etapa da oportunidade', tipo: 'lista', valores: ['novo', 'qualificacao', 'demonstracao', 'proposta', 'teste', 'negociacao', 'suspensa', 'ganha', 'perdida'] },
   'oportunidade.teste_resultado': { rotulo: 'Resultado do teste', tipo: 'lista', valores: ['pendente', 'aprovado', 'reprovado'] },
   'oportunidade.valor_mensal': { rotulo: 'Valor mensal da oportunidade (R$)', tipo: 'numero' },
   'oportunidade.dias_na_etapa': { rotulo: 'Dias na etapa atual', tipo: 'numero' },

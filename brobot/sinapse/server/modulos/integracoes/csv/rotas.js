@@ -2,6 +2,10 @@
 // Rotas da integração por CSV. O arquivo vem como texto (Content-Type: text/csv), até 5 MB.
 const { ErroNegocio, validar } = require('../../../nucleo/erros');
 const s = require('./servico');
+const { TIPOS } = require('./importadores');
+const { pode } = require('../../identidade/permissoes');
+/** Alguns fluxos pedem uma permissão a mais (ex.: migração do Pipedrive só pela gestão comercial). */
+const exigirDoTipo = (usuario, tipo) => { const p = TIPOS[tipo]?.permissao; if (p && !pode(usuario, p)) throw new ErroNegocio(403, 'sem_permissao', 'Você não tem permissão para importar este tipo de arquivo.'); };
 
 const nomeSeguro = (n) => String(n || 'arquivo.csv').replace(/[^\w.\- ]+/g, '_').slice(0, 120);
 /** Mapa de colunas escolhido na prévia: cabeçalho X-Mapa com JSON (codificado com encodeURIComponent), até 2 KB. */
@@ -16,9 +20,9 @@ module.exports = [
   { metodo: 'GET', caminho: '/api/integracoes', permissao: 'integracao.usar', descricao: 'usar as integrações',
     handler: ({ db, ctx }) => db.comoTenant(ctx.tenantId, (c) => s.painel(c)) },
   { metodo: 'POST', caminho: '/api/integracoes/csv/:tipo/previa', permissao: 'integracao.usar', texto: true, descricao: 'importar arquivos',
-    handler: ({ db, ctx, params, corpo, req }) => { const m = mapaDoCabecalho(req); return db.comoTenant(ctx.tenantId, (c) => s.previa(c, params.tipo, corpo, m)); } },
+    handler: ({ db, ctx, params, corpo, req, usuario }) => { exigirDoTipo(usuario, params.tipo); const m = mapaDoCabecalho(req); return db.comoTenant(ctx.tenantId, (c) => s.previa(c, params.tipo, corpo, m)); } },
   { metodo: 'POST', caminho: '/api/integracoes/csv/:tipo/aplicar', permissao: 'integracao.usar', texto: true, descricao: 'importar arquivos',
-    handler: ({ db, ctx, params, corpo, req }) => { const m = mapaDoCabecalho(req); return db.comoTenant(ctx.tenantId, (c) => s.aplicar(c, ctx, params.tipo, nomeSeguro(req.headers['x-arquivo']), corpo, m)); } },
+    handler: ({ db, ctx, params, corpo, req, usuario }) => { exigirDoTipo(usuario, params.tipo); const m = mapaDoCabecalho(req); return db.comoTenant(ctx.tenantId, (c) => s.aplicar(c, ctx, params.tipo, nomeSeguro(req.headers['x-arquivo']), corpo, m)); } },
   { metodo: 'POST', caminho: '/api/integracoes/lotes/:id/resolver', permissao: 'integracao.usar', descricao: 'confirmar arquivos exportados',
     handler: ({ db, ctx, params, corpo }) => {
       const d = validar(corpo, { resultado: { obrigatorio: true, tipo: 'texto', em: ['confirmado', 'falhou'] },

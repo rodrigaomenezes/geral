@@ -9,7 +9,10 @@ const { publicar, auditar } = require('../../nucleo/registro');
 const { relogio, DIA } = require('../../nucleo/relogio');
 const { normalizarTelefone } = require('../../nucleo/telefone');
 const ocorrencias = require('../ocorrencias/servico');
-const { ETAPAS, ABERTAS, PRODUTOS, validarMudanca } = require('./funil');
+const { ETAPAS, ABERTAS, validarMudanca } = require('./funil');
+const catalogo = require('./catalogo');
+const propostas = require('./propostas');
+const atividades = require('./atividades');
 
 const ACAO_PADRAO = { qualificacao: 'Agendar a demonstração', demonstracao: 'Enviar a proposta', proposta: 'Combinar o teste (período e critério de sucesso)',
   negociacao: 'Fechar a venda' };
@@ -32,13 +35,14 @@ function normalizar(d) {
   }
   if (o.contato_email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(o.contato_email)) throw erro.entrada('E-mail inválido.', [{ campo: 'contatoEmail', problema: 'inválido' }]);
   if (o.produtos !== undefined && o.produtos !== null) {
-    const lista = Array.isArray(o.produtos) ? o.produtos : String(o.produtos).split(',').map((s) => s.trim()).filter(Boolean);
-    if (lista.some((p) => !PRODUTOS[p])) throw erro.entrada('Produto desconhecido.', [{ campo: 'produtos', problema: `use: ${Object.keys(PRODUTOS).join(', ')}` }]);
-    o.produtos = lista;
+    // O catálogo (por organização) confere os códigos depois, em `conferirProdutos`.
+    o.produtos = Array.isArray(o.produtos) ? o.produtos : String(o.produtos).split(',').map((s) => s.trim()).filter(Boolean);
   }
   for (const n of ['frota', 'valor_mensal']) if (o[n] !== undefined && o[n] !== null) { o[n] = Number(o[n]); if (!(o[n] >= 0)) throw erro.entrada(`Valor inválido em ${n}.`); }
   return o;
 }
+
+const conferirProdutos = async (c, ctx, o) => { if (o.produtos && o.produtos.length) await catalogo.validarProdutos(c, ctx, o.produtos); return o; };
 
 async function codigo(c, ctx) {
   const r = uma(await c.query(`INSERT INTO contadores (tenant_id, nome, valor) VALUES ($1, 'oportunidade', 1)
@@ -47,7 +51,7 @@ async function codigo(c, ctx) {
 }
 
 async function criar(c, ctx, d) {
-  const o = normalizar(d);
+  const o = await conferirProdutos(c, ctx, normalizar(d));
   if (!o.empresa) throw erro.entrada('Informe o nome da empresa.', [{ campo: 'empresa', problema: 'obrigatório' }]);
   const agora = relogio.agora();
   const cod = await codigo(c, ctx);
@@ -83,8 +87,8 @@ async function gravar(c, atual, colunas, versao) {
 /** Edita dados (sem mudar de etapa). */
 async function atualizar(c, ctx, id, d, versao) {
   const atual = await buscar(c, id, true);
-  if (!ABERTAS.includes(atual.etapa)) throw erro.conflito('Oportunidade encerrada não pode ser editada.');
-  const o = normalizar(d);
+  if (!ABERTAS.includes(atual.etapa)) throw erro.conflito('Oportunidade encerrada ou suspensa não pode ser editada.');
+  const o = await conferirProdutos(c, ctx, normalizar(d));
   const colunas = Object.fromEntries(Object.entries(o).filter(([k]) => CAMPOS.includes(k)));
   const r = await gravar(c, atual, colunas, versao);
   await auditar(c, ctx, { acao: 'oportunidade.editada', entidade: 'oportunidade', entidadeId: id, depois: Object.keys(colunas) });
@@ -94,13 +98,17 @@ async function atualizar(c, ctx, id, d, versao) {
 /** Muda de etapa aplicando os dados enviados junto (ex.: período e critério do teste). */
 async function mover(c, ctx, id, para, d = {}, versao) {
   const atual = await buscar(c, id, true);
-  const o = normalizar(d);
+  const o = await conferirProdutos(c, ctx, normalizar(d));
   const proposta = { ...atual, ...o };
   if (para === 'perdida') { proposta.motivo_perda = d.motivoPerda || null; }
+  // DP-04: da Proposta direto para a Negociação só quando nenhum produto exige teste no catálogo.
+  const dispensa = para === 'negociacao' && atual.etapa === 'proposta' && !(await catalogo.exigeTeste(c, ctx, proposta.produtos || []));
+  if (dispensa) proposta.teste_dispensado = true;
   validarMudanca(atual, proposta, para);
   const agora = relogio.agora();
   const colunas = Object.fromEntries(Object.entries(o).filter(([k]) => CAMPOS.includes(k)));
   Object.assign(colunas, { etapa: para, etapa_desde: agora });
+  if (dispensa) colunas.teste_dispensado = true;
   if (para === 'perdida') Object.assign(colunas, { motivo_perda: d.motivoPerda, detalhe_perda: d.detalhePerda || null, fechada_em: agora, proxima_acao: null, proxima_acao_em: null });
   if (para === 'teste' && !o.proxima_acao) Object.assign(colunas, { proxima_acao: 'Acompanhar o teste e registrar o resultado', proxima_acao_em: new Date(`${proposta.teste_fim}T21:00:00Z`) });
   let venda = null;
@@ -150,17 +158,77 @@ async function criarContaDaVenda(c, ctx, o) {
       [ctx.tenantId, o.empresa, o.cnpj, o.frota ? `${o.frota} veículos` : null, o.produtos, o.valor_mensal, o.id]));
     await c.query("INSERT INTO status_financeiro (tenant_id, conta_id, situacao) VALUES ($1, $2, 'desconhecido') ON CONFLICT DO NOTHING", [ctx.tenantId, conta.id]);
   }
-  const nomesProdutos = o.produtos.map((p) => PRODUTOS[p]).join(', ');
+  const cat = await catalogo.mapa(c, ctx);
+  const nomesProdutos = o.produtos.map((p) => cat[p]?.nome || p).join(', ');
   const oc = await ocorrencias.criar(c, ctx, {
     origem: 'interna', contaId: conta.id, tipo: 'onboarding', prioridade: 'alta', equipeCodigo: 'cs',
     titulo: `${expansao ? 'Expansão' : 'Onboarding'}: ${conta.nome} (${nomesProdutos})`,
     descricao: `Venda ${o.codigo} fechada pelo Comercial. Contato comercial: ${o.contato_nome || '-'} ${o.contato_telefone || ''} ${o.contato_email || ''}. `
-      + `Teste: ${o.teste_criterio || '-'} (${o.teste_parecer || 'aprovado'}). O CS define o ponto focal (1 nome + 1 contato) e repassa ao Suporte.`,
+      + `Teste: ${o.teste_dispensado ? 'dispensado (produtos sem teste no catálogo)' : `${o.teste_criterio || '-'} (${o.teste_parecer || 'aprovado'})`}. O CS define o ponto focal (1 nome + 1 contato) e repassa ao Suporte.`,
     proximaAcao: 'Definir o ponto focal e o plano de onboarding',
   });
   await auditar(c, ctx, { acao: expansao ? 'conta.expansao_vendida' : 'conta.criada_pela_venda', entidade: 'conta', entidadeId: conta.id,
     depois: { oportunidade: o.codigo, produtos: o.produtos, valorMensal: o.valor_mensal } });
   return { contaId: conta.id, ocorrenciaId: oc.id, expansao };
+}
+
+/** Suspende (CRM-011): sai do funil ativo, com motivo e data para retomar — que vira a próxima ação. */
+async function suspender(c, ctx, id, { motivo, retomarEm }, versao) {
+  const atual = await buscar(c, id, true);
+  if (!ABERTAS.includes(atual.etapa)) throw erro.conflito('Só oportunidade em andamento pode ser suspensa.');
+  const quando = new Date(retomarEm); const agora = relogio.agora();
+  if (!(quando > agora) || quando - agora > 365 * DIA) throw erro.entrada('Data para retomar: no futuro e em até 1 ano.', [{ campo: 'retomarEm', problema: 'inválida' }]);
+  const r = await gravar(c, atual, { etapa: 'suspensa', suspensa_de: atual.etapa, motivo_suspensao: motivo, etapa_desde: agora,
+    proxima_acao: `Retomar contato (suspensa: ${motivo})`.slice(0, 200), proxima_acao_em: quando }, versao);
+  await auditar(c, ctx, { acao: 'oportunidade.suspensa', entidade: 'oportunidade', entidadeId: id, antes: { etapa: atual.etapa }, depois: { etapa: 'suspensa', retomarEm: quando }, motivo });
+  await publicar(c, ctx, { tipo: 'oportunidade.etapa', agregado: 'oportunidade', agregadoId: id, chave: `op:${id}:v${r.version}`, payload: { de: atual.etapa, para: 'suspensa' } });
+  return r;
+}
+
+/** Retoma a suspensa (volta à etapa de onde saiu) ou reabre a perdida (volta à qualificação, com motivo). */
+async function retomar(c, ctx, id, { motivo } = {}, versao) {
+  const atual = await buscar(c, id, true);
+  const agora = relogio.agora();
+  let colunas; let acao;
+  if (atual.etapa === 'suspensa') {
+    acao = 'oportunidade.retomada';
+    colunas = { etapa: atual.suspensa_de, suspensa_de: null, motivo_suspensao: null, etapa_desde: agora,
+      proxima_acao: ACAO_PADRAO[atual.suspensa_de] || 'Retomar a negociação', proxima_acao_em: new Date(agora.getTime() + DIA) };
+  } else if (atual.etapa === 'perdida') {
+    if (!(motivo && motivo.trim().length >= 5)) throw erro.entrada('Diga por que a oportunidade está sendo reaberta.', [{ campo: 'motivo', problema: 'obrigatório' }]);
+    acao = 'oportunidade.reaberta';
+    colunas = { etapa: 'qualificacao', motivo_perda: null, detalhe_perda: null, fechada_em: null, etapa_desde: agora,
+      proxima_acao: 'Retomar a negociação (reaberta)', proxima_acao_em: new Date(agora.getTime() + DIA) };
+  } else throw erro.conflito('Só oportunidade suspensa ou perdida pode ser retomada.');
+  const r = await gravar(c, atual, colunas, versao);
+  await auditar(c, ctx, { acao, entidade: 'oportunidade', entidadeId: id, antes: { etapa: atual.etapa, motivoPerda: atual.motivo_perda }, depois: { etapa: r.etapa }, motivo: motivo || null });
+  await publicar(c, ctx, { tipo: 'oportunidade.etapa', agregado: 'oportunidade', agregadoId: id, chave: `op:${id}:v${r.version}`, payload: { de: atual.etapa, para: r.etapa } });
+  return r;
+}
+
+/** Migração do Pipedrive (CRM-018) por CSV: negócios em aberto entram uma vez só (id do Pipedrive). Ganhos e perdidos
+ *  ficam para a migração completa do histórico, com a exportação real e a conciliação aprovada. */
+async function importarDoPipedrive(c, ctx, linhas) {
+  const resumo = { criadas: 0, jaExistiam: 0 }; const erros = [];
+  const emails = [...new Set(linhas.map((l) => (l.responsavel_email || '').toLowerCase()).filter(Boolean))];
+  const donos = new Map((await c.query("SELECT id, lower(email) AS email FROM usuarios WHERE lower(email) = ANY($1) AND ativo AND papel IN ('comercial','supervisor','admin')", [emails])).rows.map((u) => [u.email, u.id]));
+  const agora = relogio.agora();
+  for (const l of linhas) {
+    if (uma(await c.query("SELECT 1 FROM oportunidades WHERE fonte = 'pipedrive' AND id_externo = $1", [l.id]))) { resumo.jaExistiam++; continue; }
+    let o;
+    try { o = normalizar({ empresa: l.organizacao, cnpj: l.cnpj || undefined, contatoNome: l.contato || undefined, contatoTelefone: l.telefone || undefined,
+      contatoEmail: l.email || undefined, valorMensal: l.valor || undefined }); } catch (e) { erros.push({ linha: l.numero, erro: e.message }); continue; }
+    const cod = await codigo(c, ctx);
+    const op = uma(await c.query(`INSERT INTO oportunidades (tenant_id, codigo, empresa, cnpj, contato_nome, contato_telefone, contato_email, origem, valor_mensal,
+        responsavel_id, proxima_acao, proxima_acao_em, fonte, id_externo, criado_em) VALUES ($1,$2,$3,$4,$5,$6,$7,'base',$8,$9,$10,$11,'pipedrive',$12,$13) RETURNING id`,
+    [ctx.tenantId, cod, o.empresa, o.cnpj || null, o.contato_nome || null, o.contato_telefone || null, o.contato_email || null, o.valor_mensal ?? null,
+      donos.get((l.responsavel_email || '').toLowerCase()) || null, `Revisar negócio migrado do Pipedrive${l.etapa ? ` (lá: ${l.etapa})` : ''}`.slice(0, 200),
+      new Date(agora.getTime() + DIA), l.id, l.criado_em || agora]));
+    if (l.titulo || l.observacoes) await atividades.registrar(c, ctx, { id: op.id, etapa: 'novo' }, { tipo: 'nota', assunto: (l.titulo || 'Negócio do Pipedrive').slice(0, 200), resultado: l.observacoes || null });
+    await auditar(c, ctx, { acao: 'oportunidade.importada_pipedrive', entidade: 'oportunidade', entidadeId: op.id, depois: { codigo: cod, idPipedrive: l.id } });
+    resumo.criadas++;
+  }
+  return { resumo: [`${resumo.criadas} oportunidade(s) criada(s) do Pipedrive`, `${resumo.jaExistiam} já estavam no Sinapse (mesmo id do Pipedrive)`], erros };
 }
 
 async function definirProximaAcao(c, ctx, id, { proximaAcao, proximaAcaoEm }, versao) {
@@ -170,29 +238,30 @@ async function definirProximaAcao(c, ctx, id, { proximaAcao, proximaAcaoEm }, ve
 }
 
 async function listar(c, { q, minhas, usuario } = {}) {
-  const params = [];
-  const onde = ["(o.etapa NOT IN ('ganha','perdida') OR o.fechada_em > now() - interval '60 days')"];
+  const params = [relogio.agora()];
+  const onde = ["(o.etapa NOT IN ('ganha','perdida') OR o.fechada_em > $1::timestamptz - interval '60 days')"];
   if (q) { params.push(`%${q}%`); onde.push(`(o.empresa ILIKE $${params.length} OR o.codigo ILIKE $${params.length} OR o.cnpj LIKE $${params.length})`); }
   if (minhas) { params.push(usuario.id); onde.push(`o.responsavel_id = $${params.length}`); }
   const r = await c.query(
     `SELECT o.id, o.codigo, o.empresa, o.etapa, o.valor_mensal, o.frota, o.produtos, o.proxima_acao, o.proxima_acao_em, o.etapa_desde, o.teste_fim,
-       o.teste_resultado, o.version, o.conta_id, u.nome AS responsavel_nome
+       o.teste_resultado, o.teste_dispensado, o.version, o.conta_id, o.fonte, o.suspensa_de, u.nome AS responsavel_nome
      FROM oportunidades o LEFT JOIN usuarios u ON u.id = o.responsavel_id
      WHERE ${onde.join(' AND ')} ORDER BY o.proxima_acao_em NULLS LAST LIMIT 300`, params);
   return { itens: r.rows, limite: 300 };
 }
 
-async function detalhe(c, id) {
+async function detalhe(c, ctx, id) {
   const o = uma(await c.query('SELECT o.*, u.nome AS responsavel_nome, ct.nome AS conta_nome FROM oportunidades o LEFT JOIN usuarios u ON u.id = o.responsavel_id LEFT JOIN contas ct ON ct.id = o.conta_id WHERE o.id = $1', [id]));
   if (!o) throw erro.naoEncontrado('Oportunidade');
   const historico = (await c.query("SELECT acao, ator_nome, antes, depois, motivo, criado_em FROM auditoria WHERE entidade = 'oportunidade' AND entidade_id = $1 ORDER BY id", [id])).rows;
-  return { ...o, historico };
+  return { ...o, historico, propostas: await propostas.listar(c, id), atividades: await atividades.listar(c, id),
+    exigeTeste: await catalogo.exigeTeste(c, ctx, o.produtos || []) };
 }
 
 /** Indicadores do funil (para o Comercial e para a diretoria). */
 async function indicadores(c) {
   const porEtapa = (await c.query(`SELECT etapa, count(*)::int AS n, coalesce(sum(valor_mensal),0)::float AS valor FROM oportunidades
-    WHERE etapa NOT IN ('ganha','perdida') OR fechada_em > now() - interval '90 days' GROUP BY etapa`)).rows;
+    WHERE etapa NOT IN ('ganha','perdida') OR fechada_em > $1::timestamptz - interval '90 days' GROUP BY etapa`, [relogio.agora()])).rows;
   const testes = uma(await c.query(`SELECT count(*) FILTER (WHERE teste_resultado = 'aprovado')::int AS aprovados,
     count(*) FILTER (WHERE teste_resultado = 'reprovado')::int AS reprovados,
     count(*) FILTER (WHERE etapa = 'teste' AND teste_resultado IS NULL)::int AS em_andamento,
@@ -204,4 +273,4 @@ async function indicadores(c) {
   return { porEtapa, testes, motivos };
 }
 
-module.exports = { criar, atualizar, mover, registrarTeste, definirProximaAcao, listar, detalhe, indicadores, normalizar };
+module.exports = { criar, atualizar, mover, registrarTeste, definirProximaAcao, suspender, retomar, importarDoPipedrive, listar, detalhe, indicadores, normalizar, buscar };

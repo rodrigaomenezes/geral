@@ -30,7 +30,12 @@ export function trocar(el, ...filhos) {
 
 const FUSO = { timeZone: 'America/Sao_Paulo' };
 export const dataHora = (v) => (v ? new Date(v).toLocaleString('pt-BR', { ...FUSO, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
-export const data = (v) => (v ? new Date(v).toLocaleDateString('pt-BR', FUSO) : '—');
+// Dia sem hora ('AAAA-MM-DD', colunas DATE) é mostrado como está, sem passar por fuso (senão vira o dia anterior).
+export const data = (v) => {
+  if (!v) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : new Date(v).toLocaleDateString('pt-BR', FUSO);
+};
 export const cnpj = (v) => (v ? v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '');
 
 export function relativo(v, agora = new Date()) {

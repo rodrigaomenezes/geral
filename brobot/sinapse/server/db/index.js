@@ -7,6 +7,10 @@
 // `sistema` é reservado a rotinas sem usuário (login, fila de jobs, supervisor).
 
 const PAPEL_APP = 'sinapse_app';
+// Coluna DATE (dia, sem hora: validade, período do teste, feriado) volta como texto 'AAAA-MM-DD' nos dois motores.
+// Como objeto Date ela vira meia-noite UTC e aparece um dia antes no horário de Brasília.
+const OID_DATE = 1082;
+const dataComoTexto = (v) => v;
 
 /** TLS (R-03): com sslmode na URL, o certificado do servidor é verificado (CA própria em SINAPSE_DB_CA ou as do sistema).
  *  Desligar a verificação só com SINAPSE_DB_TLS_INSEGURO=1, escolha explícita que fica no log. */
@@ -17,7 +21,8 @@ function opcoesTls(url, tls = {}, log = console.log) {
 }
 
 function criarAdaptadorPg(url, tls, log) {
-  const { Pool } = require('pg');
+  const { Pool, types } = require('pg');
+  types.setTypeParser(OID_DATE, dataComoTexto);
   const ssl = opcoesTls(url, tls, log);
   // O pg trata sslmode da URL por conta própria e sobrepõe `ssl`: tiramos da URL para valer a regra acima.
   if (ssl) url = url.replace(/([?&])sslmode=[^&]*&?/, '$1').replace(/[?&]$/, '');
@@ -47,7 +52,8 @@ function criarAdaptadorPg(url, tls, log) {
 async function criarAdaptadorPglite(dir) {
   const { PGlite } = require('@electric-sql/pglite');
   if (dir) require('node:fs').mkdirSync(dir, { recursive: true });
-  const db = dir ? new PGlite(dir) : new PGlite();
+  const opcoes = { parsers: { [OID_DATE]: dataComoTexto } };
+  const db = dir ? new PGlite(dir, opcoes) : new PGlite(opcoes);
   await db.waitReady;
   // PGlite tem uma conexão só: as transações são serializadas aqui para não se misturarem.
   let fila = Promise.resolve();

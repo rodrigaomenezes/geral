@@ -20,6 +20,7 @@ const TODAS = {
   'agenda.usar': 'usar o Meu dia e os lembretes',
   'comercial.ver': 'ver o funil comercial',
   'comercial.editar': 'cadastrar e mover oportunidades',
+  'comercial.gerir': 'gerir o catálogo de produtos e aprovar descontos acima da alçada',
   'integracao.usar': 'importar e exportar arquivos da Platform e do OMIE',
   'telefonia.usar': 'ligar pelo sistema',
   'telefonia.gerir': 'configurar a telefonia e ver o painel de ligações',

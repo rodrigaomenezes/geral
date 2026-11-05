@@ -15,6 +15,7 @@ const mapas = require('./mapa');
 const { TIPOS } = require('./importadores');
 const { EXPORTS } = require('./exportadores');
 const rodadas = require('../../rodadas/servico');
+const comercial = require('../../comercial/servico');
 
 const MAX_ERROS = 200;
 const PRAZO_CONFIRMACAO_MS = 2 * DIA;
@@ -23,6 +24,7 @@ const OPCIONAIS = ['codigo_erro', 'expira_em', 'referencia', 'ultimo_login', 'us
 const hashDe = (texto) => crypto.createHash('sha256').update(texto).digest('hex');
 
 const defDe = (tipo) => { const d = TIPOS[tipo]; if (!d) throw erro.entrada('Tipo de importação desconhecido.'); return d; };
+const opcionaisDe = (def) => def.opcionais || OPCIONAIS;
 const mapaAtivo = async (c, tipo) => uma(await c.query('SELECT id, versao, mapa FROM mapas_csv WHERE tipo = $1 AND ativo', [tipo]));
 
 /** Lê o arquivo e decide o mapa: o enviado na prévia/aplicação, senão o salvo, senão nenhum. */
@@ -40,7 +42,7 @@ async function analisar(c, tipo, texto, mapaEnviado) {
   // Um mapa salvo que não serve para este arquivo (colunas mudaram) não é aplicado: a prévia pede outro.
   const serve = mapa && !mapas.validarMapa(mapa, def.colunas, tabela.cabecalhos).length;
   const t = serve ? mapas.aplicarMapa(tabela, mapa) : tabela;
-  const faltam = def.colunas.filter((col) => !t.cabecalhos.includes(col) && !OPCIONAIS.includes(col));
+  const faltam = def.colunas.filter((col) => !t.cabecalhos.includes(col) && !opcionaisDe(def).includes(col));
   const validas = []; const erros = [];
   if (!faltam.length) {
     for (const l of t.linhas) {
@@ -54,7 +56,7 @@ async function analisar(c, tipo, texto, mapaEnviado) {
 
 /** O que a tela precisa para pedir o mapeamento. */
 const pedidoDeMapa = (a) => ({
-  precisaMapear: true, faltam: a.faltam, campos: a.def.colunas, opcionais: a.def.colunas.filter((x) => OPCIONAIS.includes(x)),
+  precisaMapear: true, faltam: a.faltam, campos: a.def.colunas, opcionais: a.def.colunas.filter((x) => opcionaisDe(a.def).includes(x)),
   cabecalhos: a.original.cabecalhos, sugestao: mapas.sugerir(a.def.colunas, a.original.cabecalhos),
   amostra: a.original.linhas.slice(0, 3).map((l) => l.valores),
 });
@@ -89,7 +91,7 @@ async function aplicar(c, ctx, tipo, nomeArquivo, texto, mapaEnviado) {
     `INSERT INTO importacoes (tenant_id, tipo, arquivo, hash, linhas, aplicadas, com_erro, criado_por, mapa_id) VALUES ($1,$2,$3,$4,$5,0,0,$6,$7)
      ON CONFLICT (tenant_id, tipo, hash) DO NOTHING RETURNING id`, [ctx.tenantId, tipo, nomeArquivo, a.hash, a.tabela.linhas.length, ctx.usuario?.id || null, mapaId]));
   if (!reg) throw erro.conflito('Este mesmo arquivo já foi importado. Nada foi alterado.');
-  const r = a.validas.length ? await a.def.aplicar(c, ctx, a.validas, { rodadas }) : { resumo: [], erros: [] };
+  const r = a.validas.length ? await a.def.aplicar(c, ctx, a.validas, { rodadas, comercial }) : { resumo: [], erros: [] };
   const erros = [...a.erros, ...(r.erros || [])];
   const aplicadas = a.validas.length - (r.erros || []).length;
   const estado = erros.length ? 'parcial' : 'concluido';
@@ -142,7 +144,7 @@ async function painel(c) {
     ORDER BY (e.estado = 'aguardando_confirmacao') DESC, e.criado_em DESC LIMIT 30`, [agora])).rows;
   return {
     importacoes: Object.fromEntries(Object.entries(TIPOS).map(([k, t]) => [k, { nome: t.nome, origem: t.origem, colunas: t.colunas, exemplo: t.exemplo,
-      ultimoArquivoEm: ultimos.get(k) || null, mapaVersao: mapasAtivos.get(k) || null, layout: 'proposto pelo Sinapse · pendente de validação com arquivo real' }])),
+      permissao: t.permissao || null, ultimoArquivoEm: ultimos.get(k) || null, mapaVersao: mapasAtivos.get(k) || null, layout: 'proposto pelo Sinapse · pendente de validação com arquivo real' }])),
     exportacoes: Object.fromEntries(Object.entries(EXPORTS).map(([k, e]) => [k, { nome: e.nome, destino: e.destino }])),
     historico, lotes,
   };

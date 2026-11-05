@@ -136,3 +136,15 @@ dimensionamento e da infraestrutura definitiva.
 | Exportação = lote aguardando confirmação; confirmar/falhou com evidência; atraso → divergência + tarefa (adendo CSV §4–6, SUP-004 parcial) | ✔ testado | `exportacoes`, `csv/lotes.js`, supervisor · `csv-lotes.test.js` |
 | Usuários de teste por perfil com senha de variável de ambiente | ✔ testado | `identidade/usuarios-teste.js` · `seguranca.test.js` |
 | Reprocessamento autorizado do mesmo arquivo, retorno automático do destino | ○ | próxima fatia de CSV |
+
+## Entrega de 05/11/2026 (F3a · Comercial como CRM)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Catálogo de produtos com "exige teste" por produto (CRM-009, DP-04) | ✔ testado | `comercial/catalogo.js` · `test/comercial-crm.test.js` |
+| Propostas versionadas, imutáveis depois de enviadas, com alçada de desconto (CRM-007, CRM-008) | ✔ testado | `comercial/propostas.js`, migração 008 · `comercial-crm.test.js` |
+| Atividades da negociação e linha do tempo (CRM-005, CRM-010) | ✔ testado | `comercial/atividades.js` · `comercial-crm.test.js` |
+| Suspender, retomar e reabrir com motivo (CRM-011) | ✔ testado | `comercial/servico.js` · `comercial-crm.test.js` |
+| Migração dos negócios abertos do Pipedrive por CSV (CRM-018 parcial) | ✔ testado | `csv/importadores.js` `pipedrive_negocios` · `comercial-crm.test.js` |
+| Datas sem hora corretas na tela; layout do funil comercial restaurado | ✔ corrigido | `db/index.js`, `dom.js`, `styles.css` · `regras.test.js` |
+| Múltiplos funis, pessoas × organizações, renovação/expansão, previsão (CRM-001/003/014/015) | ○ | F3b |

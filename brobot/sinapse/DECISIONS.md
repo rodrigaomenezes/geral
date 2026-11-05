@@ -134,3 +134,23 @@ não depender do módulo CSV inteiro.
 **Decisão:** `SINAPSE_SENHA_TESTE` cria/atualiza na subida um usuário por perfil (`gestor@brobot.com.br`, `suporte1@…`),
 idempotente por e-mail; a senha não está no código (repositório público) nem no banco (só o hash scrypt). Recusado em
 `SINAPSE_AMBIENTE=producao`.
+
+# T-023 — Comercial como CRM (F3a): catálogo, propostas com alçada, atividades, suspensão e migração do Pipedrive
+**Contexto:** adendo Comercial da diretriz (substituir o Pipedrive) e DP-04 (teste obrigatório para todo produto?).
+**Decisão:** `produtos_comerciais` por organização com `exige_teste` (padrão = exige, a regra de antes); a oportunidade
+só vai da Proposta direto à Negociação quando nenhum produto exige teste, e o banco aceita o fechamento com
+`teste_dispensado`. Propostas versionadas (`propostas`): uma vigente por oportunidade, enviada imutável (gatilho),
+desconto acima da alçada (`tenants.config.comercial.descontoMaximo`, padrão 10%) aprovado por outra pessoa com
+`comercial.gerir`; enviar a proposta passa o valor e os produtos dela para a oportunidade. Atividades
+(`atividades_comerciais`) com resultado obrigatório ao concluir; agendada vira a próxima ação. Suspensa guarda a etapa
+de origem e a data para retomar; perdida reabre na qualificação com motivo. Migração do Pipedrive por CSV (com o
+mapeamento da F2): só negócios abertos, uma vez por id (`fonte`, `id_externo`), apenas pela gestão comercial.
+**Fora (F3b):** múltiplos funis (CRM-003), pessoas × organizações (CRM-001), renovação/expansão (CRM-014), previsão
+(CRM-015), histórico de ganhos e perdidos do Pipedrive (aguarda a exportação real).
+
+# T-024 — Datas sem hora como texto; classe própria do quadro de ocorrências
+**Problema encontrado:** colunas DATE (validade, período do teste, VIP, feriado) chegavam como meia-noite UTC e a tela
+mostrava o dia anterior (fuso de Brasília); e o `teste_fim` lido do banco gerava data inválida ao montar a próxima
+ação. **Correção:** os dois motores devolvem DATE como `AAAA-MM-DD`; `data()` da tela formata esse texto direto.
+**Problema encontrado:** o CSS do quadro de ocorrências (PR 14) reusou a classe `.quadro` do funil comercial e mudou
+o layout dele. **Correção:** o quadro de ocorrências usa `.kquadro`.

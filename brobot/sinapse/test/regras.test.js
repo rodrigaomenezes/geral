@@ -134,3 +134,9 @@ test('banco: UPDATE informa quantas linhas mudou nos dois motores (rowCount)', a
   const nada = await t.app.db.query("UPDATE equipes SET nome = nome WHERE codigo = 'nao_existe'");
   assert.equal(nada.rowCount, 0);
 });
+
+test('banco: coluna DATE volta como texto AAAA-MM-DD nos dois motores (sem virar o dia anterior no fuso de Brasília)', async () => {
+  const [r] = await t.sql("SELECT '2026-11-20'::date AS d, now() AS agora");
+  assert.equal(r.d, '2026-11-20');
+  assert.ok(r.agora instanceof Date, 'timestamp continua Date');
+});
