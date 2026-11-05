@@ -1,7 +1,8 @@
 'use strict';
-// Comercial: oportunidades no funil de aquisição com teste antes do fechamento. Venda ganha vira conta em
-// onboarding (ou expansão de conta existente pelo CNPJ) e abre o onboarding para o CS — o CS define o ponto focal
-// e repassa ao Suporte (reunião de 03/11/2026). Toda mudança: auditoria + evento (processos podem reagir).
+// Comercial: oportunidades em três funis — aquisição (teste antes do fechamento), expansão (upsell/cross-sell de cliente
+// da carteira) e renovação. Venda de aquisição vira conta em onboarding e abre o onboarding para o CS (o CS define o
+// ponto focal e repassa ao Suporte — reunião de 03/11/2026); expansão soma produtos e valor à conta; renovação troca o
+// valor do contrato. Toda mudança: auditoria + evento (processos podem reagir).
 
 const { uma } = require('../../db');
 const { erro } = require('../../nucleo/erros');
@@ -9,23 +10,25 @@ const { publicar, auditar } = require('../../nucleo/registro');
 const { relogio, DIA } = require('../../nucleo/relogio');
 const { normalizarTelefone } = require('../../nucleo/telefone');
 const ocorrencias = require('../ocorrencias/servico');
-const { ETAPAS, ABERTAS, validarMudanca } = require('./funil');
+const { ETAPAS, ABERTAS, FUNIS, validarMudanca, previsao } = require('./funil');
 const catalogo = require('./catalogo');
 const propostas = require('./propostas');
 const atividades = require('./atividades');
+const contatos = require('./contatos');
 
 const ACAO_PADRAO = { qualificacao: 'Agendar a demonstração', demonstracao: 'Enviar a proposta', proposta: 'Combinar o teste (período e critério de sucesso)',
   negociacao: 'Fechar a venda' };
 
 const CAMPOS = ['empresa', 'cnpj', 'contato_nome', 'contato_telefone', 'contato_email', 'origem', 'produtos', 'frota', 'valor_mensal',
-  'responsavel_id', 'proxima_acao', 'proxima_acao_em', 'teste_inicio', 'teste_fim', 'teste_criterio'];
+  'responsavel_id', 'proxima_acao', 'proxima_acao_em', 'teste_inicio', 'teste_fim', 'teste_criterio', 'fechamento_previsto'];
 
 /** Normaliza o que veio da tela (camelCase) para as colunas, com validação de formato. */
 function normalizar(d) {
   const o = {};
   const mapa = { empresa: 'empresa', cnpj: 'cnpj', contatoNome: 'contato_nome', contatoTelefone: 'contato_telefone', contatoEmail: 'contato_email',
     origem: 'origem', produtos: 'produtos', frota: 'frota', valorMensal: 'valor_mensal', responsavelId: 'responsavel_id', proximaAcao: 'proxima_acao',
-    proximaAcaoEm: 'proxima_acao_em', testeInicio: 'teste_inicio', testeFim: 'teste_fim', testeCriterio: 'teste_criterio' };
+    proximaAcaoEm: 'proxima_acao_em', testeInicio: 'teste_inicio', testeFim: 'teste_fim', testeCriterio: 'teste_criterio',
+    fechamentoPrevisto: 'fechamento_previsto' };
   for (const [k, col] of Object.entries(mapa)) if (d[k] !== undefined) o[col] = d[k] === '' ? null : d[k];
   if (o.cnpj) { o.cnpj = String(o.cnpj).replace(/\D/g, ''); if (o.cnpj.length !== 14) throw erro.entrada('CNPJ precisa ter 14 dígitos.', [{ campo: 'cnpj', problema: 'inválido' }]); }
   if (o.contato_telefone) {
@@ -38,6 +41,7 @@ function normalizar(d) {
     // O catálogo (por organização) confere os códigos depois, em `conferirProdutos`.
     o.produtos = Array.isArray(o.produtos) ? o.produtos : String(o.produtos).split(',').map((s) => s.trim()).filter(Boolean);
   }
+  if (o.fechamento_previsto && !/^\d{4}-\d{2}-\d{2}$/.test(String(o.fechamento_previsto))) throw erro.entrada('Fechamento previsto: use uma data (AAAA-MM-DD).', [{ campo: 'fechamentoPrevisto', problema: 'inválida' }]);
   for (const n of ['frota', 'valor_mensal']) if (o[n] !== undefined && o[n] !== null) { o[n] = Number(o[n]); if (!(o[n] >= 0)) throw erro.entrada(`Valor inválido em ${n}.`); }
   return o;
 }
@@ -52,16 +56,30 @@ async function codigo(c, ctx) {
 
 async function criar(c, ctx, d) {
   const o = await conferirProdutos(c, ctx, normalizar(d));
+  const funil = d.funil || 'aquisicao';
+  if (!FUNIS[funil]) throw erro.entrada('Funil desconhecido.', [{ campo: 'funil', problema: `use: ${Object.keys(FUNIS).join(', ')}` }]);
+  let conta = null;
+  if (funil !== 'aquisicao') {
+    // Expansão e renovação partem de um cliente da carteira: empresa e CNPJ vêm da conta.
+    conta = d.contaOrigemId ? uma(await c.query('SELECT id, nome, cnpj, valor_mensal FROM contas WHERE id = $1 AND arquivada_em IS NULL', [d.contaOrigemId])) : null;
+    if (!conta) throw erro.entrada('Expansão e renovação precisam de um cliente da carteira.', [{ campo: 'contaOrigemId', problema: 'obrigatório' }]);
+    Object.assign(o, { empresa: conta.nome, cnpj: conta.cnpj });
+    if (funil === 'renovacao' && o.valor_mensal === undefined && conta.valor_mensal !== null) o.valor_mensal = Number(conta.valor_mensal);
+  }
   if (!o.empresa) throw erro.entrada('Informe o nome da empresa.', [{ campo: 'empresa', problema: 'obrigatório' }]);
   const agora = relogio.agora();
   const cod = await codigo(c, ctx);
+  const acaoInicial = { aquisicao: 'Qualificar o lead (dor, frota, decisor)', expansao: 'Entender a necessidade nova com o cliente', renovacao: 'Confirmar a renovação e as condições com o cliente' }[funil];
   const op = uma(await c.query(
     `INSERT INTO oportunidades (tenant_id, codigo, empresa, cnpj, contato_nome, contato_telefone, contato_email, origem, produtos, frota, valor_mensal,
-       responsavel_id, proxima_acao, proxima_acao_em) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-    [ctx.tenantId, cod, o.empresa, o.cnpj || null, o.contato_nome || null, o.contato_telefone || null, o.contato_email || null, o.origem || 'outbound',
+       responsavel_id, proxima_acao, proxima_acao_em, funil, conta_origem_id, fechamento_previsto, encaminhada_por)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+    [ctx.tenantId, cod, o.empresa, o.cnpj || null, o.contato_nome || null, o.contato_telefone || null, o.contato_email || null, conta ? 'base' : o.origem || 'outbound',
       o.produtos || [], o.frota ?? null, o.valor_mensal ?? null, o.responsavel_id || (ctx.usuario?.papel === 'comercial' ? ctx.usuario.id : null),
-      o.proxima_acao || 'Qualificar o lead (dor, frota, decisor)', o.proxima_acao_em || new Date(agora.getTime() + DIA)]));
-  await auditar(c, ctx, { acao: 'oportunidade.criada', entidade: 'oportunidade', entidadeId: op.id, depois: { codigo: cod, empresa: op.empresa } });
+      o.proxima_acao || acaoInicial, o.proxima_acao_em || new Date(agora.getTime() + DIA), funil, conta?.id || null, o.fechamento_previsto || null,
+      d.encaminhada ? ctx.usuario?.id || null : null]));
+  await auditar(c, ctx, { acao: d.encaminhada ? 'oportunidade.encaminhada' : 'oportunidade.criada', entidade: 'oportunidade', entidadeId: op.id,
+    depois: { codigo: cod, empresa: op.empresa, funil }, motivo: d.observacao || null });
   await publicar(c, ctx, { tipo: 'oportunidade.etapa', agregado: 'oportunidade', agregadoId: op.id, chave: `op:${op.id}:v1`, payload: { de: null, para: 'novo' } });
   return op;
 }
@@ -101,8 +119,17 @@ async function mover(c, ctx, id, para, d = {}, versao) {
   const o = await conferirProdutos(c, ctx, normalizar(d));
   const proposta = { ...atual, ...o };
   if (para === 'perdida') { proposta.motivo_perda = d.motivoPerda || null; }
-  // DP-04: da Proposta direto para a Negociação só quando nenhum produto exige teste no catálogo.
-  const dispensa = para === 'negociacao' && atual.etapa === 'proposta' && !(await catalogo.exigeTeste(c, ctx, proposta.produtos || []));
+  // DP-04: da Proposta direto para a Negociação quando nenhum produto exige teste no catálogo. Renovação dispensa
+  // sempre (o cliente já usa); expansão só olha os produtos que a conta ainda não tem.
+  let dispensa = false;
+  if (para === 'negociacao' && atual.etapa === 'proposta') {
+    if (atual.funil === 'renovacao') dispensa = true;
+    else {
+      const jaTem = atual.funil === 'expansao' ? (uma(await c.query('SELECT produtos FROM contas WHERE id = $1', [atual.conta_origem_id]))?.produtos || []) : [];
+      const novos = (proposta.produtos || []).filter((p) => !jaTem.includes(p));
+      dispensa = atual.funil === 'expansao' && !novos.length ? (proposta.produtos || []).length > 0 : !(await catalogo.exigeTeste(c, ctx, novos));
+    }
+  }
   if (dispensa) proposta.teste_dispensado = true;
   validarMudanca(atual, proposta, para);
   const agora = relogio.agora();
@@ -126,7 +153,7 @@ async function mover(c, ctx, id, para, d = {}, versao) {
     payload: { de: atual.etapa, para, contaId: r.conta_id } });
   if (venda) {
     await publicar(c, ctx, { tipo: 'oportunidade.ganha', agregado: 'oportunidade', agregadoId: id, chave: `op.ganha:${id}`,
-      payload: { contaId: venda.contaId, ocorrenciaId: venda.ocorrenciaId, expansao: venda.expansao, valorMensal: r.valor_mensal } });
+      payload: { contaId: venda.contaId, ocorrenciaId: venda.ocorrenciaId, expansao: venda.expansao, renovacao: !!venda.renovacao, funil: r.funil, valorMensal: r.valor_mensal } });
   }
   return { ...r, venda };
 }
@@ -143,9 +170,20 @@ async function registrarTeste(c, ctx, id, { resultado, parecer }, versao) {
   return r;
 }
 
-/** Venda ganha → conta em onboarding (ou expansão da conta do mesmo CNPJ) + onboarding para o CS. */
+/** Venda ganha → conta em onboarding (ou expansão da conta do mesmo CNPJ) + onboarding para o CS.
+ *  Renovação: troca o valor do contrato da conta de origem, sem novo onboarding. */
 async function criarContaDaVenda(c, ctx, o) {
-  let conta = uma(await c.query('SELECT * FROM contas WHERE cnpj = $1 AND arquivada_em IS NULL', [o.cnpj]));
+  if (o.funil === 'renovacao') {
+    const antes = uma(await c.query('SELECT * FROM contas WHERE id = $1 FOR UPDATE', [o.conta_origem_id]));
+    const produtos = [...new Set([...(antes.produtos || []), ...(o.produtos || [])])];
+    const conta = uma(await c.query('UPDATE contas SET valor_mensal = $2, produtos = $3, version = version + 1, atualizado_em = now() WHERE id = $1 RETURNING *',
+      [antes.id, o.valor_mensal, produtos]));
+    await auditar(c, ctx, { acao: 'conta.renovada', entidade: 'conta', entidadeId: conta.id, antes: { valorMensal: antes.valor_mensal, produtos: antes.produtos },
+      depois: { oportunidade: o.codigo, valorMensal: conta.valor_mensal, produtos } });
+    return { contaId: conta.id, ocorrenciaId: null, expansao: true, renovacao: true };
+  }
+  let conta = uma(await c.query(o.conta_origem_id ? 'SELECT * FROM contas WHERE id = $1' : 'SELECT * FROM contas WHERE cnpj = $1 AND arquivada_em IS NULL',
+    [o.conta_origem_id || o.cnpj]));
   const expansao = !!conta;
   if (conta) {
     const produtos = [...new Set([...(conta.produtos || []), ...o.produtos])];
@@ -237,25 +275,34 @@ async function definirProximaAcao(c, ctx, id, { proximaAcao, proximaAcaoEm }, ve
   return gravar(c, atual, { proxima_acao: proximaAcao, proxima_acao_em: proximaAcaoEm }, versao);
 }
 
-async function listar(c, { q, minhas, usuario } = {}) {
+async function listar(c, { q, minhas, usuario, funil } = {}) {
   const params = [relogio.agora()];
+  if (funil && FUNIS[funil]) params.push(funil);
   const onde = ["(o.etapa NOT IN ('ganha','perdida') OR o.fechada_em > $1::timestamptz - interval '60 days')"];
   if (q) { params.push(`%${q}%`); onde.push(`(o.empresa ILIKE $${params.length} OR o.codigo ILIKE $${params.length} OR o.cnpj LIKE $${params.length})`); }
-  if (minhas) { params.push(usuario.id); onde.push(`o.responsavel_id = $${params.length}`); }
+  if (funil && FUNIS[funil]) onde.push('o.funil = $2');
+  // "Minhas" inclui a fila (sem dono): oportunidade encaminhada pelo CS não pode sumir da tela de quem vai pegá-la.
+  if (minhas) { params.push(usuario.id); onde.push(`(o.responsavel_id = $${params.length} OR o.responsavel_id IS NULL)`); }
   const r = await c.query(
     `SELECT o.id, o.codigo, o.empresa, o.etapa, o.valor_mensal, o.frota, o.produtos, o.proxima_acao, o.proxima_acao_em, o.etapa_desde, o.teste_fim,
-       o.teste_resultado, o.teste_dispensado, o.version, o.conta_id, o.fonte, o.suspensa_de, u.nome AS responsavel_nome
+       o.teste_resultado, o.teste_dispensado, o.version, o.conta_id, o.fonte, o.suspensa_de, o.funil, o.fechamento_previsto, u.nome AS responsavel_nome,
+       count(*) OVER()::int AS total
      FROM oportunidades o LEFT JOIN usuarios u ON u.id = o.responsavel_id
      WHERE ${onde.join(' AND ')} ORDER BY o.proxima_acao_em NULLS LAST LIMIT 300`, params);
-  return { itens: r.rows, limite: 300 };
+  // O quadro mostra até 300; acima disso a tela avisa e pede filtro (busca, funil, "só as minhas").
+  return { itens: r.rows.map(({ total, ...x }) => x), total: r.rows[0]?.total || 0, limite: 300 };
 }
 
 async function detalhe(c, ctx, id) {
-  const o = uma(await c.query('SELECT o.*, u.nome AS responsavel_nome, ct.nome AS conta_nome FROM oportunidades o LEFT JOIN usuarios u ON u.id = o.responsavel_id LEFT JOIN contas ct ON ct.id = o.conta_id WHERE o.id = $1', [id]));
+  const o = uma(await c.query(`SELECT o.*, u.nome AS responsavel_nome, ct.nome AS conta_nome, co.nome AS conta_origem_nome, co.produtos AS conta_origem_produtos,
+    co.valor_mensal AS conta_origem_valor, ep.nome AS encaminhada_por_nome FROM oportunidades o LEFT JOIN usuarios u ON u.id = o.responsavel_id
+    LEFT JOIN contas ct ON ct.id = o.conta_id LEFT JOIN contas co ON co.id = o.conta_origem_id LEFT JOIN usuarios ep ON ep.id = o.encaminhada_por WHERE o.id = $1`, [id]));
   if (!o) throw erro.naoEncontrado('Oportunidade');
   const historico = (await c.query("SELECT acao, ator_nome, antes, depois, motivo, criado_em FROM auditoria WHERE entidade = 'oportunidade' AND entidade_id = $1 ORDER BY id", [id])).rows;
-  return { ...o, historico, propostas: await propostas.listar(c, id), atividades: await atividades.listar(c, id),
-    exigeTeste: await catalogo.exigeTeste(c, ctx, o.produtos || []) };
+  // Mesma regra do `mover`: renovação nunca exige teste; expansão só pelos produtos novos.
+  const novos = o.funil === 'expansao' ? (o.produtos || []).filter((p) => !(o.conta_origem_produtos || []).includes(p)) : o.produtos || [];
+  const exigeTeste = o.funil === 'renovacao' ? false : o.funil === 'expansao' && !novos.length && (o.produtos || []).length ? false : await catalogo.exigeTeste(c, ctx, novos);
+  return { ...o, historico, propostas: await propostas.listar(c, id), atividades: await atividades.listar(c, id), contatos: await contatos.listar(c, id), exigeTeste };
 }
 
 /** Indicadores do funil (para o Comercial e para a diretoria). */
@@ -270,7 +317,21 @@ async function indicadores(c) {
     count(*) FILTER (WHERE etapa NOT IN ('ganha','perdida') AND proxima_acao_em < $1)::int AS acao_vencida
     FROM oportunidades`, [relogio.agora()]));
   const motivos = (await c.query("SELECT motivo_perda, count(*)::int AS n FROM oportunidades WHERE etapa = 'perdida' GROUP BY motivo_perda ORDER BY n DESC")).rows;
-  return { porEtapa, testes, motivos };
+  const abertas = (await c.query("SELECT etapa, valor_mensal, fechamento_previsto FROM oportunidades WHERE etapa NOT IN ('ganha','perdida','suspensa')")).rows;
+  const porFunil = (await c.query(`SELECT funil, count(*) FILTER (WHERE etapa NOT IN ('ganha','perdida','suspensa'))::int AS abertas,
+    coalesce(sum(valor_mensal) FILTER (WHERE etapa NOT IN ('ganha','perdida','suspensa')), 0)::float AS valor,
+    count(*) FILTER (WHERE etapa = 'ganha' AND fechada_em > $1::timestamptz - interval '90 days')::int AS ganhas_90d FROM oportunidades GROUP BY funil`, [relogio.agora()])).rows;
+  return { porEtapa, testes, motivos, porFunil, previsao: previsao(abertas, 3, relogio.agora()) };
 }
 
-module.exports = { criar, atualizar, mover, registrarTeste, definirProximaAcao, suspender, retomar, importarDoPipedrive, listar, detalhe, indicadores, normalizar, buscar };
+/** CS encaminha ao Comercial (CS-011): oportunidade de expansão ou renovação de um cliente da carteira, na fila do
+ *  Comercial (sem responsável), com a observação de quem encaminhou. */
+async function encaminhar(c, ctx, { contaId, funil, observacao }) {
+  if (!['expansao', 'renovacao'].includes(funil)) throw erro.entrada('Encaminhe como expansão ou renovação.');
+  const op = await criar(c, ctx, { funil, contaOrigemId: contaId, encaminhada: true, observacao,
+    proximaAcao: `Contato do Comercial (encaminhado: ${observacao})`.slice(0, 200) });
+  await atividades.registrar(c, ctx, op, { tipo: 'nota', assunto: `Encaminhado por ${ctx.usuario?.nome || 'CS'}`, resultado: observacao });
+  return op;
+}
+
+module.exports = { encaminhar, criar, atualizar, mover, registrarTeste, definirProximaAcao, suspender, retomar, importarDoPipedrive, listar, detalhe, indicadores, normalizar, buscar };

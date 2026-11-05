@@ -32,7 +32,7 @@ Estados de lote (RECEBIDO … CONFIRMADO/FALHOU), manifesto com hash e correlaç
 com prazo e ocorrência quando o retorno não chega, rejeição por linha, reprocessamento autorizado, contratos
 versionados por fluxo, **mapeamento de colunas salvo por fluxo** (o primeiro arquivo real é ligado aos campos na prévia, sem código), modelos de arquivo para download, central de integração com frescor. Migração aditiva `importacoes`/`lotes`.
 
-## F3 · Comercial (CRM-001…020, substitui o Pipedrive) — F3a ✔ FEITA em 05/11 (catálogo, propostas, alçada, atividades, suspensão, migração de abertos); F3b: funis, pessoas, renovação, previsão
+## F3 · Comercial (CRM-001…020, substitui o Pipedrive) — F3a ✔ FEITA em 05/11 (catálogo, propostas, alçada, atividades, suspensão, migração de abertos); F3b ✔ FEITA em 05/11 (funis de expansão e renovação, pessoas, previsão, CS encaminha)
 Pessoas × organizações com dedup; catálogo de produtos; múltiplos pipelines; propostas versionadas; alçadas;
 suspenso/reaberto; handoff formal com aceite; renovação/expansão; importação do Pipedrive com prévia e conciliação.
 DE-PARA em `DE_PARA_PIPEDRIVE_SINAPSE.csv` (a validar com a exportação real).

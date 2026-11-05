@@ -154,3 +154,14 @@ mostrava o dia anterior (fuso de Brasília); e o `teste_fim` lido do banco gerav
 ação. **Correção:** os dois motores devolvem DATE como `AAAA-MM-DD`; `data()` da tela formata esse texto direto.
 **Problema encontrado:** o CSS do quadro de ocorrências (PR 14) reusou a classe `.quadro` do funil comercial e mudou
 o layout dele. **Correção:** o quadro de ocorrências usa `.kquadro`.
+
+# T-025 — Funis de expansão e renovação, pessoas da negociação e previsão (F3b)
+**Contexto:** adendo Comercial (CRM-001, 003, 014, 015) e CS-011 (oportunidade de expansão encaminhada ao Comercial).
+**Decisão:** em vez de funis com etapas livres (que exigiriam reescrever as regras de banco de cada etapa), três funis
+fixos com as mesmas etapas e regras próprias: aquisição (como antes); expansão (cliente da carteira, teste só para
+produto novo que o catálogo exige, ganhar soma produtos e valor à conta e abre "Expansão" para o CS); renovação
+(dispensa teste, ganhar troca o valor do contrato, sem onboarding). O CS encaminha pela Carteira (`conta.editar`): a
+oportunidade fica na fila do Comercial, sem dono, e "Minhas" passa a incluir a fila. Pessoas (`contatos_comerciais`)
+são únicas por telefone e por e-mail na organização; reaproveitar completa dado vazio e nunca sobrescreve. Previsão =
+valor × probabilidade da etapa por mês de fechamento previsto, com a fórmula na tela (probabilidades em `funil.js`).
+**Fora:** etapas configuráveis por funil; probabilidade configurável por organização; vínculo pessoa ↔ conta.

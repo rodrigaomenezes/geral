@@ -104,7 +104,7 @@ CS-007;Utilizar conta de demonstração, sem expor dados reais de clientes.;AUSE
 CS-008;Registrar dúvidas, avaliação e ações posteriores ao treinamento.;AUSENTE;—;—;
 CS-009;Acompanhar efetividade do treinamento por evolução de uso.;AUSENTE;—;—;
 CS-010;Programar insights do Caça Condutores com frequência e opt-out.;PARCIAL;processo CaçaCondutores semanal desligado;—;sem teste
-CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;PARCIAL;Comercial no mesmo sistema;—;encaminhamento CS→Comercial ausente
+CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;IMPLEMENTADO E TESTADO;encaminhar expansão/renovação ao Comercial pela Carteira;comercial-funis.test;
 CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;AUSENTE;—;—;
 DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;PARCIAL;ocorrência tipo técnica;regras DEV-005;evidência sanitizada não verificada
 DEV-002;Rastrear prioridade, impacto, responsável e aceite do Desenvolvimento.;PARCIAL;prioridade/responsável/aceite;AT-010;
@@ -188,21 +188,21 @@ BL-06;Visões de sucesso pré/pós Painéis ERP de correção e falha.;IMPLEMENT
 BL-07;Último login e mapa de uso Telemetria Platform, análise ERP e consentimento.;BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
 BL-08;Frequência de consulta Indicação Condutores;BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
 BL-09;"WhatsApp→tickets Conector ERP; substitui ideia de acoplamento direto ao Redmine.";IMPLEMENTADO E TESTADO;WhatsApp oficial e QR viram entrada/ocorrência;WhatsApp oficial/QR;
-CRM-001;organizações, pessoas e contatos com deduplicação;PARCIAL;contas, pontos_focais, oportunidades (empresa/cnpj);comercial;"pessoa×organização não separadas; sem dedup de pessoa"
+CRM-001;organizações, pessoas e contatos com deduplicação;IMPLEMENTADO E TESTADO;contatos_comerciais únicos por telefone/e-mail + papel na oportunidade;comercial-funis.test;vínculo pessoa ↔ conta ainda não
 CRM-002;leads, origem, qualificação e atribuição;PARCIAL;oportunidades.origem/etapa novo;comercial;captura externa ausente
-CRM-003;múltiplos pipelines configuráveis;AUSENTE;funil único fixo (comercial/funil.js);—;múltiplos pipelines
+CRM-003;múltiplos pipelines configuráveis;PARCIAL;três funis fixos (aquisição, expansão, renovação) com regras próprias;comercial-funis.test;etapas configuráveis por funil
 CRM-004;oportunidades com valor, probabilidade e produtos;PARCIAL;oportunidades valor/responsável/produtos;comercial;moeda/probabilidade por etapa parciais
 CRM-005;atividades e calendário;IMPLEMENTADO E TESTADO;atividades_comerciais (ligação, reunião, e-mail, WhatsApp, visita, nota);comercial-crm.test;
-CRM-006;próxima ação obrigatória;PARCIAL;proxima_acao_em em oportunidade;comercial;alerta/substituição por ausência não testados
+CRM-006;próxima ação obrigatória;IMPLEMENTADO E TESTADO;"CHECK oportunidade_aberta_completa; suspensa com data; fila sem dono visível";"comercial-funis.test; comercial-crm.test";substituição por ausência do vendedor ainda não
 CRM-007;propostas e versões;IMPLEMENTADO E TESTADO;propostas versionadas, enviada imutável (gatilho);comercial-crm.test;anexos ausentes (INT-009)
 CRM-008;alçadas de desconto;IMPLEMENTADO E TESTADO;"alçada de desconto por organização; aprovação por outra pessoa com comercial.gerir";comercial-crm.test;alçadas por faixa/cargo ainda não
 CRM-009;catálogo de produtos;IMPLEMENTADO E TESTADO;produtos_comerciais com exige_teste e preço de referência;comercial-crm.test;vínculo com módulos operacionais ainda por código
 CRM-010;trilha de negociação;IMPLEMENTADO E TESTADO;atividades + auditoria na linha do tempo;comercial-crm.test;
 CRM-011;ganho/perdido/suspenso/reaberto;IMPLEMENTADO E TESTADO;ganha/perdida/suspensa/reaberta com motivo;comercial-crm.test;
 CRM-012;teste/piloto quando aplicável;IMPLEMENTADO E TESTADO;teste por produto (exige_teste) e dispensa registrada;comercial-crm.test;
-CRM-013;handoff venda→onboarding;PARCIAL;ganha → conta em onboarding;comercial ganha;aceite formal e dados mínimos ausentes
-CRM-014;renovação e expansão;AUSENTE;—;—;
-CRM-015;previsões e relatórios;PARCIAL;dashboard comercial;dashboards;
+CRM-013;handoff venda→onboarding;PARCIAL;ganha → conta em onboarding + ocorrência para o CS;comercial;aceite formal e checklist na F4
+CRM-014;renovação e expansão;IMPLEMENTADO E TESTADO;"funis de expansão e renovação; CS encaminha";comercial-funis.test;
+CRM-015;previsões e relatórios;IMPLEMENTADO E TESTADO;"previsão ponderada por mês com fórmula; totais por funil";comercial-funis.test;probabilidade configurável ainda não
 CRM-016;automações comerciais;PARCIAL;motor de processos genérico;processos;gatilhos comerciais limitados
 CRM-017;RBAC por carteira;PARCIAL;"permissões comercial.*; RLS";dashboards permissão;carteira por vendedor não comprovada
 CRM-018;migração do Pipedrive;PARCIAL;importador pipedrive_negocios (abertos, dedup por id) com mapeamento de colunas;comercial-crm.test;ganhos/perdidos e histórico completo aguardam exportação real

@@ -360,3 +360,13 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .proposta-item select, .proposta-item input { min-width: 0; }
 @media (max-width: 420px) { .proposta-item { grid-template-columns: 1fr 1fr auto; } .proposta-item select { grid-column: 1 / -1; } }
 .proposta-total { font-weight: 600; margin: .3rem 0 .6rem; }
+
+/* Comercial: previsão de fechamento (barra cheia = valor bruto do mês; parte escura = provável ponderado). */
+.previsao { list-style: none; margin: 0 0 .5rem; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.previsao li { display: grid; grid-template-columns: 9rem 1fr; gap: .25rem .75rem; align-items: center; }
+.previsao-mes { font-weight: 600; font-size: .88rem; }
+.previsao-barra { display: block; height: .75rem; background: var(--neutro-f); border-radius: 4px; overflow: hidden; }
+.previsao-bruto { display: block; height: 100%; background: var(--destaque-claro); border-radius: 4px; }
+.previsao-ponderado { display: block; height: 100%; background: var(--marca); border-radius: 4px; }
+.previsao-valor { grid-column: 2; font-size: .82rem; color: var(--suave); }
+@media (max-width: 480px) { .previsao li { grid-template-columns: 1fr; } .previsao-valor { grid-column: 1; } }
