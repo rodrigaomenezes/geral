@@ -8,7 +8,7 @@ const { enfileirar } = require('../../jobs/fila');
 const { publicar, auditar } = require('../../nucleo/registro');
 const { relogio, HORA } = require('../../nucleo/relogio');
 const { renderizar } = require('./modelos');
-const mensageria = require('../integracoes/mensageria-demo');
+const mensageria = require('../integracoes/mensageria');
 
 const JANELA = { inicio: 8, fim: 20, fusoMinutos: -180 };
 const TENTATIVAS_ANTES_DO_FALLBACK = 3;
