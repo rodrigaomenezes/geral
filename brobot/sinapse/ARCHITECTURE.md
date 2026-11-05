@@ -24,9 +24,9 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/integracoes/csv  importar (prévia → aplicar, hash único) e exportar CSV com Platform e OMIE
         ├─ modulos/telefonia     central de ligações (portada do Lumen): treino, SIP/WebRTC (JsSIP), celular; conclui a tarefa de ligação
         ├─ modulos/processos     motor de processos escritos pela operação: gatilho → condições → passos → "para sozinho se"
-        ├─ modulos/comunicacao   modelos versionados, consentimento/opt-out, janela de horário, retentativa, fallback
+        ├─ modulos/comunicacao   mensagens padrão editáveis (rascunho → revisão → aprovada), consentimento, janela, retentativa, fallback, template Meta
         ├─ modulos/supervisor    varredura de invariantes, escalonamento, handoff vencido, heartbeat, fila de falhas
-        ├─ modulos/painel        indicadores da seção 13
+        ├─ modulos/painel        indicadores da seção 13 e 6 dashboards (blocos = tabela de dados; gráfico, tabela e CSV leem a mesma)
         ├─ modulos/integracoes   Platform e OMIE (demonstração + CSV), WhatsApp oficial (Meta Cloud API, webhook assinado), e-mail (demonstração)
         └─ modulos/demo          dados fictícios e simulador (só com SINAPSE_DEMO ligado)
         │
@@ -40,7 +40,7 @@ escrever, exceto o adaptador de demonstração da Platform, que lê a tabela do 
 
 ## Dados
 
-Migrações `001_fundacao`, `002_processos` e `003_meu_dia_comercial_csv` (cada uma com `.down.sql`). Principais tabelas:
+Migrações `001` a `005` (fundação, processos, meu dia/comercial/CSV, canais, mensagens), cada uma com `.down.sql`. Principais tabelas:
 
 | Tabela | Papel |
 | --- | --- |
@@ -57,6 +57,7 @@ Migrações `001_fundacao`, `002_processos` e `003_meu_dia_comercial_csv` (cada 
 | `importacoes`, `uso_contas` | Arquivos CSV aplicados (hash único, erros por linha) e uso da Platform por conta (último login) |
 | `telefonia_config`, `telefonia_ramais`, `chamadas`, `chamada_eventos` | Telefonia: provedor por organização, ramal SIP (senha cifrada), ligações com estados e eventos |
 | `whatsapp_numeros` | Número oficial da organização (token cifrado); o webhook acha a organização pelo `phone_number_id` |
+| `modelos_mensagem` | Versões das mensagens padrão por organização; aprovada é imutável; template da Meta opcional |
 | `jobs`, `integracoes`, `divergencias`, `sistema` | Fila durável, saúde/checkpoint das integrações, reconciliação, heartbeat/relógio |
 
 Invariantes garantidas **pelo banco** (CHECK): ocorrência ativa tem fila, prazo e próxima ação (RN-008); resolvida
@@ -124,12 +125,10 @@ ser adiantado na demonstração para mostrar a cadência inteira em minutos.
   da Brobot ainda não foi aplicado.
 - A tabela `contatos_programados` (cadência fixa da 001) ficou sem uso desde a 002; não foi removida (migração aditiva).
 - **Canais:** telefonia (treino, SIP, celular) e WhatsApp oficial prontos; faltam do Lumen o WhatsApp por QR (Baileys), a
-  gravação de ligações, a fila de ligações e os modelos (templates) aprovados da Meta para enviar fora da janela de 24 h
-  (hoje, fora da janela, o envio cai para e-mail depois das retentativas).
+  gravação de ligações e a fila de ligações. O template da Meta (fora da janela de 24 h) é informado por mensagem padrão.
 - **Marca:** identidade Brobot aplicada a partir do site (azul, Montserrat servida localmente, botões em pílula); o
   wordmark é desenhado em CSS até chegar o arquivo oficial do logo (SVG).
-- **Fora desta fase:** offboarding, CS (saúde da conta, treinamentos, campanhas), incidentes, base de
-  conhecimento, anexos, LGPD (exportação/anonimização), MFA, OpenAPI/AsyncAPI publicados, modelos de mensagem
-  editáveis na tela (hoje versionados em código). Ver `docs/RASTREABILIDADE.md`.
+- **Fora desta fase:** offboarding, CS (treinamentos coletivos), incidentes, base de conhecimento, anexos, LGPD
+  (exportação/anonimização), MFA, OpenAPI/AsyncAPI publicados, modo escuro. Ver `docs/RASTREABILIDADE.md`.
 - Listas da carteira e da triagem usam subconsultas por linha limitadas à página (25–30 linhas); medir antes de
   otimizar quando houver volume real.

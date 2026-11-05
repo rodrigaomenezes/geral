@@ -46,11 +46,13 @@ async function criarAdaptadorPglite(dir) {
     fila = r.catch(() => {});
     return r;
   };
+  // O PGlite devolve `affectedRows`; o pg devolve `rowCount`. O resto do sistema usa `rowCount` nos dois.
+  const comContagem = (r) => Object.assign(r, { rowCount: r.affectedRows ?? r.rows?.length ?? 0 });
   return {
     motor: dir ? 'pglite' : 'pglite-memoria',
-    query: (sql, params) => emFila(() => db.query(sql, params)),
+    query: (sql, params) => emFila(async () => comContagem(await db.query(sql, params))),
     exec: (sql) => emFila(() => db.exec(sql)),
-    tx: (fn) => emFila(() => db.transaction((t) => fn({ query: (s, p) => t.query(s, p), exec: (s) => t.exec(s) }))),
+    tx: (fn) => emFila(() => db.transaction((t) => fn({ query: async (s, p) => comContagem(await t.query(s, p)), exec: (s) => t.exec(s) }))),
     fechar: () => db.close(),
   };
 }

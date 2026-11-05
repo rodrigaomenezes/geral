@@ -139,3 +139,25 @@ test('CSV Platform: resultado de pré-rodada por veículo cria a rodada, as pend
   assert.match(exp.headers.get('content-type'), /text\/csv/);
   assert.match(await exp.text(), /CSV1A11/);
 });
+
+test('mensagens padrão: rascunho → revisão → aprovação por outra pessoa; o envio passa a usar o texto aprovado (e o template da Meta)', async () => {
+  const rafael = await t.entrarComo('Rafael Lima');
+  const marina = await t.entrarComo('Marina Costa');
+  assert.equal((await rafael.post('/modelos/lembrete_cliente/rascunho', { texto: 'Oi {nome}, {inexistente}' })).status, 400, 'variável desconhecida é recusada');
+  const p = await rafael.post('/modelos/lembrete_cliente/previa', { texto: 'Oi {nome}! Seguimos aguardando você sobre o {protocolo} da {conta}.' });
+  assert.match(p.corpo.texto, /Oi Fernanda!/);
+  assert.equal((await rafael.post('/modelos/lembrete_cliente/rascunho', { texto: 'Oi {nome}! Seguimos aguardando você sobre o {protocolo} da {conta}.' })).status, 200);
+  assert.equal((await rafael.post('/modelos/lembrete_cliente/aprovar', {})).status, 403, 'Suporte não aprova');
+  assert.equal((await rafael.post('/modelos/lembrete_cliente/revisao')).status, 200);
+  const ap = await marina.post('/modelos/lembrete_cliente/aprovar', { parecer: 'Ok', templateNome: 'lembrete_retorno_v1', templateVariaveis: 'nome, protocolo' });
+  assert.equal(ap.status, 200);
+  assert.equal(ap.corpo.versoes[0].estado, 'ativa');
+  await assert.rejects(t.sql("UPDATE modelos_mensagem SET texto = 'mudou' WHERE codigo = 'lembrete_cliente' AND estado = 'ativa'"), /não pode ser alterada/);
+  const tid = await t.tenant();
+  const { renderizarAtual } = require('../server/modulos/comunicacao/modelos-servico');
+  const r = await t.app.db.comoTenant(tid, (c) => renderizarAtual(c, 'lembrete_cliente', { nome: 'Ana', protocolo: 'SIN-1', conta: 'X' }));
+  assert.equal(r.texto, 'Oi Ana! Seguimos aguardando você sobre o SIN-1 da X.');
+  assert.deepEqual(r.template, { nome: 'lembrete_retorno_v1', idioma: 'pt_BR', variaveis: ['Ana', 'SIN-1'] });
+  const lista = (await rafael.get('/modelos')).corpo.itens.find((x) => x.codigo === 'lembrete_cliente');
+  assert.match(lista.emUso, /versão 1/);
+});

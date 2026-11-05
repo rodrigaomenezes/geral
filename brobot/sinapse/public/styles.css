@@ -266,3 +266,48 @@ label.btn:focus-within { outline: 2px solid var(--destaque); outline-offset: 2px
 .opcao-canal:hover { border-color: var(--destaque); background: var(--destaque-claro); }
 .opcao-canal span { font-size: .85rem; color: var(--suave); }
 .wordmark { display: inline-flex; align-items: center; white-space: nowrap; }
+
+/* Dashboards e gráficos (paleta validada: categórica em ordem fixa; status só para estado) */
+:root { --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a; --serie-4: #eda100; --serie-5: #e87ba4; --serie-6: #008300; }
+.abas { display: flex; gap: .35rem; overflow-x: auto; margin-bottom: .75rem; padding-bottom: .25rem; }
+.aba { white-space: nowrap; padding: .45rem .9rem; border-radius: 999px; text-decoration: none; color: var(--texto); background: #fff; border: 1px solid var(--borda); font-weight: 600; font-size: .88rem; }
+.aba.ativa { background: var(--marca); color: #fff; border-color: var(--marca); }
+.blocos { display: grid; grid-template-columns: 1fr; gap: 0 1rem; }
+.bloco-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
+.bloco-acoes { display: flex; gap: .35rem; }
+.bloco-tiles { grid-column: 1 / -1; }
+.g-tiles { margin-bottom: 0; }
+.g-barras { display: flex; flex-direction: column; gap: .35rem; }
+.g-linha { display: grid; grid-template-columns: minmax(6rem, 38%) 1fr auto; gap: .5rem; align-items: center; color: inherit; text-decoration: none; padding: .15rem .25rem; border-radius: 6px; }
+a.g-linha:hover { background: var(--destaque-claro); }
+.g-rotulo { font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-trilho { display: block; height: 10px; background: var(--neutro-f); border-radius: 0 4px 4px 0; overflow: hidden; }
+.g-barra { display: block; height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.g-pilha-v { display: flex; flex-direction: column; gap: 3px; }
+.g-pilha-v .g-trilho { height: 8px; }
+.g-empilhado { display: flex; gap: 2px; background: transparent; min-width: 2px; }
+.g-seg { display: block; height: 100%; min-width: 3px; }
+.g-seg:last-child { border-radius: 0 4px 4px 0; }
+.g-valor { font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--texto); }
+.g-valor small { color: var(--suave); font-weight: 400; }
+.legenda { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin-bottom: .5rem; font-size: .8rem; color: var(--suave); }
+.legenda-item { display: inline-flex; align-items: center; gap: .35rem; }
+.legenda-item i { width: .7rem; height: .7rem; border-radius: 3px; display: inline-block; }
+.g-svg { width: 100%; height: auto; display: block; }
+.g-grade { stroke: var(--borda); stroke-width: 1; }
+.g-eixo { fill: var(--suave); font-size: 11px; }
+.g-rotulo-final { fill: var(--texto); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.g-cruz { stroke: var(--suave); stroke-width: 1; stroke-dasharray: 3 3; }
+.g-funil { display: flex; flex-direction: column; gap: .4rem; }
+.g-funil-linha { display: grid; grid-template-columns: minmax(6rem, 30%) 1fr auto; gap: .5rem; align-items: center; }
+.g-funil-trilho { display: flex; justify-content: center; }
+.g-funil-barra { display: block; height: 22px; border-radius: 6px; }
+.dica-grafico { position: fixed; z-index: 80; pointer-events: none; background: #0d2236; color: #fff; padding: .45rem .6rem; border-radius: 8px; font-size: .8rem; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: 260px; }
+.dica-grafico strong { display: block; margin-bottom: .15rem; }
+@media (min-width: 960px) { .blocos { grid-template-columns: 1fr 1fr; } }
+
+/* Mensagens padrão */
+.chips-var { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin-bottom: .5rem; }
+.chip-var { font: inherit; font-size: .78rem; font-family: ui-monospace, Menlo, monospace; padding: .2rem .5rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--destaque-claro); color: var(--marca-escura); cursor: pointer; }
+.msg-bolha { background: #e7f8ee; border-radius: 12px 12px 12px 2px; padding: .75rem .9rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .92rem; margin-bottom: .5rem; }
+.msg-resumo { white-space: pre-line; }

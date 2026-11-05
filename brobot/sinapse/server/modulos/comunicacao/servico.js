@@ -7,7 +7,7 @@ const { uma } = require('../../db');
 const { enfileirar } = require('../../jobs/fila');
 const { publicar, auditar } = require('../../nucleo/registro');
 const { relogio, HORA } = require('../../nucleo/relogio');
-const { renderizar } = require('./modelos');
+const modelosServico = require('./modelos-servico');
 const mensageria = require('../integracoes/mensageria');
 
 const JANELA = { inicio: 8, fim: 20, fusoMinutos: -180 };
@@ -40,14 +40,15 @@ function proximaJanela(agora) {
  */
 async function programarEnvio(c, ctx, { contaId, ocorrenciaId = null, pontoFocal, grupo = null, modelo, variaveis, canalPreferido,
   contatoProgramadoId = null, executarEm, fallback = true }) {
-  const { texto, modelo: mv } = renderizar(modelo, variaveis);
+  const { texto, modelo: mv, template } = await modelosServico.renderizarAtual(c, modelo, variaveis);
   // Grupo do cliente (WhatsApp): canal operacional combinado com o cliente; sem canal alternativo.
   const escolha = grupo ? { canal: 'whatsapp', para: grupo } : escolherCanal(pontoFocal, canalPreferido);
   const status = escolha.canal ? 'enfileirada' : 'bloqueada';
   const it = uma(await c.query(
-    `INSERT INTO interacoes (tenant_id, ocorrencia_id, conta_id, canal, direcao, destinatario, texto, modelo, status_entrega, autor_id)
-     VALUES ($1, $2, $3, $4, 'saida', $5, $6, $7, $8, $9) RETURNING *`,
-    [ctx.tenantId, ocorrenciaId, contaId, escolha.canal || 'interno', escolha.para || null, texto, mv, status, ctx.usuario?.id || null],
+    `INSERT INTO interacoes (tenant_id, ocorrencia_id, conta_id, canal, direcao, destinatario, texto, modelo, status_entrega, autor_id, variaveis)
+     VALUES ($1, $2, $3, $4, 'saida', $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [ctx.tenantId, ocorrenciaId, contaId, escolha.canal || 'interno', escolha.para || null, texto, mv, status, ctx.usuario?.id || null,
+      template ? JSON.stringify({ template }) : null],
   ));
   if (!escolha.canal) {
     await auditar(c, ctx, { acao: 'mensagem.bloqueada', entidade: 'interacao', entidadeId: it.id, motivo: escolha.motivo });
@@ -77,7 +78,7 @@ async function jobEnviar(c, ctx, { interacaoId, pontoFocalId, fallback, contatoP
         antes: { canal: 'whatsapp' }, depois: { canal: 'email' }, motivo: `WhatsApp falhou ${job.tentativas - 1} vezes` });
     }
   }
-  const r = await mensageria.enviar(c, canal, { para: destinatario, texto: it.texto });
+  const r = await mensageria.enviar(c, canal, { para: destinatario, texto: it.texto, template: canal === 'whatsapp' ? it.variaveis?.template : undefined });
   await c.query("UPDATE interacoes SET status_entrega = 'enviada', id_externo = $2, canal = $3, destinatario = $4 WHERE id = $1",
     [it.id, r.idExterno, canal, destinatario]);
   if (contatoProgramadoId) {
