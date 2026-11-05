@@ -6,6 +6,10 @@ Fonte dos requisitos: *Especificação de Requisitos do ERP Operacional Brobot v
 `docs/RASTREABILIDADE.md`. Pilha: Node.js 22 sem framework (`node:http`), JavaScript CommonJS, PostgreSQL
 (gerenciado via `DATABASE_URL` ou embutido via PGlite no Volume), front em JS puro (PWA, módulos ES, sem build).
 
+**Visão do cliente (05/11/2026):** o Sinapse é o **único sistema de gestão** da Brobot. Operacional, CS, Suporte e
+**Comercial** trabalham e se consolidam aqui; a Platform (ferramenta principal, produtos e consultas) e o OMIE
+(financeiro) ficam conectados por integração. Nenhuma área deve precisar de planilha, Redmine ou ferramenta paralela.
+
 Siga a **política permanente de engenharia** (`../../docs/POLITICA_ENGENHARIA.md` e `../../CLAUDE.md`). Antes de
 mudança significativa, leia `ARCHITECTURE.md` e `DECISIONS.md` deste projeto.
 
