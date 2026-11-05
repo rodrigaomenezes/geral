@@ -45,3 +45,15 @@ com o dado. **Por quê:** histórico, indicadores e futura integração derivam 
 # T-008 — Classificação determinística; IA fora da Fase 1
 **Decisão:** regras por termos; um assunto reconhecido = classificação certa; nenhum ou vários = triagem humana.
 **Por quê:** RN-013 e princípio 9 (IA nunca decide sozinha). IA pode sugerir numa fase futura, com revisão humana.
+
+# T-009 — Processos escritos pela operação, executados por um motor próprio sobre o outbox
+**Decisão:** a cadência de contatos deixou de ser código fixo e virou processo editável (lista de passos em
+formulário, com leitura em português, simulação e versões). O motor consome o outbox de eventos e roda na fila de jobs.
+**Por quê:** pedido do cliente ("escrever processos que o sistema seguirá sozinho") e WFL-003/WFL-013/SUP-010/RN-012.
+Sem dependência nova nem motor externo (BPMN): o vocabulário é pequeno, validado e testado.
+**Contrato:** a definição (`gatilho`, `condicoes`, `passos`, `encerrarSe`, `agenda`) é versionada; mudar o sentido de um
+campo exige versão nova do vocabulário.
+
+# T-010 — Marca por organização na configuração
+**Decisão:** nome, cores (hex) e logo em `tenants.config.marca`, aplicados no carregamento. **Por quê:** white-label
+(seção 2 da especificação); o material oficial da Brobot entra sem mudar código.

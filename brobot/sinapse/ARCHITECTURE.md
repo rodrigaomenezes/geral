@@ -18,7 +18,8 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/clientes      carteira, VIP, roteamento RN-001, pontos focais com histórico, bloqueio (recusado sem regra)
         ├─ modulos/entrada       inbox durável + deduplicação, identificação por telefone E.164, classificação, triagem
         ├─ modulos/ocorrencias   máquina de estados (pura), SLA por calendário (puro), handoff, tarefas, resposta no canal
-        ├─ modulos/rodadas       pré-rodada D-4/D-3/ligação/D-1, pós-rodada D0/D+3, pendências, revalidação na Platform
+        ├─ modulos/rodadas       teste D-4 e resultado D0 na Platform, pendências, revalidação; publica os fatos para os processos
+        ├─ modulos/processos     motor de processos escritos pela operação: gatilho → condições → passos → "para sozinho se"
         ├─ modulos/comunicacao   modelos versionados, consentimento/opt-out, janela de horário, retentativa, fallback
         ├─ modulos/supervisor    varredura de invariantes, escalonamento, handoff vencido, heartbeat, fila de falhas
         ├─ modulos/painel        indicadores da seção 13
@@ -35,7 +36,7 @@ escrever, exceto o adaptador de demonstração da Platform, que lê a tabela do 
 
 ## Dados
 
-Uma migração (`server/db/migracoes/001_fundacao.sql`, com `.down.sql`). Principais tabelas:
+Migrações `001_fundacao` e `002_processos` (cada uma com `.down.sql`). Principais tabelas:
 
 | Tabela | Papel |
 | --- | --- |
@@ -46,6 +47,7 @@ Uma migração (`server/db/migracoes/001_fundacao.sql`, com `.down.sql`). Princi
 | `rodadas`, `pendencias`, `contatos_programados` | Pré e pós-rodada; pendência única por placa+erro enquanto aberta |
 | `eventos` | Outbox com o contrato canônico (event_id, schema_version, aggregate, correlation, idempotency_key…) |
 | `auditoria` | Só anexação (gatilho recusa UPDATE/DELETE) |
+| `processos`, `processo_versoes`, `processo_execucoes`, `processo_passos_log` | Processos automáticos: versão ativada imutável (gatilho), execução presa à versão, registro de cada passo |
 | `jobs`, `integracoes`, `divergencias`, `sistema` | Fila durável, saúde/checkpoint das integrações, reconciliação, heartbeat/relógio |
 
 Invariantes garantidas **pelo banco** (CHECK): ocorrência ativa tem fila, prazo e próxima ação (RN-008); resolvida
@@ -61,10 +63,27 @@ aprovador; exceção de roteamento tem justificativa; pendência corrigida tem e
 - **CSRF:** POST exige JSON e origem igual ao host. **CSP** sem inline; front sem `innerHTML`.
 - Webhook com token comparado em tempo constante. Nenhum segredo, senha ou certificado é guardado.
 
+## Motor de processos
+
+Um processo é `{ gatilho, condicoes[], passos[], encerrarSe[] }` (`modulos/processos/catalogo.js` e `regras.js`, puros).
+- **Gatilhos:** eventos do outbox (ocorrência aberta/mudou/em espera/escalonada/reaberta, pré-rodada com pendências,
+  rodada executada) ou por conta ("Executar agora" e semanal).
+- **Passos:** esperar (horas ou relativo ao D0), enviar mensagem (ponto focal, grupo do cliente ou ambos), ligar e
+  esperar o resultado (atendeu/não atendeu), criar tarefa, mudar prioridade, mudar equipe, nota, escalar. Cada passo
+  pode ter "só se…".
+- **Execução:** `processos.despachar` (5 s) lê o outbox, inicia execuções e reavalia o "para sozinho se" das execuções da
+  mesma conta/ocorrência; `processo.avancar` roda os passos numa transação até uma espera; `processos.agenda` (1 h)
+  dispara os semanais. Correção confirmada encerra na hora a cadência da conta (`rodadas` chama `motor.reavaliar`).
+- **Segurança:** rascunho → ativar (anterior "substituída") → restaurar; simulação num item real sem gravar; evento
+  causado por uma execução não dispara o mesmo processo; mais de 5 inícios em 24 h no mesmo item são contidos e viram
+  divergência no Supervisor.
+- **Padrões** (`padroes.js`): pré-rodada (D-3, ligação, formalização se não atender, D-1), pós-rodada (comunicado no
+  grupo + follow-up D+3), força-tarefa de ponto focal, erro de consulta aciona o Suporte, cliente sem retorno, VIP com
+  prioridade alta, insights semanais do CaçaCondutores (desligado até revisão do texto).
+
 ## Tempo, jobs e supervisor
 
-Tudo que acontece "depois" é um job: `entrada.processar`, `rodada.pre_rodada` (D-4), `rodada.contato` (D-3,
-intermediária, D-1, resultado, D+3), `rodada.executar` (D0), `comunicacao.enviar`, `omie.sincronizar` (10 min) e
+Tudo que acontece "depois" é um job: `entrada.processar`, `rodada.pre_rodada` (D-4), `rodada.executar` (D0), `comunicacao.enviar`, `omie.sincronizar` (10 min) e
 `supervisor.varrer` (1 min). O ciclo do worker (2 s) só procura o que venceu. O relógio (`nucleo/relogio.js`) pode
 ser adiantado na demonstração para mostrar a cadência inteira em minutos.
 
@@ -80,10 +99,13 @@ ser adiantado na demonstração para mostrar a cadência inteira em minutos.
   e das pendências decisórias da seção 16. Consequência: a demonstração não conversa com sistemas reais.
 - **Uma réplica:** o relógio da demonstração fica em memória por processo, e o PGlite tem uma conexão só. Para
   mais de uma réplica, usar `DATABASE_URL` e desligar o ajuste de relógio (`SINAPSE_DEMO=0`).
-- **Outbox sem consumidor externo:** eventos são gravados com o contrato canônico, mas ainda não são publicados
-  para fora (`publicado_em` fica nulo). Entra com a integração Comercial/Financeiro.
+- **Outbox só com consumidor interno:** o motor de processos consome os eventos (`publicado_em`); ainda não há envio
+  para sistemas externos (Comercial/Financeiro).
+- **Marca:** cores, nome e logo vêm de `tenants.config.marca` (`/marca/<arquivo>` em `public/marca`); o material oficial
+  da Brobot ainda não foi aplicado.
+- A tabela `contatos_programados` (cadência fixa da 001) ficou sem uso desde a 002; não foi removida (migração aditiva).
 - **Fora desta fase:** onboarding/offboarding, CS (saúde da conta, treinamentos, campanhas), incidentes, base de
-  conhecimento, anexos, LGPD (exportação/anonimização), MFA, OpenAPI/AsyncAPI publicados, edição de regras com
-  simulação e rollback (SUP-010). Ver `docs/RASTREABILIDADE.md`.
+  conhecimento, anexos, LGPD (exportação/anonimização), MFA, OpenAPI/AsyncAPI publicados, modelos de mensagem
+  editáveis na tela (hoje versionados em código). Ver `docs/RASTREABILIDADE.md`.
 - Listas da carteira e da triagem usam subconsultas por linha limitadas à página (25–30 linhas); medir antes de
   otimizar quando houver volume real.

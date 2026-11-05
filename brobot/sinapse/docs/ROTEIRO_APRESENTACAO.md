@@ -21,16 +21,23 @@ máximo 3 dias), *Resolver* (exige evidência), *Transferir* para o Desenvolvime
 até o aceite). Responda ao cliente: a mensagem sai pelo canal de origem com status de entrega. Mostre a **linha do
 tempo**: cada passo tem quem, quando e por quê.
 
-## 4. Pré-rodada sem coordenação manual (4 min)
-**Rodadas → Transportadora Rota Sul** (D-4 hoje): a pré-rodada já testou na Platform, normalizou os erros (vínculo
-SNE, certificado), abriu **uma** ocorrência com os veículos e programou D-3, ligação e D-1.
-1. **Simulador → +1 dia**: o aviso D-3 sai sozinho (veja a conversa da ocorrência).
-2. **Simulador → +1 dia**: aparece a tarefa **Ligar para…** em **Tarefas** (resultado obrigatório).
+## 4. Processos que o sistema segue sozinho (5 min)
+Abra **Processos**: a cadência combinada na reunião de 03/11 está escrita em português ("Quando… Se… 1. Esperar até
+D-3 2. Enviar… Para sozinho se…"). Abra o da pré-rodada → **Editar** → mostre os passos, clique em **Simular num item
+real** (nada é gravado) e volte sem ativar.
+
+**Rodadas → Transportadora Rota Sul** (D-4 hoje): a pré-rodada testou na Platform, normalizou os erros (vínculo SNE,
+certificado) e abriu **uma** ocorrência; o processo está "aguardando" o D-3 (veja "Processos automáticos" na rodada).
+1. **Simulador → +1 dia**: o aviso D-3 sai sozinho.
+2. **Simulador → +1 dia**: aparece a tarefa **Ligar para…** em **Tarefas**. Registre como **Não atendeu**, depois
+   *Processar fila agora*: a formalização sai no **grupo do cliente** e para o **ponto focal**.
 3. **Simulador → Correção pelo cliente**: escolha as placas da Rota Sul → *Cliente corrigiu*. Na rodada, clique em
-   **Revalidar na Platform** em cada placa: o ERP confirma tecnicamente, fecha a pendência, **cancela o D-1** e
+   **Revalidar na Platform** em cada placa: o ERP confirma tecnicamente, fecha a pendência, **encerra o processo** (o D-1 não sai) e
    resolve a ocorrência com a evidência da consulta (AT-008).
-4. **TransMinas Fretes** (rodada já executada): a pendência **persistente** continua visível e o acompanhamento D+3
-   está programado: encerrar o contato não é resolver o problema (AT-009).
+4. **TransMinas Fretes** (rodada já executada): o comunicado de sucesso/falha foi para o grupo, o follow-up D+3 está
+   agendado, e a pendência **persistente** continua visível: encerrar o contato não é resolver o problema (AT-009).
+5. **Processos → Força-tarefa: ponto focal → Executar agora**: só a conta sem ponto focal recebe a tarefa (VIP para o
+   CS, demais para o Suporte); ao cadastrar o ponto focal, o processo para sozinho.
 
 ## 5. Resiliência (2 min)
 - **Simulador → whatsapp: derrubar**, responda a um cliente e use *+1 hora* quatro vezes: o WhatsApp é retentado
@@ -48,6 +55,6 @@ SNE, certificado), abriu **uma** ocorrência com os veículos e programou D-3, l
   consulte o Financeiro" (dado financeiro mínimo).
 
 ## Fechamento
-Mostre `docs/RASTREABILIDADE.md`: a matriz AT-001 a AT-016 roda automaticamente a cada mudança (27 testes, em
+Mostre `docs/RASTREABILIDADE.md`: a matriz AT-001 a AT-016 roda automaticamente a cada mudança (33 testes, em
 PostgreSQL de verdade), com as fases seguintes (onboarding, CS e adaptadores reais da Platform e do OMIE) mapeadas
 nas pendências decisórias da seção 16.
