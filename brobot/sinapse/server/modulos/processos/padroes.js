@@ -5,9 +5,10 @@
 const PADROES = [
   {
     nome: 'Pré-rodada: cadência de credenciais (D-3, ligação, D-1)',
-    descricao: 'Reunião 03/11: D-3 WhatsApp; ligação ao ponto focal e, se não atender, formaliza no grupo e com o ponto focal; '
-      + 'D-1 nova ligação + mensagem. VIP com o CS, demais com o Suporte. Para sozinho quando todas as pendências forem corrigidas. '
-      + 'Em aberto: o horário exato da ligação intermediária e se o combinado por telefone também é formalizado no grupo.',
+    descricao: 'Reunião 03/11 e anotação da pré-rodada (confirmado em 05/11): D-3 WhatsApp; ligação ao ponto focal — se atender, '
+      + 'o combinado é formalizado no grupo; se não atender, mensagem no grupo e ao ponto focal; D-1 nova ligação + mensagem. '
+      + 'VIP com o CS, demais com o Suporte. Para sozinho quando todas as pendências forem corrigidas. '
+      + 'Em aberto: o horário exato da ligação intermediária.',
     definicao: {
       gatilho: 'rodada.pendencias',
       condicoes: [],
@@ -19,6 +20,8 @@ const PADROES = [
         { tipo: 'ligar', equipe: 'da_conta', prazoHoras: 8, roteiro: 'explicar cada pendência e combinar a correção até o D-1' },
         { tipo: 'enviar_mensagem', destino: 'grupo_e_ponto_focal', modelo: 'formalizacao_ligacao',
           seCondicoes: [{ campo: 'ligacao.atendeu', operador: 'igual', valor: false }] },
+        { tipo: 'enviar_mensagem', destino: 'grupo', modelo: 'formalizacao_combinado',
+          seCondicoes: [{ campo: 'ligacao.atendeu', operador: 'igual', valor: true }] },
         { tipo: 'esperar', ateD0Horas: -24 },
         { tipo: 'ligar', equipe: 'da_conta', prazoHoras: 6, roteiro: 'último aviso antes da rodada oficial' },
         { tipo: 'enviar_mensagem', destino: 'ponto_focal', modelo: 'pre_rodada_d1' },
@@ -151,7 +154,11 @@ async function garantir(c, ctx, servico) {
     try {
       criado = await servico.criar(c, ctx, { nome: p.nome, descricao: p.descricao, definicao: p.definicao, sistema: true });
     } catch (e) {
-      if (e.code === 'entrada_invalida') continue; // organização sem as equipes que o processo usa (ex.: parceiro sem CS)
+      // Só pula a organização que não tem as equipes que o processo usa (ex.: parceiro sem CS). Qualquer outro
+      // problema na definição é defeito do padrão e precisa aparecer (antes era engolido em silêncio).
+      const soEquipe = e.code === 'entrada_invalida' && Array.isArray(e.details) && e.details.length
+        && e.details.every((x) => /^equipe inexistente/.test(x.problema));
+      if (soEquipe) continue;
       throw e;
     }
     if (p.ativo !== false) await servico.ativar(c, ctx, criado.id, 'Processo padrão (reunião de 03/11/2026)');

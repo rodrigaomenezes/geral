@@ -27,6 +27,11 @@ const MODELOS = {
     texto: 'Olá, {nome}. Tentamos falar com você por telefone sobre {qtd} pendência(s) da {conta} que impedem a consulta:\n{lista}\n'
       + 'Pode nos responder por aqui? Assim que corrigir, avise e nós revalidamos. Protocolo {protocolo}.',
   },
+  formalizacao_combinado: {
+    versao: 1, nome: 'Formalização: combinado por telefone', variaveis: ['nome', 'conta', 'qtd', 'lista', 'protocolo'],
+    texto: 'Olá! Registrando o que combinamos por telefone com {nome} sobre {qtd} pendência(s) da {conta} que impedem a consulta:\n{lista}\n'
+      + 'Quando a correção for feita, avise por aqui e nós revalidamos antes da rodada. Protocolo {protocolo}.',
+  },
   comunicado_rodada: {
     versao: 1, nome: 'Comunicado da rodada (sucesso e falha por veículo)', variaveis: ['nome', 'conta', 'produto', 'sucesso', 'total', 'lista_sucesso', 'lista', 'protocolo'],
     texto: 'Olá, {nome}. A rodada {produto} da {conta} foi concluída: {sucesso} de {total} veículos consultados com sucesso.\n'

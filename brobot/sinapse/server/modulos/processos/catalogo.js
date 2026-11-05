@@ -59,7 +59,7 @@ const PASSOS = {
   } },
   enviar_mensagem: { rotulo: 'Enviar mensagem', params: {
     destino: { tipo: 'lista', rotulo: 'Para quem', valores: ['ponto_focal', 'grupo', 'grupo_e_ponto_focal'], obrigatorio: true },
-    modelo: { tipo: 'lista', rotulo: 'Modelo', valores: ['pre_rodada_d3', 'pre_rodada_d1', 'formalizacao_ligacao', 'comunicado_rodada', 'pos_rodada_d3', 'lembrete_cliente', 'insights_caca_condutores', 'texto_livre'], obrigatorio: true },
+    modelo: { tipo: 'lista', rotulo: 'Modelo', valores: ['pre_rodada_d3', 'pre_rodada_d1', 'formalizacao_ligacao', 'formalizacao_combinado', 'comunicado_rodada', 'pos_rodada_d3', 'lembrete_cliente', 'insights_caca_condutores', 'texto_livre'], obrigatorio: true },
     texto: { tipo: 'texto', rotulo: 'Texto (para texto livre; use {conta}, {protocolo}, {nome}, {qtd_pendencias})' },
   } },
   ligar: { rotulo: 'Ligar para o ponto focal e esperar o resultado', params: {
@@ -104,6 +104,7 @@ const rv = (v) => (Array.isArray(v) ? v.map(rv).join(' ou ') : typeof v === 'boo
 
 const NOMES_MODELO = {
   pre_rodada_d3: 'Pré-rodada · aviso D-3', pre_rodada_d1: 'Pré-rodada · lembrete D-1', formalizacao_ligacao: 'Formalização: tentamos ligar',
+  formalizacao_combinado: 'Formalização: combinado por telefone',
   comunicado_rodada: 'Comunicado da rodada (sucesso e falha por veículo)', pos_rodada_d3: 'Pós-rodada · follow-up D+3',
   lembrete_cliente: 'Lembrete: aguardamos seu retorno', insights_caca_condutores: 'Insights do CaçaCondutores',
 };

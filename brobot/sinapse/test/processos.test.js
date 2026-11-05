@@ -93,6 +93,27 @@ test('ligação com resultado: "não atendeu" formaliza no grupo e com o ponto f
   assert.equal(exe.estado, 'aguardando', 'segue esperando o D-1');
 });
 
+test('todos os processos padrão são válidos (com todas as equipes) e cada modelo usado existe', () => {
+  const { PADROES } = require('../server/modulos/processos/padroes');
+  const { MODELOS } = require('../server/modulos/comunicacao/modelos');
+  const { validarDefinicao } = require('../server/modulos/processos/regras');
+  for (const p of PADROES) {
+    assert.doesNotThrow(() => validarDefinicao(p.definicao, { equipes: ['suporte', 'cs', 'operacoes', 'dev', 'financeiro', 'comercial', 'contingencia'] }), p.nome);
+    for (const passo of p.definicao.passos) if (passo.modelo && passo.modelo !== 'texto_livre') assert.ok(MODELOS[passo.modelo], `${p.nome}: modelo ${passo.modelo}`);
+  }
+});
+
+test('ligação com resultado: "atendeu" formaliza o combinado no grupo (anotação da pré-rodada, confirmada em 05/11)', async () => {
+  const [lig] = await t.sql(`SELECT t.id, t.rodada_id, c.id AS conta_id, c.grupo_whatsapp FROM tarefas t JOIN rodadas r ON r.id = t.rodada_id JOIN contas c ON c.id = r.conta_id
+    WHERE t.tipo = 'ligacao' AND t.estado = 'aberta' AND c.nome <> 'Transportadora Rota Sul' AND c.grupo_whatsapp IS NOT NULL LIMIT 1`);
+  assert.ok(lig, 'outra conta com ligação aberta na pré-rodada');
+  const marina = await t.entrarComo('Marina Costa');
+  assert.equal((await marina.post(`/tarefas/${lig.id}/concluir`, { resultado: 'Combinou corrigir a credencial até amanhã', resultadoCodigo: 'atendeu' })).status, 200);
+  await t.avancar(0.01);
+  const enviadas = await t.sql("SELECT destinatario, modelo FROM interacoes WHERE conta_id = $1 AND modelo IN ('formalizacao_combinado@1', 'formalizacao_ligacao@1')", [lig.conta_id]);
+  assert.deepEqual(enviadas.map((x) => [x.modelo, x.destinatario]), [['formalizacao_combinado@1', lig.grupo_whatsapp]], 'só o combinado, no grupo');
+});
+
 test('força-tarefa por conta: "Executar agora" cria tarefa e para sozinho quando o ponto focal é cadastrado', async () => {
   const marina = await t.entrarComo('Marina Costa');
   const [proc] = await t.sql("SELECT id FROM processos WHERE nome LIKE 'Força-tarefa%'");
