@@ -17,24 +17,29 @@ const TODAS = {
   'auditoria.ver': 'ver a auditoria',
   'processo.ver': 'ver os processos automáticos',
   'processo.editar': 'criar, editar e ativar processos automáticos',
+  'agenda.usar': 'usar o Meu dia e os lembretes',
+  'comercial.ver': 'ver o funil comercial',
+  'comercial.editar': 'cadastrar e mover oportunidades',
+  'integracao.usar': 'importar e exportar arquivos da Platform e do OMIE',
   'demo.simular': 'usar o simulador',
 };
 
-const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver', 'processo.ver'];
+const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar'];
 
 const PAPEIS = {
   admin: Object.keys(TODAS),
   supervisor: Object.keys(TODAS).filter((p) => p !== 'financeiro.bloqueio'),
   suporte: [...OPERACIONAL, 'conta.editar', 'rodada.operar'],
-  cs: [...OPERACIONAL, 'conta.editar', 'rodada.operar'],
-  operacoes: [...OPERACIONAL, 'rodada.operar', 'conta.editar'],
-  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver', 'processo.ver'],
-  financeiro: ['ocorrencia.ver', 'conta.ver', 'financeiro.detalhe', 'financeiro.bloqueio'],
+  cs: [...OPERACIONAL, 'conta.editar', 'rodada.operar', 'comercial.ver'],
+  operacoes: [...OPERACIONAL, 'rodada.operar', 'conta.editar', 'integracao.usar'],
+  comercial: ['comercial.ver', 'comercial.editar', 'conta.ver', 'agenda.usar', 'processo.ver', 'ocorrencia.ver'],
+  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar'],
+  financeiro: ['ocorrencia.ver', 'conta.ver', 'financeiro.detalhe', 'financeiro.bloqueio', 'agenda.usar', 'integracao.usar', 'comercial.ver'],
 };
 
 const NOMES_PAPEIS = {
   admin: 'Administração', supervisor: 'Supervisão', suporte: 'Suporte', cs: 'Customer Success',
-  operacoes: 'Operações', dev: 'Desenvolvimento', financeiro: 'Financeiro',
+  operacoes: 'Operações', dev: 'Desenvolvimento', financeiro: 'Financeiro', comercial: 'Comercial',
 };
 
 const permissoesDe = (papel) => PAPEIS[papel] || [];
