@@ -19,6 +19,9 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/entrada       inbox durável + deduplicação, identificação por telefone E.164, classificação, triagem
         ├─ modulos/ocorrencias   máquina de estados (pura), SLA por calendário (puro), handoff, tarefas, resposta no canal
         ├─ modulos/rodadas       teste D-4 e resultado D0 na Platform, pendências, revalidação; publica os fatos para os processos
+        ├─ modulos/agenda        Meu dia, lembretes (pessoa/equipe, recorrência, adiar) e central de notificações
+        ├─ modulos/comercial     funil de aquisição com teste antes do fechamento; venda ganha → conta em onboarding + CS
+        ├─ modulos/integracoes/csv  importar (prévia → aplicar, hash único) e exportar CSV com Platform e OMIE
         ├─ modulos/processos     motor de processos escritos pela operação: gatilho → condições → passos → "para sozinho se"
         ├─ modulos/comunicacao   modelos versionados, consentimento/opt-out, janela de horário, retentativa, fallback
         ├─ modulos/supervisor    varredura de invariantes, escalonamento, handoff vencido, heartbeat, fila de falhas
@@ -36,7 +39,7 @@ escrever, exceto o adaptador de demonstração da Platform, que lê a tabela do 
 
 ## Dados
 
-Migrações `001_fundacao` e `002_processos` (cada uma com `.down.sql`). Principais tabelas:
+Migrações `001_fundacao`, `002_processos` e `003_meu_dia_comercial_csv` (cada uma com `.down.sql`). Principais tabelas:
 
 | Tabela | Papel |
 | --- | --- |
@@ -48,6 +51,9 @@ Migrações `001_fundacao` e `002_processos` (cada uma com `.down.sql`). Princip
 | `eventos` | Outbox com o contrato canônico (event_id, schema_version, aggregate, correlation, idempotency_key…) |
 | `auditoria` | Só anexação (gatilho recusa UPDATE/DELETE) |
 | `processos`, `processo_versoes`, `processo_execucoes`, `processo_passos_log` | Processos automáticos: versão ativada imutável (gatilho), execução presa à versão, registro de cada passo |
+| `lembretes`, `notificacoes` | Lembretes (pessoa ou equipe; recorrentes) e avisos por pessoa (chave única: não repete) |
+| `oportunidades` | Funil comercial; CHECK: aberta tem próxima ação, negociação/ganho exigem teste aprovado, ganha tem conta |
+| `importacoes`, `uso_contas` | Arquivos CSV aplicados (hash único, erros por linha) e uso da Platform por conta (último login) |
 | `jobs`, `integracoes`, `divergencias`, `sistema` | Fila durável, saúde/checkpoint das integrações, reconciliação, heartbeat/relógio |
 
 Invariantes garantidas **pelo banco** (CHECK): ocorrência ativa tem fila, prazo e próxima ação (RN-008); resolvida
@@ -81,6 +87,16 @@ Um processo é `{ gatilho, condicoes[], passos[], encerrarSe[] }` (`modulos/proc
   grupo + follow-up D+3), força-tarefa de ponto focal, erro de consulta aciona o Suporte, cliente sem retorno, VIP com
   prioridade alta, insights semanais do CaçaCondutores (desligado até revisão do texto).
 
+## Integração por CSV (fase atual)
+
+A Platform e o OMIE ainda não têm API conectada: cada lado exporta um CSV e o outro importa.
+- **Importar:** resultado de rodada por veículo (pré-rodada D-4 ou oficial D0; a rodada passa a `fonte = 'csv'` e o
+  Sinapse deixa de chamar o adaptador para ela), status de credenciais (coluna de senha é recusada), uso/último login,
+  situação financeira do OMIE (CNPJ desconhecido vira divergência). Sempre prévia → aplicar; mesmo arquivo não entra
+  duas vezes; uma transação por arquivo.
+- **Exportar:** novos clientes para o OMIE, provisionamento e carteira (com VIP) para a Platform, pendências abertas.
+  Proteção contra injeção de fórmula; cada exportação fica na auditoria.
+
 ## Tempo, jobs e supervisor
 
 Tudo que acontece "depois" é um job: `entrada.processar`, `rodada.pre_rodada` (D-4), `rodada.executar` (D0), `comunicacao.enviar`, `omie.sincronizar` (10 min) e
@@ -104,7 +120,9 @@ ser adiantado na demonstração para mostrar a cadência inteira em minutos.
 - **Marca:** cores, nome e logo vêm de `tenants.config.marca` (`/marca/<arquivo>` em `public/marca`); o material oficial
   da Brobot ainda não foi aplicado.
 - A tabela `contatos_programados` (cadência fixa da 001) ficou sem uso desde a 002; não foi removida (migração aditiva).
-- **Fora desta fase:** onboarding/offboarding, CS (saúde da conta, treinamentos, campanhas), incidentes, base de
+- **Canais:** WhatsApp e telefonia ainda são de demonstração; a próxima entrega porta do Lumen Operações a API oficial
+  da Meta e o QR, o softphone SIP/WebRTC, a ligação pelo celular e a fila de ligações.
+- **Fora desta fase:** offboarding, CS (saúde da conta, treinamentos, campanhas), incidentes, base de
   conhecimento, anexos, LGPD (exportação/anonimização), MFA, OpenAPI/AsyncAPI publicados, modelos de mensagem
   editáveis na tela (hoje versionados em código). Ver `docs/RASTREABILIDADE.md`.
 - Listas da carteira e da triagem usam subconsultas por linha limitadas à página (25–30 linhas); medir antes de

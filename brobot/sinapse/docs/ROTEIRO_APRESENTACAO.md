@@ -4,6 +4,10 @@ Antes: abra o link publicado, entre como **Marina Costa (Supervisão)** e, **no 
 Simulador → *Reiniciar demonstração* (as datas das rodadas são relativas ao momento em que a demonstração é criada).
 Deixe outra aba (janela anônima) com **Rafael Lima (Suporte)**.
 
+## 0. Cada pessoa abre o sistema no "Meu dia" (1 min)
+Entre como **Rafael (Suporte)**: o Meu dia junta o que está atrasado, o que vence hoje, as transferências para a equipe
+e os lembretes (com adiar e "feito"). O sino mostra os avisos (lembrete vencido, escalonamento, transferência).
+
 ## 1. A tese (1 min)
 "Hoje a coordenação é manual: planilhas, e-mail, Redmine, WhatsApp. No Sinapse **nenhuma ocorrência fica sem dono,
 prazo ou próxima ação**, e toda mudança deixa rastro." Mostre o **Painel**: *órfãs 0* e *sem próxima ação 0*, com
@@ -47,6 +51,14 @@ certificado) e abriu **uma** ocorrência; o processo está "aguardando" o D-3 (v
 - A transferência "Timeout recorrente na consulta do DETRAN-SP" não foi aceita em 2 horas: com os avanços do
   relógio ela já está na **Contingência**, com tarefa de escalonamento para a Supervisão (AT-010).
 
+## 5b. Comercial e integrações (3 min)
+- Entre como **Patrícia (Comercial)** → **Comercial**: o funil em quadro. Abra a *Agro Transportes Paraná* (teste
+  aprovado) → *Avançar para Negociação* → *Fechar venda*: a conta nasce em onboarding, o CS recebe o onboarding e
+  Operações a tarefa de provisionar na Platform. Tente avançar uma oportunidade sem teste: o sistema não deixa.
+- Entre como **Pedro (Operações)** → **Integrações**: importe um CSV de resultado de pré-rodada (o modelo está em
+  "Colunas esperadas"), veja a prévia e aplique: a rodada, as pendências e a cadência aparecem sozinhas. Baixe a
+  carteira com a coluna VIP para a Platform.
+
 ## 6. Segurança e governança (2 min)
 - **AT-014**: tentativa de ler um dado da organização "Parceiro White-label": o banco não devolve nada e a tentativa
   fica auditada.
@@ -55,6 +67,6 @@ certificado) e abriu **uma** ocorrência; o processo está "aguardando" o D-3 (v
   consulte o Financeiro" (dado financeiro mínimo).
 
 ## Fechamento
-Mostre `docs/RASTREABILIDADE.md`: a matriz AT-001 a AT-016 roda automaticamente a cada mudança (33 testes, em
+Mostre `docs/RASTREABILIDADE.md`: a matriz AT-001 a AT-016 roda automaticamente a cada mudança (40 testes, em
 PostgreSQL de verdade), com as fases seguintes (onboarding, CS e adaptadores reais da Platform e do OMIE) mapeadas
 nas pendências decisórias da seção 16.

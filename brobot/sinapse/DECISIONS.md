@@ -57,3 +57,17 @@ campo exige versão nova do vocabulário.
 # T-010 — Marca por organização na configuração
 **Decisão:** nome, cores (hex) e logo em `tenants.config.marca`, aplicados no carregamento. **Por quê:** white-label
 (seção 2 da especificação); o material oficial da Brobot entra sem mudar código.
+
+# T-011 — Comercial dentro do Sinapse, com teste obrigatório antes do fechamento
+**Decisão:** visão do cliente (05/11/2026): o Sinapse é o único sistema de gestão, inclusive do Comercial. Funil padrão
+de aquisição com etapa Teste; o banco recusa negociação ou ganho sem teste aprovado. Venda ganha cria a conta em
+onboarding (ou expande a do mesmo CNPJ) e o onboarding vai para o CS.
+
+# T-012 — Platform e OMIE por CSV nesta fase
+**Decisão:** integração por arquivos (exportar/importar) até as APIs estarem disponíveis. O resultado de rodada por CSV
+reaproveita exatamente o mesmo processamento da API (`processarPreRodada`/`processarOficial`). **Rever** quando houver
+API: o adaptador real substitui o arquivo sem mudar o resto.
+
+# T-013 — Reaproveitar canais do Lumen Operações
+**Decisão:** WhatsApp (API oficial + QR), telefonia (SIP/WebRTC, celular, treino) e fila de ligações vêm do Lumen
+Operações, adaptados ao PostgreSQL multiempresa. **Atenção:** este repositório é público; o código portado fica visível.

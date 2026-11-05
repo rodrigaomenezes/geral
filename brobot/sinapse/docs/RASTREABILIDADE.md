@@ -52,13 +52,13 @@ Testes: `test/aceite.test.js` (AT-xxx) e `test/regras.test.js`.
 | GOV | 001 (organizações, equipes, perfis), 002 (VIP com critério/aprovador/validade), 003 (substituto), 004, 005, 006 (histórico), 007, 008 (feriados, expediente, SLA) | 009 delegação temporária ○, 010 matriz RACI na tela ○ |
 | INT | 001, 002, 003, 004, 005, 007, 008, 010 (busca por cliente/CNPJ/protocolo) | 006 dividir/mesclar ◐ (tabela de vínculos pronta, sem tela), 009 anexos ○ |
 | WFL | 001, 002, 003 (processos), 004, 005, 006, 007, 008, 009, 010, 011, 012, 013 (versões de processo), 014, 015 (concorrência e laço) | — |
-| ONB | — | 001–012 ○ (Fase 3 do plano de implantação) |
+| ONB | 001 (venda ganha cria o onboarding), 002 ◐, 004 ◐ (exportação de provisionamento) | 003, 005–012 ○ |
 | PRE | 001, 002, 003, 004, 005, 006, 007, 008, 009, 010 (escalonamento), 012 (taxa de correção) | 011 comunicado final ◐ (resultado enviado; quem autoriza é pendência decisória) |
 | POS | 001, 002, 003, 004, 005, 006, 007, 008, 010 | 009 recomendação de RCA ◐ (contador de recorrência) |
 | REC | 002 (categorias), 003, 004 (erro técnico → Desenvolvimento) | 001, 005–008 ◐/○ (volumetria da Platform) |
 | CRE | 001, 002 (status), 005, 006, 007, 008 | 003 consultas não geradas ○, 004 alerta de expiração ◐ (data exibida) |
 | COM | 001, 003, 004, 005, 006, 007, 009, 010 (processo semanal com opt-out) | 002 aprovação de modelos ○, 008 central do cliente ○ (Platform) |
-| CS | 001 (carteira VIP), 010 (insights CaçaCondutores semanais, desligado até revisão) | 002–009, 011, 012 ○ (Fase 4) |
+| CS | 001 (carteira VIP), 003 ◐ (último login por CSV), 011 ◐ (Comercial no mesmo sistema), 010 (insights CaçaCondutores semanais, desligado até revisão) | 002–009, 011, 012 ○ (Fase 4) |
 | DEV | 001, 002, 004, 005 | 003 sincronizar ferramenta técnica ○, 006 incidentes ○, 007 ◐, 008 ○ |
 | FIN | 001, 002, 003, 005, 006, 007, 008, 009, 010 | 004 eventos ao Financeiro ◐ (outbox gravado, sem envio) |
 | SUP | 001, 002, 003, 005, 006, 007, 009 (correlação por requisição), 010 (processos com simulação e restauração), 012 ◐ | 004 reconciliação Platform ◐ (OMIE pronto), 008 LGPD ○, 011 contingência de canal ◐ |
@@ -87,3 +87,14 @@ dimensionamento e da infraestrutura definitiva.
 | Erros invisíveis, central de pendências, último login, frequência de consulta (melhorias 3, 4, 7, 8) | ○ | dependem de dados/telas da Platform |
 | Treinamento coletivo do CS e documento por tela | ○ | Fase 4 (CS) |
 | Pontos em aberto da reunião (critério VIP, regra "1 CNPJ desativa a rodada", formalização quando atende, quem autoriza o comunicado) | aguardando decisão | os processos permitem ajustar sem código quando forem decididos |
+
+## Entrega de 05/11/2026 (Meu dia, Comercial, CSV)
+
+| Item | Situação | Onde |
+| --- | --- | --- |
+| Meu dia: atrasado, hoje, transferências para a equipe, aguardando cliente, lembretes, oportunidades | ✔ | `modulos/agenda`, tela inicial |
+| Lembretes pessoais e de equipe, recorrentes, adiar; criados também por processos | ✔ | passo "Criar lembrete" |
+| Central de notificações (lembrete vencido, escalonamento, transferência) sem repetição | ✔ | sino no topo |
+| Comercial: funil com teste antes do fechamento, quadro, indicadores, venda → onboarding | ✔ | `modulos/comercial` |
+| Platform/OMIE por CSV (rodadas, credenciais, uso, situação financeira; exportações) | ✔ | `modulos/integracoes/csv` |
+| Canais reais (WhatsApp, telefonia) aproveitando o Lumen Operações | ○ | próxima entrega |

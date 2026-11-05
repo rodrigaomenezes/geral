@@ -5,8 +5,9 @@ ocorrências com máquina de estados e SLA, transferências com aceite, pré-rod
 pós-rodada (D0 → D+3), carteira com VIP e pontos focais, supervisor independente e auditoria completa.
 **Processos automáticos:** a operação escreve, em formulário, processos que o sistema segue sozinho (gatilho → condições →
 passos → "para sozinho se"), com simulação, versões e restauração. Os processos da reunião de 03/11/2026 já vêm prontos.
-A Platform Brobot continua dona das consultas e o OMIE, do financeiro: o Sinapse conversa com os dois por
-adaptadores (hoje em modo demonstração).
+**Meu dia** (tela inicial de cada pessoa), **lembretes** e **avisos**; **Comercial** com funil de aquisição e teste antes do
+fechamento. A Platform Brobot continua dona das consultas e o OMIE, do financeiro: nesta fase os dados vão e voltam por
+**CSV** (Integrações), com prévia antes de gravar.
 
 **Fase 1 · demonstração.** Os dados são fictícios e o simulador reproduz os cenários de aceite da especificação.
 
@@ -15,7 +16,7 @@ adaptadores (hoje em modo demonstração).
 ```bash
 npm install
 npm start          # http://localhost:3000 — cria o banco embutido em ./data/pg e a demonstração
-npm test           # 33 testes: matriz de aceite AT-001 a AT-016, regras e motor de processos
+npm test           # 40 testes: aceite AT-001 a AT-016, regras, processos, comercial, agenda e CSV
 ```
 
 Com PostgreSQL próprio: `DATABASE_URL=postgres://... npm start`. Testes contra um PostgreSQL de teste (o schema é
