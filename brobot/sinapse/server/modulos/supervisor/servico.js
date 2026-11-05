@@ -14,6 +14,7 @@ const { relogio, HORA } = require('../../nucleo/relogio');
 const ocorrencias = require('../ocorrencias/servico');
 const tarefas = require('../ocorrencias/tarefas');
 const identidade = require('../identidade/servico');
+const lotesCsv = require('../integracoes/csv/lotes');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -60,7 +61,9 @@ async function jobVarrer(c, ctx) {
       titulo: `${o.protocolo}: próxima ação vencida (nível ${nivel})`, prazoEm: new Date(agora.getTime() + HORA) });
     resumo.escalonadas++;
   }
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas) {
+  // Adendo CSV: arquivo exportado sem confirmação de aplicação no destino dentro do prazo.
+  resumo.lotesSemConfirmacao = await lotesCsv.verificarLotesAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };
