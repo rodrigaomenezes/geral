@@ -12,7 +12,7 @@ export const seloEstado = (ctx, e) => selo(ctx.catalogos.estados[e] || e, COR_ES
 export const seloSla = (s) => (s ? selo(...SLA[s]) : null);
 
 export async function telaOcorrencias(el, ctx, fixo = {}) {
-  const filtros = { estado: fixo.estado || 'ativas', equipe: ctx.query?.get('equipe') || '', minhas: false, q: '', pagina: 1 };
+  const filtros = { estado: fixo.estado || ctx.query?.get('estado') || 'ativas', equipe: ctx.query?.get('equipe') || '', minhas: false, q: '', pagina: 1 };
   const lista = h('div', { class: 'lista' });
   const rodape = h('div', { class: 'paginacao' });
 
@@ -43,7 +43,8 @@ export async function telaOcorrencias(el, ctx, fixo = {}) {
 
   trocar(el,
     h('div', { class: 'titulo-tela' }, h('h1', {}, fixo.titulo || 'Ocorrências'),
-      ctx.pode('ocorrencia.atender') && !fixo.estado ? h('button', { class: 'btn btn-primario', onclick: () => novaOcorrencia(ctx) }, 'Nova ocorrência') : null),
+      fixo.estado ? null : h('div', { class: 'acoes' }, h('a', { class: 'btn btn-fantasma', href: '#/quadro' }, 'Ver em quadro'),
+        ctx.pode('ocorrencia.atender') ? h('button', { class: 'btn btn-primario', onclick: () => novaOcorrencia(ctx) }, 'Nova ocorrência') : null)),
     fixo.estado === 'triagem' ? h('p', { class: 'suave' }, 'Mensagens sem cliente identificado ou com assunto incerto. Nada se perde: cada uma tem prazo e próxima ação até ser classificada.') : null,
     h('div', { class: 'filtros' }, fixo.estado ? null : estado, equipe, busca, h('label', { class: 'check' }, minhas, 'Só as minhas')),
     lista, rodape);
@@ -118,20 +119,25 @@ async function camposDaAcao(ctx, acao) {
   }
 }
 
+/** Executa uma transição da máquina (detalhe e quadro usam a mesma): pede os campos que a ação exige e envia com a
+ *  versão lida, para que duas pessoas mexendo ao mesmo tempo recebam conflito em vez de sobrescrever. */
+export async function executarAcao(ctx, o, acao, rotulo, aoTerminar, aoCancelar = () => {}) {
+  const campos = await camposDaAcao(ctx, acao);
+  const enviar = async (dados) => {
+    await api.post(`/ocorrencias/${o.id}/transicoes`, { acao, versao: o.version, dados });
+    aviso(`${rotulo}: feito.`);
+    aoTerminar();
+  };
+  if (!campos) { try { await enviar({}); } catch (e) { aviso(textoErro(e), 'erro'); aoCancelar(); } return; }
+  let feito = false;
+  modal(rotulo, (fechar) => formulario(campos, rotulo, async (d) => { await enviar(d); feito = true; fechar(); }), () => { if (!feito) aoCancelar(); });
+}
+
 export async function telaOcorrencia(el, ctx, id) {
   const o = await api.get(`/ocorrencias/${id}`);
   const recarregar = () => telaOcorrencia(el, ctx, id);
 
-  async function executar(acao, rotulo) {
-    const campos = await camposDaAcao(ctx, acao);
-    const enviar = async (dados) => {
-      await api.post(`/ocorrencias/${id}/transicoes`, { acao, versao: o.version, dados });
-      aviso(`${rotulo}: feito.`);
-      recarregar();
-    };
-    if (!campos) { try { await enviar({}); } catch (e) { aviso(textoErro(e), 'erro'); } return; }
-    modal(rotulo, (fechar) => formulario(campos, rotulo, async (d) => { await enviar(d); fechar(); }));
-  }
+  const executar = (acao, rotulo) => executarAcao(ctx, o, acao, rotulo, recarregar);
 
   const acoes = h('div', { class: 'acoes' }, o.acoes.map((a) => h('button', {
     class: `btn ${['resolver', 'assumir', 'classificar', 'aceitar_handoff'].includes(a.acao) ? 'btn-primario' : ''}`, onclick: () => executar(a.acao, a.rotulo),

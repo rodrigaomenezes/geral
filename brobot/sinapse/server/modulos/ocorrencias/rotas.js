@@ -38,6 +38,13 @@ module.exports = [
       });
       return com(201, await db.comoTenant(ctx.tenantId, (c) => s.criar(c, ctx, { ...d, origem: 'interna' })));
     } },
+  { metodo: 'GET', caminho: '/api/ocorrencias/quadro', permissao: 'ocorrencia.ver',
+    handler: ({ db, ctx, usuario, query }) => {
+      const d = validar(query, { equipe: { tipo: 'texto', max: 30 }, responsavel: { tipo: 'texto', max: 40 }, q: { tipo: 'texto', max: 100 },
+        vip: { tipo: 'texto', em: ['1'] }, vencidas: { tipo: 'texto', em: ['1'] } });
+      if (d.responsavel && !['eu', 'ninguem'].includes(d.responsavel) && !/^[0-9a-f-]{36}$/i.test(d.responsavel)) throw new ErroNegocio(400, 'entrada_invalida', 'Responsável inválido.');
+      return db.comoTenant(ctx.tenantId, (c) => s.quadro(c, usuario, { ...d, vip: d.vip === '1', vencidas: d.vencidas === '1' }));
+    } },
   { metodo: 'GET', caminho: '/api/ocorrencias/:id', permissao: 'ocorrencia.ver',
     handler: ({ db, ctx, usuario, params }) => comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => s.detalhe(c, usuario, params.id)) },
   { metodo: 'POST', caminho: '/api/ocorrencias/:id/transicoes', permissao: 'ocorrencia.ver',

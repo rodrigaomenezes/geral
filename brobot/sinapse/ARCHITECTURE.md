@@ -27,7 +27,7 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/comunicacao   mensagens padrão editáveis (rascunho → revisão → aprovada), consentimento, janela, retentativa, fallback, template Meta
         ├─ modulos/supervisor    varredura de invariantes, escalonamento, handoff vencido, heartbeat, fila de falhas
         ├─ modulos/painel        indicadores da seção 13 e 6 dashboards (blocos = tabela de dados; gráfico, tabela e CSV leem a mesma)
-        ├─ modulos/integracoes   Platform e OMIE (demonstração + CSV), WhatsApp oficial (Meta Cloud API, webhook assinado), e-mail (demonstração)
+        ├─ modulos/integracoes   Platform e OMIE (demonstração + CSV), WhatsApp oficial (Meta Cloud API, webhook assinado) ou por QR Code (Baileys, sessão no Volume), e-mail (demonstração)
         └─ modulos/demo          dados fictícios e simulador (só com SINAPSE_DEMO ligado)
         │
 server/jobs/fila.js — fila durável no PostgreSQL (FOR UPDATE SKIP LOCKED), backoff, fila de falhas, recorrentes
@@ -56,7 +56,7 @@ Migrações `001` a `005` (fundação, processos, meu dia/comercial/CSV, canais,
 | `oportunidades` | Funil comercial; CHECK: aberta tem próxima ação, negociação/ganho exigem teste aprovado, ganha tem conta |
 | `importacoes`, `uso_contas` | Arquivos CSV aplicados (hash único, erros por linha) e uso da Platform por conta (último login) |
 | `telefonia_config`, `telefonia_ramais`, `chamadas`, `chamada_eventos` | Telefonia: provedor por organização, ramal SIP (senha cifrada), ligações com estados e eventos |
-| `whatsapp_numeros` | Número oficial da organização (token cifrado); o webhook acha a organização pelo `phone_number_id` |
+| `whatsapp_numeros` | Número da organização (um ativo): oficial (token cifrado; o webhook acha a organização pelo `phone_number_id`) ou QR (`status`, `ultimo_erro`; sessão em `/data/wa-sessoes`) |
 | `modelos_mensagem` | Versões das mensagens padrão por organização; aprovada é imutável; template da Meta opcional |
 | `jobs`, `integracoes`, `divergencias`, `sistema` | Fila durável, saúde/checkpoint das integrações, reconciliação, heartbeat/relógio |
 
@@ -72,6 +72,9 @@ aprovador; exceção de roteamento tem justificativa; pendência corrigida tem e
 - **Permissão** por rota (`permissoes.js`); Financeiro vê detalhe financeiro, os demais só "atenção financeira".
 - **CSRF:** POST exige JSON e origem igual ao host. **CSP** sem inline; front sem `innerHTML`.
 - Webhook com token comparado em tempo constante. Nenhum segredo, senha ou certificado é guardado.
+- **Ambiente (T-019):** em produção a demonstração (login sem senha) só liga com `SINAPSE_DEMO=1` e aparece numa faixa
+  fixa; `SINAPSE_AMBIENTE=producao` recusa demonstração, banco embutido e TLS do banco sem verificação. Login com
+  limite de tentativas (5 por e-mail / 30 por endereço em 15 min). HSTS em produção.
 
 ## Motor de processos
 
@@ -124,10 +127,13 @@ ser adiantado na demonstração para mostrar a cadência inteira em minutos.
 - **Marca:** cores, nome e logo vêm de `tenants.config.marca` (`/marca/<arquivo>` em `public/marca`); o material oficial
   da Brobot ainda não foi aplicado.
 - A tabela `contatos_programados` (cadência fixa da 001) ficou sem uso desde a 002; não foi removida (migração aditiva).
-- **Canais:** telefonia (treino, SIP, celular) e WhatsApp oficial prontos; faltam do Lumen o WhatsApp por QR (Baileys), a
-  gravação de ligações e a fila de ligações. O template da Meta (fora da janela de 24 h) é informado por mensagem padrão.
+- **Canais:** telefonia (treino, SIP, celular), WhatsApp oficial e por QR Code prontos (tela Canais); faltam do Lumen a
+  gravação de ligações e a fila de ligações. O QR não é a API oficial: risco de bloqueio do número (T-020). O template da Meta (fora da janela de 24 h) é informado por mensagem padrão.
 - **Marca:** identidade Brobot aplicada a partir do site (azul, Montserrat servida localmente, botões em pílula); o
   wordmark é desenhado em CSS até chegar o arquivo oficial do logo (SVG).
+- **Limitador de login na memória do processo:** vale para uma réplica; com várias, passa para tabela.
+- **Quadro (Kanban):** uma consulta por carga (25 cartões por coluna, tarefas agregadas só dos cartões exibidos);
+  colunas = estados da máquina; arrastar chama a mesma transição do detalhe.
 - **Fora desta fase:** offboarding, CS (treinamentos coletivos), incidentes, base de conhecimento, anexos, LGPD
   (exportação/anonimização), MFA, OpenAPI/AsyncAPI publicados, modo escuro. Ver `docs/RASTREABILIDADE.md`.
 - Listas da carteira e da triagem usam subconsultas por linha limitadas à página (25–30 linhas); medir antes de

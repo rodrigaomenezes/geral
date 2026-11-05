@@ -97,3 +97,24 @@ o template da Meta com as variáveis na ordem indicada (resolve a janela de 24 h
 **Problema encontrado:** o PGlite devolve `affectedRows`, o `pg` devolve `rowCount`; com o banco embutido, checagens por
 `rowCount` (cancelar jobs, cadastro do número de WhatsApp, revisão de mensagem) falhavam em silêncio.
 **Correção:** o adaptador do PGlite preenche `rowCount`; teste de regressão em `test/regras.test.js`.
+
+# T-019 — Demonstração explícita em produção, TLS verificado e limite de login (F0 da auditoria)
+**Problema encontrado (auditoria de 05/11, R-01/R-03/R-04):** o modo demonstração vinha ligado por padrão — no Railway
+qualquer pessoa entrava como qualquer perfil sem senha; a conexão TLS com o PostgreSQL aceitava qualquer certificado;
+o login não limitava tentativas.
+**Decisão:** em `NODE_ENV=production` a demonstração só liga com `SINAPSE_DEMO=1` (faixa fixa na tela);
+`SINAPSE_AMBIENTE=producao` recusa demonstração, banco embutido e TLS sem verificação. Com `sslmode` o certificado é
+verificado (`SINAPSE_DB_CA` para CA própria; desligar só com `SINAPSE_DB_TLS_INSEGURO=1`, registrado no log). Login:
+5 erros por e-mail ou 30 por endereço em 15 min → 429. O limitador fica na memória do processo (uma réplica hoje); com
+várias réplicas, passa para tabela. HSTS em produção. `npm run verificar` no CI (sintaxe, sem `innerHTML`, sem
+`setInterval` no servidor).
+**Consequência:** a apresentação no Railway precisa de `SINAPSE_DEMO=1`.
+
+# T-020 — WhatsApp por QR Code (Baileys) além da API oficial
+**Contexto:** pedido de 05/11 ("inclua o WhatsApp QR Code"), aprovado com ciência do risco (DP-03).
+**Decisão:** o número por QR é mais um provedor de `whatsapp_numeros` (`provedor = 'qr'`, migração 006 aditiva); um
+número ativo por organização. Sessão em arquivo no Volume (`/data/wa-sessoes`), conexão na memória do processo;
+recebido vira entrada deduplicada pelo id da mensagem; o que o celular manda direto vai ao histórico (eco, sem
+duplicar); status entregue/lida pela mesma regra do oficial (não regride). Testado com simulador
+(`SINAPSE_WA_QR_FALSO=1`).
+**Riscos:** não é a API oficial — a Meta pode bloquear o número; sem Volume a sessão se perde a cada deploy.

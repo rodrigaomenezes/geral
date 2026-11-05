@@ -8,17 +8,9 @@ const cloud = require('./whatsapp-cloud');
 const entrada = require('../entrada/servico');
 
 const STATUS = { sent: 'enviada', delivered: 'entregue', read: 'lida', failed: 'falhou' };
-const ORDEM = { enfileirada: 0, enviada: 1, entregue: 2, lida: 3 };
-
-async function aplicarStatus(c, s) {
-  const novo = STATUS[s.status];
-  if (!novo) return;
-  const it = uma(await c.query("SELECT id, status_entrega FROM interacoes WHERE id_externo = $1 AND direcao = 'saida' FOR UPDATE", [s.id]));
-  if (!it) return;
-  // Evento fora de ordem (entregue depois de lida) não volta o status.
-  if (novo !== 'falhou' && (ORDEM[novo] ?? 0) <= (ORDEM[it.status_entrega] ?? -1)) return;
-  await c.query('UPDATE interacoes SET status_entrega = $2, erro_entrega = $3 WHERE id = $1', [it.id, novo, s.erro]);
-}
+const { aplicarStatus: aplicar } = require('./whatsapp-status');
+const qr = require('./whatsapp-qr');
+const aplicarStatus = (c, s) => aplicar(c, s.id, STATUS[s.status], s.erro);
 
 module.exports = [
   { metodo: 'GET', caminho: '/api/whatsapp/webhook', publica: true,
@@ -42,9 +34,38 @@ module.exports = [
       }
       return { ok: true };
     } },
+  { metodo: 'POST', caminho: '/api/whatsapp/qr/conectar', permissao: 'canais.gerir', descricao: 'conectar o WhatsApp por QR Code',
+    handler: async ({ db, ctx }) => {
+      const n = await db.comoTenant(ctx.tenantId, async (c) => {
+        let x = uma(await c.query("SELECT id FROM whatsapp_numeros WHERE provedor = 'qr' ORDER BY criado_em DESC LIMIT 1"));
+        await c.query("UPDATE whatsapp_numeros SET ativo = false, atualizado_em = now() WHERE ativo AND provedor <> 'qr'");
+        if (x) await c.query("UPDATE whatsapp_numeros SET ativo = true, status = 'conectando', atualizado_em = now() WHERE id = $1", [x.id]);
+        else x = uma(await c.query("INSERT INTO whatsapp_numeros (tenant_id, provedor, status) VALUES ($1, 'qr', 'conectando') RETURNING id", [ctx.tenantId]));
+        await auditar(c, ctx, { acao: 'whatsapp.qr_conectar', entidade: 'whatsapp', entidadeId: x.id });
+        return x;
+      });
+      const atual = qr.situacao(n.id);
+      if (atual.estado !== 'conectado') { await qr.encerrar(n.id, { sair: false }); await qr.iniciar(n.id); }
+      return { id: n.id, ...qr.situacao(n.id) };
+    } },
+  { metodo: 'GET', caminho: '/api/whatsapp/qr', permissao: 'canais.gerir', descricao: 'ver a conexão por QR Code',
+    handler: ({ db, ctx }) => db.comoTenant(ctx.tenantId, async (c) => {
+      const n = uma(await c.query("SELECT id, status, ultimo_erro, numero_exibicao, ativo FROM whatsapp_numeros WHERE provedor = 'qr' ORDER BY criado_em DESC LIMIT 1"));
+      return n ? { id: n.id, ativo: n.ativo, status: n.status, erro: n.ultimo_erro, telefone: n.numero_exibicao, ...qr.situacao(n.id) } : { estado: 'nunca_conectado' };
+    }) },
+  { metodo: 'POST', caminho: '/api/whatsapp/qr/desconectar', permissao: 'canais.gerir', descricao: 'desconectar o WhatsApp por QR Code',
+    handler: async ({ db, ctx }) => {
+      const n = await db.comoTenant(ctx.tenantId, async (c) => {
+        const x = uma(await c.query("UPDATE whatsapp_numeros SET status = 'desconectado', ativo = false, atualizado_em = now() WHERE provedor = 'qr' AND ativo RETURNING id"));
+        if (x) await auditar(c, ctx, { acao: 'whatsapp.qr_desconectar', entidade: 'whatsapp', entidadeId: x.id });
+        return x;
+      });
+      if (n) await qr.encerrar(n.id, { sair: true });
+      return { ok: true };
+    } },
   { metodo: 'GET', caminho: '/api/whatsapp/numero', permissao: 'canais.gerir', descricao: 'ver o número de WhatsApp',
     handler: ({ db, ctx }) => db.comoTenant(ctx.tenantId, async (c) => ({
-      numero: uma(await c.query('SELECT id, provedor, phone_number_id, waba_id, numero_exibicao, (token_cifrado IS NOT NULL) AS tem_token, atualizado_em FROM whatsapp_numeros WHERE ativo')),
+      numero: uma(await c.query('SELECT id, provedor, status, phone_number_id, waba_id, numero_exibicao, (token_cifrado IS NOT NULL) AS tem_token, atualizado_em FROM whatsapp_numeros WHERE ativo')),
       webhook: '/api/whatsapp/webhook', verificacaoConfigurada: !!process.env.WA_VERIFY_TOKEN, assinaturaConfigurada: !!process.env.META_APP_SECRET })) },
   { metodo: 'POST', caminho: '/api/whatsapp/numero', permissao: 'canais.gerir', descricao: 'conectar o número de WhatsApp',
     handler: ({ db, ctx, corpo }) => {

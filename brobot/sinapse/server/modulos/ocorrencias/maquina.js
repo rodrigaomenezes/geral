@@ -35,17 +35,17 @@ const DESFECHOS_SEM_RESOLUCAO = {
 };
 
 const TRANSICOES = {
-  classificar: { rotulo: 'Classificar', de: ['triagem'], permissao: 'ocorrencia.triar' },
-  assumir: { rotulo: 'Assumir', de: ['aberta'], permissao: 'ocorrencia.atender' },
-  devolver_fila: { rotulo: 'Devolver à fila', de: ['em_atendimento'], permissao: 'ocorrencia.atender' },
-  aguardar_cliente: { rotulo: 'Aguardar cliente', de: ['em_atendimento'], permissao: 'ocorrencia.atender' },
-  aguardar_terceiro: { rotulo: 'Aguardar terceiro', de: ['em_atendimento'], permissao: 'ocorrencia.atender' },
-  retomar: { rotulo: 'Retomar', de: ['aguardando_cliente', 'aguardando_terceiro'], permissao: 'ocorrencia.atender' },
-  solicitar_handoff: { rotulo: 'Transferir', de: ['aberta', 'em_atendimento', 'aguardando_terceiro'], permissao: 'ocorrencia.atender' },
-  aceitar_handoff: { rotulo: 'Aceitar transferência', de: ['em_handoff'], permissao: 'ocorrencia.atender' },
-  resolver: { rotulo: 'Resolver', de: ['em_atendimento'], permissao: 'ocorrencia.atender' },
-  encerrar_sem_resolucao: { rotulo: 'Encerrar sem resolução', de: ATIVOS, permissao: 'ocorrencia.atender' },
-  reabrir: { rotulo: 'Reabrir', de: FINAIS, permissao: 'ocorrencia.atender' },
+  classificar: { rotulo: 'Classificar', de: ['triagem'], para: 'aberta', permissao: 'ocorrencia.triar' },
+  assumir: { rotulo: 'Assumir', de: ['aberta'], para: 'em_atendimento', permissao: 'ocorrencia.atender' },
+  devolver_fila: { rotulo: 'Devolver à fila', de: ['em_atendimento'], para: 'aberta', permissao: 'ocorrencia.atender' },
+  aguardar_cliente: { rotulo: 'Aguardar cliente', de: ['em_atendimento'], para: 'aguardando_cliente', permissao: 'ocorrencia.atender' },
+  aguardar_terceiro: { rotulo: 'Aguardar terceiro', de: ['em_atendimento'], para: 'aguardando_terceiro', permissao: 'ocorrencia.atender' },
+  retomar: { rotulo: 'Retomar', de: ['aguardando_cliente', 'aguardando_terceiro'], para: 'em_atendimento', permissao: 'ocorrencia.atender' },
+  solicitar_handoff: { rotulo: 'Transferir', de: ['aberta', 'em_atendimento', 'aguardando_terceiro'], para: 'em_handoff', permissao: 'ocorrencia.atender' },
+  aceitar_handoff: { rotulo: 'Aceitar transferência', de: ['em_handoff'], para: 'em_atendimento', permissao: 'ocorrencia.atender' },
+  resolver: { rotulo: 'Resolver', de: ['em_atendimento'], para: 'resolvida', permissao: 'ocorrencia.atender' },
+  encerrar_sem_resolucao: { rotulo: 'Encerrar sem resolução', de: ATIVOS, para: 'encerrada_sem_resolucao', permissao: 'ocorrencia.atender' },
+  reabrir: { rotulo: 'Reabrir', de: FINAIS, para: 'aberta', permissao: 'ocorrencia.atender' },
 };
 
 const ehGestor = (u) => u && (u.papel === 'supervisor' || u.papel === 'admin');
@@ -58,10 +58,13 @@ function exigir(dados, campos) {
 }
 
 /** Ações que o usuário pode executar agora (para a tela mostrar só os botões válidos). */
+// Assumir e transferir são só da equipe dona (ou da gestão): fora dela, a tela não oferece o que o servidor recusaria.
+const SO_DA_EQUIPE = ['assumir', 'solicitar_handoff'];
 function acoesPermitidas(oc, usuario) {
+  const daEquipe = usuario.equipe_id === oc.equipe_id || ehGestor(usuario);
   return Object.entries(TRANSICOES)
-    .filter(([, t]) => t.de.includes(oc.estado) && pode(usuario, t.permissao))
-    .map(([acao, t]) => ({ acao, rotulo: t.rotulo }));
+    .filter(([acao, t]) => t.de.includes(oc.estado) && pode(usuario, t.permissao) && (daEquipe || !SO_DA_EQUIPE.includes(acao)))
+    .map(([acao, t]) => ({ acao, rotulo: t.rotulo, para: t.para }));
 }
 
 /**

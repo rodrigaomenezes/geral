@@ -1,0 +1,14 @@
+objeto_pipedrive;campo;destino_sinapse;regra_de_transformacao;duplicatas;historico;status;teste;aceite
+Organization;name;contas.nome / oportunidades.empresa;texto aparado;CNPJ normalizado (14 dígitos) quando houver; senão nome+telefone;preservar add_time;A VALIDAR (sem exportação real);—;pendente
+Organization;CNPJ (campo personalizado?);contas.cnpj;só dígitos, validar DV;chave principal;—;A VALIDAR: confirmar se existe o campo;—;pendente
+Person;name/phone/email;pontos_focais (cliente) ou contato da oportunidade;telefone E.164 com nono dígito;telefone normalizado;preservar;AUSENTE: entidade pessoa separada não existe (CRM-001);—;pendente
+Deal;title/value/currency;oportunidades.titulo/valor;moeda BRL; outras moedas a decidir;id do Pipedrive guardado como id_externo;preservar add_time/won_time/lost_time;PARCIAL;—;pendente
+Deal;stage_id/pipeline_id;oportunidades.etapa;mapa etapa→etapa por pipeline;—;histórico de etapas se a exportação trouxer;AUSENTE: múltiplos pipelines (CRM-003);—;pendente
+Deal;status (open/won/lost) + lost_reason;oportunidades.etapa ganha/perdida + motivo;won exige teste aprovado hoje (DP-04);—;preservar;PARCIAL;—;pendente
+Deal;user_id (owner);oportunidades.responsavel_id;mapa usuário Pipedrive→usuário Sinapse;—;—;A VALIDAR;—;pendente
+Deal;products;oportunidades.produtos;catálogo (CRM-009);—;—;AUSENTE catálogo;—;pendente
+Activity;type/subject/due_date/done;lembretes ou tarefas comerciais;tipo ligação/reunião/e-mail;id externo;preservar autor e data;PARCIAL (CRM-005);—;pendente
+Note;content;notas da oportunidade;texto puro (sem HTML);—;preservar autor/data;PARCIAL;—;pendente
+File;anexos;—;depende de anexos seguros (INT-009);—;—;AUSENTE;—;pendente
+Custom fields;todos;a mapear um a um;—;—;—;A VALIDAR;—;pendente
+Automations;workflows;processos (motor) com gatilhos comerciais;reescrever como processo versionado;—;—;A INVENTARIAR;—;pendente

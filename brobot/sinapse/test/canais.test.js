@@ -6,6 +6,9 @@ const crypto = require('node:crypto');
 const { cifrar, decifrar } = require('../server/nucleo/cifra');
 const { numeroParaDiscar } = require('../server/modulos/telefonia/provedores');
 const { subir } = require('./ajuda');
+const whatsappQr = require('../server/modulos/integracoes/whatsapp-qr');
+const falso = require('../server/modulos/integracoes/whatsapp-qr-falso')._teste;
+process.env.SINAPSE_WA_QR_FALSO = '1';
 
 const CHAVE = 'chave-de-teste-com-mais-de-32-caracteres!!';
 const SEGREDO = 'segredo-do-app-da-meta-para-teste';
@@ -143,4 +146,55 @@ test('WhatsApp oficial: conectar número, enviar pela Cloud API, receber mensage
   assert.deepEqual([ent.duplicatas, ent.estado], [1, 'processada']);
   const rec = await t.sql("SELECT ocorrencia_id FROM interacoes WHERE id_externo = 'wamid.recebida-1'");
   assert.equal(rec.length, 1, 'uma mensagem só, na conversa do ponto focal');
+});
+
+const esperar = async (fn, ms = 3000) => { const fim = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > fim) throw new Error('tempo esgotado'); await new Promise((r) => setTimeout(r, 40)); } };
+
+test('WhatsApp por QR Code: conectar, escanear, receber (dedup), responder, eco do celular, status e queda', async () => {
+  const marina = await t.entrarComo('Marina Costa');
+  const lucas = await t.entrarComo('Lucas Ferreira');
+  assert.equal((await lucas.post('/whatsapp/qr/conectar')).status, 403, 'só quem gere canais');
+  const c = await marina.post('/whatsapp/qr/conectar');
+  assert.equal(c.status, 200);
+  const id = c.corpo.id;
+  const qr = await esperar(async () => { const r = await marina.get('/whatsapp/qr'); return r.corpo.qr ? r.corpo : null; });
+  assert.match(qr.qr, /^data:image\/png;base64,/);
+  assert.equal(qr.estado, 'aguardando_qr');
+  const pasta = whatsappQr.pastaDa(id);
+  falso.escanear(pasta, '5511940000001');
+  await esperar(async () => (await marina.get('/whatsapp/qr')).corpo.estado === 'conectado');
+  const [n] = await t.sql('SELECT status, ativo, numero_exibicao FROM whatsapp_numeros WHERE id = $1', [id]);
+  assert.deepEqual([n.status, n.ativo, n.numero_exibicao], ['conectado', true, '+5511940000001']);
+  assert.equal((await t.sql("SELECT count(*)::int AS q FROM whatsapp_numeros WHERE ativo AND tenant_id = $1", [await t.tenant()]))[0].q, 1, 'só um número ativo');
+  // cliente escreve pelo WhatsApp: vira entrada e ocorrência; a mesma mensagem repetida não duplica
+  const sock = falso.sockDa(pasta);
+  const msg = { key: { remoteJid: '5531965432109@s.whatsapp.net', id: 'QR-IN-1', fromMe: false }, pushName: 'Karina', message: { conversation: 'Meu certificado venceu, o que faço?' } };
+  sock.ev.emit('messages.upsert', { type: 'notify', messages: [msg] });
+  sock.ev.emit('messages.upsert', { type: 'notify', messages: [msg] });
+  await esperar(async () => (await t.sql("SELECT 1 FROM entradas WHERE chave_idempotencia = 'QR-IN-1'")).length);
+  await t.avancar(0.01);
+  const [ent] = await t.sql("SELECT duplicatas, estado FROM entradas WHERE chave_idempotencia = 'QR-IN-1'");
+  assert.deepEqual([ent.duplicatas, ent.estado], [1, 'processada']);
+  const [rec] = await t.sql("SELECT ocorrencia_id FROM interacoes WHERE id_externo = 'QR-IN-1'");
+  assert.ok(rec.ocorrencia_id, 'mensagem ligada a uma ocorrência');
+  // resposta pelo sistema sai pelo celular conectado; status chega até "lida"
+  const r = await marina.post(`/ocorrencias/${rec.ocorrencia_id}/respostas`, { texto: 'Olá! Vamos renovar com você.' });
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  await t.avancar(0.01);
+  assert.equal(sock._enviadas.at(-1).conteudo.text, 'Olá! Vamos renovar com você.');
+  await esperar(async () => (await t.sql('SELECT status_entrega FROM interacoes WHERE id = $1', [r.corpo.id]))[0].status_entrega === 'lida');
+  // o eco da mensagem que o próprio sistema mandou não vira uma segunda mensagem no histórico
+  const enviada = sock._enviadas.at(-1);
+  sock.ev.emit('messages.upsert', { type: 'append', messages: [{ key: { remoteJid: enviada.jid, id: enviada.id, fromMe: true }, message: { conversation: enviada.conteudo.text } }] });
+  await new Promise((ok) => setTimeout(ok, 150));
+  assert.equal((await t.sql("SELECT count(*)::int AS q FROM interacoes WHERE texto = 'Olá! Vamos renovar com você.'"))[0].q, 1);
+  // quem respondeu direto no celular também fica no histórico da conversa (uma vez)
+  falso.ecoar(pasta, { para: '553165432109', texto: 'Mandei o passo a passo pelo celular' });
+  await esperar(async () => (await t.sql("SELECT 1 FROM interacoes WHERE texto = 'Mandei o passo a passo pelo celular' AND ocorrencia_id = $1", [rec.ocorrencia_id])).length);
+  // queda de rede: reconecta sozinho; saída no celular (401): pede QR de novo
+  falso.cair(pasta, 401);
+  await esperar(async () => (await t.sql('SELECT status FROM whatsapp_numeros WHERE id = $1', [id]))[0].status === 'erro');
+  const fim = await marina.get('/whatsapp/qr');
+  assert.match(fim.corpo.erro, /Escaneie o QR Code de novo/);
+  assert.equal((await marina.post('/whatsapp/qr/desconectar')).status, 200);
 });

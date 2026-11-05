@@ -40,12 +40,17 @@ apagado): `TESTE_DATABASE_URL=postgres://... npm test`.
 | --- | --- | --- |
 | `DATABASE_URL` | uma das duas | PostgreSQL gerenciado |
 | `SINAPSE_DATA` | uma das duas | Pasta do banco embutido (o Dockerfile já define `/data/pg`) |
-| `SINAPSE_DEMO` | não | `0` desliga login por persona, simulador e reinício (use em produção real) |
+| `SINAPSE_DEMO` | **sim, para apresentar** | `1` liga a demonstração (login por persona **sem senha**, simulador, dados fictícios, faixa amarela no topo). No Railway (`NODE_ENV=production`), **sem esta variável a demonstração fica desligada** |
+| `SINAPSE_AMBIENTE` | para dados reais | `producao` trava o ambiente: recusa `SINAPSE_DEMO=1`, exige `DATABASE_URL` e TLS verificado |
+| `SINAPSE_DB_CA` | se o banco usar certificado próprio | Certificado da autoridade (PEM) do PostgreSQL; com `sslmode` na URL o certificado é sempre verificado |
+| `SINAPSE_DB_TLS_INSEGURO` | não | `1` aceita certificado sem verificação (só fora de produção; fica registrado no log) |
 | `SINAPSE_TOKEN_ENTRADA` | não | Token (24+ caracteres) do webhook `POST /api/entrada/{organização}/{canal}`; sem ele, a rota fica desligada |
 | `SINAPSE_SENHA_ADMIN` | não | Senha (12+) do `admin@sinapse.demo`, usada só ao criar a demonstração |
 | `SINAPSE_CHAVE` | para guardar segredos | Chave (32+ caracteres) que cifra a senha dos ramais SIP e o token do WhatsApp |
 | `META_APP_SECRET` | para o WhatsApp oficial | App Secret do app da Meta: confere a assinatura do webhook |
 | `WA_VERIFY_TOKEN` | para o WhatsApp oficial | Texto que você inventa e repete no painel da Meta ao cadastrar o webhook `https://SEU-LINK/api/whatsapp/webhook` |
+
+Segurança no login: 5 senhas erradas por e-mail (ou 30 por endereço) em 15 min bloqueiam novas tentativas até a janela vencer.
 
 Monitor externo (ex.: UptimeRobot) em `/api/health/supervisor`: responde 503 se o supervisor parar.
 

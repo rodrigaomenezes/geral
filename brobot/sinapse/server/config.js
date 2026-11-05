@@ -11,8 +11,13 @@ function carregarConfig(env = process.env) {
     databaseUrl: env.DATABASE_URL || null,
     // PostgreSQL embutido: pasta dos dados (Volume /data no Railway). Vazio em teste = memória.
     dirDados: env.SINAPSE_DATA === ':memoria:' ? null : env.SINAPSE_DATA || path.join(__dirname, '..', 'data', 'pg'),
-    // Modo demonstração: login por persona, simulador e relógio ajustável. Desligue com SINAPSE_DEMO=0.
-    demo: env.SINAPSE_DEMO !== '0',
+    // Modo demonstração: login por persona SEM SENHA, simulador, relógio ajustável e dados fictícios.
+    // Fora de produção vem ligado; em produção (NODE_ENV=production) só liga com SINAPSE_DEMO=1 explícito (R-01).
+    demo: producao ? env.SINAPSE_DEMO === '1' : env.SINAPSE_DEMO !== '0',
+    // SINAPSE_AMBIENTE=producao marca o ambiente com dados reais: recusa demonstração e exige banco gerenciado.
+    ambiente: env.SINAPSE_AMBIENTE || (producao ? 'nao_informado' : 'desenvolvimento'),
+    // TLS do PostgreSQL gerenciado (R-03): certificado verificado. SINAPSE_DB_CA = certificado da autoridade (PEM).
+    dbTls: { ca: env.SINAPSE_DB_CA ? env.SINAPSE_DB_CA.replace(/\\n/g, '\n') : null, inseguro: env.SINAPSE_DB_TLS_INSEGURO === '1' },
     // Token exigido nos webhooks de entrada (cabeçalho x-sinapse-token). Sem ele, a rota fica desligada.
     tokenEntrada: env.SINAPSE_TOKEN_ENTRADA || null,
     // Senha inicial do administrador (só usada ao semear). Sem ela, só o login de demonstração funciona.
@@ -26,6 +31,12 @@ function carregarConfig(env = process.env) {
   }
   if (cfg.senhaAdmin && cfg.senhaAdmin.length < 12) {
     throw new Error('SINAPSE_SENHA_ADMIN precisa ter pelo menos 12 caracteres.');
+  }
+  if (env.SINAPSE_DEMO && !['0', '1'].includes(env.SINAPSE_DEMO)) throw new Error('SINAPSE_DEMO deve ser 0 ou 1.');
+  if (cfg.ambiente === 'producao') {
+    if (cfg.demo) throw new Error('SINAPSE_AMBIENTE=producao não aceita SINAPSE_DEMO=1: o login sem senha e os dados fictícios ficam proibidos.');
+    if (!cfg.databaseUrl) throw new Error('SINAPSE_AMBIENTE=producao exige DATABASE_URL (PostgreSQL gerenciado, com backup).');
+    if (cfg.dbTls.inseguro) throw new Error('SINAPSE_AMBIENTE=producao não aceita SINAPSE_DB_TLS_INSEGURO=1; informe SINAPSE_DB_CA.');
   }
   if (producao && !cfg.databaseUrl && !env.SINAPSE_DATA) {
     throw new Error('Em produção defina DATABASE_URL (PostgreSQL) ou SINAPSE_DATA (pasta do Volume, ex.: /data/pg).');

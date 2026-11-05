@@ -46,7 +46,7 @@ test('webhook sem o token certo é recusado', async () => {
 
 test('AT-003: responsável indisponível → ocorrência vai para o substituto', async () => {
   await t.sql("UPDATE usuarios SET disponivel = false WHERE email = 'rafael@sinapse.demo'");
-  await t.sql("UPDATE jobs SET executar_em = now() - interval '1 day' WHERE chave = 'recorrente:supervisor'");
+  await t.sql("UPDATE jobs SET executar_em = '2026-11-03T13:00:00Z'::timestamptz WHERE chave = 'recorrente:supervisor'");
   await t.processar();
   const r = await t.sql(`SELECT u.nome FROM ocorrencias o JOIN usuarios u ON u.id = o.responsavel_id
     WHERE o.titulo = 'Consulta não gerada para 3 placas novas'`);
@@ -58,8 +58,8 @@ test('AT-005: Platform fora do ar → pré-rodada fica em retentativa, sem perde
   const tid = await t.tenant();
   const [conta] = await t.sql("SELECT id FROM contas WHERE nome = 'Cargas Litoral'");
   await t.sql("UPDATE integracoes SET disponivel = false WHERE nome = 'platform' AND tenant_id = $1", [tid]);
-  const [r] = await t.sql(`INSERT INTO rodadas (tenant_id, conta_id, id_platform, produto, agendada_para) VALUES ($1,$2,'RD-AT005','Teste', now() + interval '3 days') RETURNING id`, [tid, conta.id]);
-  await t.sql(`INSERT INTO jobs (tenant_id, tipo, payload, executar_em, chave) VALUES ($1, 'rodada.pre_rodada', $2, now() - interval '1 day', 'pre:at005')`, [tid, JSON.stringify({ rodadaId: r.id })]);
+  const [r] = await t.sql(`INSERT INTO rodadas (tenant_id, conta_id, id_platform, produto, agendada_para) VALUES ($1,$2,'RD-AT005','Teste', '2026-11-07T13:00:00Z'::timestamptz) RETURNING id`, [tid, conta.id]);
+  await t.sql(`INSERT INTO jobs (tenant_id, tipo, payload, executar_em, chave) VALUES ($1, 'rodada.pre_rodada', $2, '2026-11-03T13:00:00Z'::timestamptz, 'pre:at005')`, [tid, JSON.stringify({ rodadaId: r.id })]);
   await t.processar();
   let [job] = await t.sql("SELECT estado, tentativas, ultimo_erro FROM jobs WHERE chave = 'pre:at005'");
   assert.equal(job.estado, 'pendente');
@@ -76,13 +76,13 @@ test('AT-005: Platform fora do ar → pré-rodada fica em retentativa, sem perde
 
 test('AT-006: OMIE fora do ar → o ERP não inventa status e reconcilia quando volta', async () => {
   const tid = await t.tenant();
-  await t.sql("UPDATE jobs SET executar_em = now() - interval '1 day' WHERE chave = 'recorrente:omie'");
+  await t.sql("UPDATE jobs SET executar_em = '2026-11-03T13:00:00Z'::timestamptz WHERE chave = 'recorrente:omie'");
   await t.processar();
   const antes = await t.sql("SELECT conta_id, situacao, sincronizado_em FROM status_financeiro ORDER BY conta_id");
   assert.ok(antes.length >= 4);
   await t.sql("UPDATE integracoes SET disponivel = false WHERE nome = 'omie' AND tenant_id = $1", [tid]);
   await t.sql("UPDATE demo_omie SET situacao = 'em_atraso'");
-  await t.sql("UPDATE jobs SET executar_em = now() - interval '1 day' WHERE chave = 'recorrente:omie'");
+  await t.sql("UPDATE jobs SET executar_em = '2026-11-03T13:00:00Z'::timestamptz WHERE chave = 'recorrente:omie'");
   await t.processar();
   const durante = await t.sql("SELECT conta_id, situacao, sincronizado_em FROM status_financeiro ORDER BY conta_id");
   assert.deepEqual(durante, antes, 'status guardado não muda enquanto o OMIE está fora');
@@ -166,8 +166,8 @@ test('AT-010: transferência sem aceite no prazo → fila de contingência e esc
   const [o] = await t.sql("SELECT id FROM ocorrencias WHERE titulo = 'Timeout recorrente na consulta do DETRAN-SP'");
   const [h] = await t.sql("SELECT estado FROM handoffs WHERE ocorrencia_id = $1", [o.id]);
   assert.ok(['pendente', 'expirado'].includes(h.estado));
-  await t.sql("UPDATE handoffs SET prazo_aceite_em = now() - interval '10 days' WHERE ocorrencia_id = $1 AND estado = 'pendente'", [o.id]);
-  await t.sql("UPDATE jobs SET executar_em = now() - interval '30 days' WHERE chave = 'recorrente:supervisor'");
+  await t.sql("UPDATE handoffs SET prazo_aceite_em = '2026-10-25T13:00:00Z'::timestamptz WHERE ocorrencia_id = $1 AND estado = 'pendente'", [o.id]);
+  await t.sql("UPDATE jobs SET executar_em = '2026-10-05T13:00:00Z'::timestamptz WHERE chave = 'recorrente:supervisor'");
   await t.processar();
   const [oc] = await t.sql('SELECT o.estado, e.codigo FROM ocorrencias o JOIN equipes e ON e.id = o.equipe_id WHERE o.id = $1', [o.id]);
   assert.equal(oc.codigo, 'contingencia');
@@ -203,7 +203,7 @@ test('AT-012: mensagem nova numa conversa encerrada recentemente reabre a ocorr�
 test('AT-013: supervisor parado → monitor externo recebe 503', async () => {
   const ok = await fetch(`${t.base}/api/health/supervisor`);
   assert.equal(ok.status, 200);
-  await t.sql("UPDATE sistema SET atualizado_em = now() - interval '10 minutes' WHERE chave = 'heartbeat'");
+  await t.sql("UPDATE sistema SET atualizado_em = '2026-11-04T12:50:00Z'::timestamptz WHERE chave = 'heartbeat'");
   const parado = await fetch(`${t.base}/api/health/supervisor`);
   assert.equal(parado.status, 503);
 });

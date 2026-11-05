@@ -311,3 +311,40 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .chip-var { font: inherit; font-size: .78rem; font-family: ui-monospace, Menlo, monospace; padding: .2rem .5rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--destaque-claro); color: var(--marca-escura); cursor: pointer; }
 .msg-bolha { background: #e7f8ee; border-radius: 12px 12px 12px 2px; padding: .75rem .9rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .92rem; margin-bottom: .5rem; }
 .msg-resumo { white-space: pre-line; }
+
+/* Canais: QR Code do WhatsApp e lista de ramais. */
+.alerta { background: var(--alerta-f); color: var(--alerta); padding: .55rem .75rem; border-radius: var(--raio); margin: 0 0 .5rem; }
+.alerta-perigo { background: var(--perigo-f); color: var(--perigo); }
+.qr-caixa { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin: .5rem 0; }
+.qr-caixa img { background: #fff; padding: 8px; border-radius: var(--raio); max-width: 100%; height: auto; }
+.qr-passos { margin: 0; padding-left: 1.2rem; font-size: .9rem; flex: 1 1 200px; }
+.linha-acao { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+
+/* Faixa fixa do modo demonstração (R-01): ninguém confunde com o ambiente real. */
+.faixa-demo { background: #fff4d6; color: #5c4300; border-bottom: 1px solid #e9c46a; padding: .35rem .75rem; font-size: .8rem; font-weight: 600; text-align: center; }
+@media (prefers-color-scheme: dark) { .faixa-demo { background: #3a2f10; color: #ffe39a; border-color: #6b5520; } }
+
+/* Quadro (Kanban): colunas roláveis na horizontal dentro do quadro; a página não rola para o lado (360 px). */
+.quadro { display: flex; gap: .75rem; overflow-x: auto; padding-bottom: .75rem; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.kcoluna { flex: 0 0 min(86vw, 290px); scroll-snap-align: start; background: var(--neutro-f); border: 2px solid transparent; border-radius: var(--raio); padding: .6rem; display: flex; flex-direction: column; gap: .5rem; max-height: calc(100vh - 14rem); min-height: 8rem; }
+.kcoluna-topo { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.kcoluna-topo h2 { font-size: .9rem; margin: 0; }
+.kcoluna-nota { margin: 0; font-size: .75rem; }
+.kcoluna-corpo { display: flex; flex-direction: column; gap: .5rem; overflow-y: auto; min-height: 2rem; }
+.kcoluna-mais { font-size: .82rem; text-align: center; }
+.kcoluna.pode-soltar { border-color: var(--destaque); border-style: dashed; }
+.kcoluna.sobre { background: var(--destaque-claro); }
+.kcartao { background: var(--cartao); border: 1px solid var(--borda); border-left: 4px solid var(--borda); border-radius: var(--raio); padding: .6rem .65rem; box-shadow: var(--sombra); display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
+.kcartao[draggable="true"] { cursor: grab; }
+.kcartao.movendo { opacity: .5; }
+.kcartao-titulo { font-weight: 600; color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+.kcartao-titulo:hover, .kcartao-titulo:focus { text-decoration: underline; }
+.kcartao-dono { display: flex; align-items: center; gap: .4rem; }
+.avatar { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--marca); color: #fff; font-size: .68rem; font-weight: 700; flex: none; }
+.avatar-fila { background: var(--neutro-f); color: var(--neutro); border: 1px dashed var(--neutro); }
+.cartao-tarefas { font-size: .78rem; color: var(--info); }
+.cartao-tarefas.feitas { color: var(--ok); }
+.kcartao-proxima { font-size: .78rem; color: var(--suave); }
+.kmover { align-self: flex-start; }
+.btn-bloco { width: 100%; text-align: left; }
+.quadro-resumo { margin: .25rem 0 .75rem; }

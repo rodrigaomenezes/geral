@@ -1,6 +1,8 @@
 # Rastreabilidade — requisito → código → teste
 
-Base: *Especificação de Requisitos do ERP Operacional Brobot v1.0* (04/11/2026, estado PROPOSTO). Legenda:
+Base: *Especificação de Requisitos do ERP Operacional Brobot v1.0* (04/11/2026, estado PROPOSTO). **Desde a auditoria de
+05/11, a classificação oficial e mais rigorosa (testado × sem teste × parcial × bloqueado) está em
+[`auditoria/MATRIZ_REQUISITOS.csv`](auditoria/MATRIZ_REQUISITOS.csv)**; esta página é o resumo por entrega. Legenda:
 **✔ demonstrado** (funciona e tem teste ou tela), **◐ parcial** (base pronta, falta parte), **○ fase futura**.
 Testes: `test/aceite.test.js` (AT-xxx) e `test/regras.test.js`.
 
@@ -109,3 +111,18 @@ dimensionamento e da infraestrutura definitiva.
 | Dashboards: operação, rodadas (sucesso pré/pós — melhoria 6), carteira/CS, comercial, pessoas, automação | ✔ | `modulos/painel/dashboards.js`, tela Dashboards |
 | Mensagens padrão editáveis com revisão (reunião 03/11: o Meira reescreve com as equipes) | ✔ | `comunicacao/modelos-servico.js`, tela Mensagens |
 | Template da Meta por mensagem (envio fora da janela de 24 h) | ✔ | aprovação da mensagem |
+
+## Entrega de 05/11/2026 (auditoria: F0 segurança, F1 quadro, WhatsApp QR)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Demonstração explícita em produção, faixa fixa, `SINAPSE_AMBIENTE=producao` (R-01/R-02) | ✔ testado | `config.js` · `test/seguranca.test.js` |
+| TLS do PostgreSQL com verificação de certificado (R-03) | ✔ testado | `db/index.js` `opcoesTls` · `seguranca.test.js` |
+| Limite de tentativas de login → 429 (R-04) | ✔ testado | `identidade/limitador.js` · `seguranca.test.js` |
+| HSTS em produção; `npm run verificar` no CI (R-10, R-17) | ✔ | `http/servidor.js`, `scripts/verificar.js` |
+| Testes não dependem mais do relógio real (R-14) | ✔ | `test/aceite.test.js` |
+| Quadro (Kanban) de ocorrências com responsável, tarefas x/y e próxima ação; arrastar ou "Mover para…" = transição da máquina | ✔ testado | `ocorrencias/servico.js` `quadro`, tela Quadro · `test/quadro.test.js` |
+| Tela não oferece "Assumir"/"Transferir" fora da equipe dona | ✔ testado | `maquina.acoesPermitidas` · `regras.test.js` |
+| WhatsApp por QR Code: conectar, receber (dedup), responder, eco do celular, status, queda (INT-001, INT-007, COM-005, COM-007, BL-09) | ✔ testado com simulador | `integracoes/whatsapp-qr.js`, tela Canais · `canais.test.js` |
+| Pré-rodada: ligação atendida formaliza o combinado no grupo (DP-08b) | ✔ testado | processo padrão · `processos.test.js` |
+| Processo padrão inválido deixava de ser criado em silêncio | ✔ corrigido | `processos/padroes.js` · teste de guarda |

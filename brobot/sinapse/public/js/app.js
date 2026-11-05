@@ -14,6 +14,8 @@ import { telaProcessos, editorRota } from './telas/processos.js';
 import { telaMeuDia, sinoNotificacoes } from './telas/meu-dia.js';
 import { telaComercial } from './telas/comercial.js';
 import { telaIntegracoes } from './telas/integracoes.js';
+import { telaCanais } from './telas/canais.js';
+import { telaQuadro } from './telas/quadro.js';
 import { telaDashboards } from './telas/dashboards.js';
 import { telaMensagens } from './telas/mensagens.js';
 
@@ -22,6 +24,7 @@ const MENU = [
   { rota: 'painel', rotulo: 'Painel', perm: 'ocorrencia.ver' },
   { rota: 'dashboards', rotulo: 'Dashboards', perm: 'agenda.usar' },
   { rota: 'ocorrencias', rotulo: 'Ocorrências', perm: 'ocorrencia.ver' },
+  { rota: 'quadro', rotulo: 'Quadro', perm: 'ocorrencia.ver' },
   { rota: 'triagem', rotulo: 'Triagem', perm: 'ocorrencia.triar' },
   { rota: 'tarefas', rotulo: 'Tarefas', perm: 'ocorrencia.ver' },
   { rota: 'comercial', rotulo: 'Comercial', perm: 'comercial.ver' },
@@ -30,6 +33,7 @@ const MENU = [
   { rota: 'rodadas', rotulo: 'Rodadas', perm: 'rodada.ver' },
   { rota: 'contas', rotulo: 'Carteira', perm: 'conta.ver' },
   { rota: 'integracoes', rotulo: 'Integrações', perm: 'integracao.usar' },
+  { rota: 'canais', rotulo: 'Canais', perm: 'canais.gerir' },
   { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', perm: 'auditoria.ver' },
   { rota: 'simulador', rotulo: 'Simulador', perm: 'demo.simular', demo: true },
@@ -39,6 +43,8 @@ const ROTAS = {
   'meu-dia': telaMeuDia,
   comercial: telaComercial,
   integracoes: telaIntegracoes,
+  canais: telaCanais,
+  quadro: telaQuadro,
   dashboards: telaDashboards,
   mensagens: telaMensagens,
   painel: telaPainel,
@@ -90,7 +96,8 @@ function montarCasca() {
     ctx.pode('agenda.usar') ? sinoNotificacoes() : null,
     h('button', { class: 'btn btn-fantasma', type: 'button', onclick: sair }, 'Sair'));
   const conteudo = h('main', { id: 'conteudo', tabindex: '-1' });
-  trocar(raiz, topo, h('div', { class: 'corpo' }, nav, conteudo));
+  const faixa = ctx.usuario.demo ? h('div', { class: 'faixa-demo', role: 'note' }, 'DEMONSTRAÇÃO · dados fictícios · login sem senha. Não cadastre dados reais neste ambiente.') : null;
+  trocar(raiz, faixa, topo, h('div', { class: 'corpo' }, nav, conteudo));
   nav.addEventListener('click', () => { nav.classList.remove('aberto'); botaoMenu.setAttribute('aria-expanded', 'false'); });
 }
 
