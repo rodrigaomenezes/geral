@@ -2,6 +2,7 @@ import { h, trocar, data, dataHora, cnpj, selo, campo, opcoes, aviso, modal, vaz
 import { api, textoErro } from '../api.js';
 import { formulario } from './ocorrencias.js';
 import { ligar } from '../telefone.js';
+import { secaoChecklists } from './checklist.js';
 
 const COR_FIN = { ok: 'ok', alerta: 'alerta', neutro: 'neutro' };
 const COR_CRED = { ok: 'ok', ausente: 'perigo', invalida: 'perigo', expirada: 'perigo', '2fa_pendente': 'alerta', vinculo_sne: 'alerta' };
@@ -38,6 +39,7 @@ export async function telaContas(el, ctx) {
 export async function telaConta(el, ctx, id) {
   const c = await api.get(`/contas/${id}`);
   const recarregar = () => telaConta(el, ctx, id);
+  const checklists = await secaoChecklists(ctx, { id, status: c.status }, recarregar);
   const vigentes = c.pontosFocais.filter((p) => p.vigente);
   const historico = c.pontosFocais.filter((p) => !p.vigente);
 
@@ -78,6 +80,7 @@ export async function telaConta(el, ctx, id) {
       ctx.pode('conta.editar') ? h('button', { class: 'btn', onclick: grupo }, c.grupo_whatsapp ? 'Alterar grupo do WhatsApp' : 'Cadastrar grupo do WhatsApp') : null,
       ctx.pode('conta.editar') && !ctx.pode('comercial.editar') ? h('button', { class: 'btn', onclick: encaminhar }, 'Encaminhar ao Comercial') : null,
       ctx.pode('financeiro.bloqueio') ? h('button', { class: 'btn btn-fantasma', onclick: bloqueio }, 'Pedir bloqueio por inadimplência') : null),
+    checklists,
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Cadastro'), h('dl', { class: 'dados' },
         ...par('CNPJ', cnpj(c.cnpj)), ...par('Grupo do WhatsApp', c.grupo_whatsapp ? 'cadastrado' : 'não cadastrado (mensagens "no grupo" vão ao ponto focal)'), ...par('Segmento', c.segmento || '—'), ...par('ID Platform', c.id_platform || '—'), ...par('ID OMIE', c.id_omie || '—'),

@@ -15,6 +15,7 @@ const ocorrencias = require('../ocorrencias/servico');
 const tarefas = require('../ocorrencias/tarefas');
 const identidade = require('../identidade/servico');
 const lotesCsv = require('../integracoes/csv/lotes');
+const onboarding = require('../onboarding/servico');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -63,7 +64,9 @@ async function jobVarrer(c, ctx) {
   }
   // Adendo CSV: arquivo exportado sem confirmação de aplicação no destino dentro do prazo.
   resumo.lotesSemConfirmacao = await lotesCsv.verificarLotesAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao) {
+  // ONB-003/010: item obrigatório de onboarding/offboarding vencido vira tarefa para a equipe dele.
+  resumo.checklistAtrasados = await onboarding.verificarAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };

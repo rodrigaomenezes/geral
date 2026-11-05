@@ -165,3 +165,17 @@ oportunidade fica na fila do Comercial, sem dono, e "Minhas" passa a incluir a f
 são únicas por telefone e por e-mail na organização; reaproveitar completa dado vazio e nunca sobrescreve. Previsão =
 valor × probabilidade da etapa por mês de fechamento previsto, com a fórmula na tela (probabilidades em `funil.js`).
 **Fora:** etapas configuráveis por funil; probabilidade configurável por organização; vínculo pessoa ↔ conta.
+
+# T-026 — Onboarding e offboarding por checklist (F4)
+**Contexto:** ONB-001…012 e CS-012; reunião de 03/11 (CS define o ponto focal e repassa ao Suporte).
+**Decisão:** módulo `onboarding` com modelo de checklist por organização e versionado (`checklist_modelos`, padrão em
+`onboarding/modelos.js`); o checklist aberto copia os itens (mudar o modelo não mexe no que está em andamento). Cada
+item tem grupo (ativação administrativa, técnica, sinalização financeira, relacionamento, encerramento — ONB-009),
+equipe dona, prazo e evidência. Itens com dado no sistema são conferidos sozinhos (ponto focal, produtos, grupo do
+WhatsApp, provisionamento confirmado por lote exportado, credenciais OK, primeira rodada com sucesso, código OMIE,
+ausência de pendências). Item obrigatório só sai do caminho feito com evidência ou com dispensa pedida por quem cuida e
+aprovada por OUTRA pessoa com `ocorrencia.intervir` (ONB-010; o banco confere). Concluir onboarding ativa a conta;
+concluir offboarding encerra (status `encerrada`, nada apagado). Venda de cliente novo abre o onboarding sozinha;
+item obrigatório vencido vira tarefa da equipe dele na varredura do supervisor (uma vez por item).
+**Fora:** tela para editar o modelo (há a API, para a gestão); pedido de dados ao cliente com mensagem automática
+(ONB-003 parcial); provisionamento real na Platform (ONB-004, bloqueado: CSV).
