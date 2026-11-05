@@ -1,8 +1,12 @@
 'use strict';
-const { validar } = require('../../nucleo/erros');
+const { validar, ErroNegocio } = require('../../nucleo/erros');
+const { pode } = require('../identidade/permissoes');
+const catalogo = require('./catalogo');
+const propostas = require('./propostas');
+const atividades = require('./atividades');
 const { com } = require('../../http/servidor');
 const { comAuditoriaDeAcesso } = require('../ocorrencias/rotas');
-const { ETAPAS, PRODUTOS, ORIGENS, MOTIVOS_PERDA } = require('./funil');
+const { ETAPAS, ORIGENS, MOTIVOS_PERDA } = require('./funil');
 const s = require('./servico');
 
 const CAMPOS = {
@@ -20,7 +24,19 @@ const dados = (corpo) => {
 
 module.exports = [
   { metodo: 'GET', caminho: '/api/comercial/catalogo', permissao: 'comercial.ver',
-    handler: async () => ({ etapas: ETAPAS, produtos: PRODUTOS, origens: ORIGENS, motivosPerda: MOTIVOS_PERDA }) },
+    handler: ({ db, ctx }) => db.comoTenant(ctx.tenantId, async (c) => {
+      const lista = await catalogo.listar(c, ctx);
+      return { etapas: ETAPAS, produtos: Object.fromEntries(lista.filter((x) => x.ativo).map((x) => [x.codigo, x.nome])), catalogo: lista,
+        origens: ORIGENS, motivosPerda: MOTIVOS_PERDA, tiposAtividade: atividades.TIPOS, estadosProposta: propostas.ESTADOS };
+    }) },
+  { metodo: 'POST', caminho: '/api/comercial/produtos', permissao: 'comercial.gerir', descricao: 'gerir o catálogo de produtos',
+    handler: ({ db, ctx, corpo }) => {
+      const d = validar(corpo, { codigo: { obrigatorio: true, tipo: 'texto', max: 40 }, nome: { obrigatorio: true, tipo: 'texto', min: 2, max: 80 },
+        exigeTeste: { tipo: 'booleano' }, precoReferencia: { tipo: 'texto', max: 20 }, unidade: { tipo: 'texto', min: 2, max: 30 }, ativo: { tipo: 'booleano' } });
+      if (!/^[a-z0-9_]{2,40}$/.test(d.codigo)) throw new ErroNegocio(400, 'entrada_invalida', 'Código do produto: letras minúsculas, números e _ (ex.: multas).');
+      if (d.precoReferencia !== undefined) { d.precoReferencia = Number(String(d.precoReferencia).replace(/\./g, '').replace(',', '.')); if (!(d.precoReferencia >= 0)) throw new ErroNegocio(400, 'entrada_invalida', 'Preço de referência inválido.'); }
+      return db.comoTenant(ctx.tenantId, (c) => catalogo.salvar(c, ctx, d));
+    } },
   { metodo: 'GET', caminho: '/api/comercial/oportunidades', permissao: 'comercial.ver',
     handler: ({ db, ctx, usuario, query }) => db.comoTenant(ctx.tenantId, (c) => s.listar(c, { q: query.q, minhas: query.minhas === '1', usuario })) },
   { metodo: 'GET', caminho: '/api/comercial/indicadores', permissao: 'comercial.ver',
@@ -28,7 +44,7 @@ module.exports = [
   { metodo: 'POST', caminho: '/api/comercial/oportunidades', permissao: 'comercial.editar', descricao: 'cadastrar oportunidades',
     handler: async ({ db, ctx, corpo }) => com(201, await db.comoTenant(ctx.tenantId, (c) => s.criar(c, ctx, dados(corpo)))) },
   { metodo: 'GET', caminho: '/api/comercial/oportunidades/:id', permissao: 'comercial.ver',
-    handler: ({ db, ctx, params }) => comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => s.detalhe(c, params.id)) },
+    handler: ({ db, ctx, params }) => comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => s.detalhe(c, ctx, params.id)) },
   { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id', permissao: 'comercial.editar', descricao: 'editar oportunidades',
     handler: ({ db, ctx, corpo, params }) => { const d = dados(corpo); return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => s.atualizar(c, ctx, params.id, d, d.versao)); } },
   { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id/etapa', permissao: 'comercial.editar', descricao: 'mover oportunidades',
@@ -43,4 +59,43 @@ module.exports = [
       const d = validar(corpo, { resultado: { obrigatorio: true, tipo: 'texto', em: ['aprovado', 'reprovado'] }, parecer: { obrigatorio: true, tipo: 'texto', min: 5, max: 1000 }, versao: { tipo: 'inteiro' } });
       return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => s.registrarTeste(c, ctx, params.id, d, d.versao));
     } },
+  { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id/suspender', permissao: 'comercial.editar', descricao: 'suspender oportunidades',
+    handler: ({ db, ctx, corpo, params }) => {
+      const d = validar(corpo, { motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 300 }, retomarEm: { obrigatorio: true, tipo: 'data' }, versao: { tipo: 'inteiro' } });
+      return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => s.suspender(c, ctx, params.id, d, d.versao));
+    } },
+  { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id/retomar', permissao: 'comercial.editar', descricao: 'retomar ou reabrir oportunidades',
+    handler: ({ db, ctx, corpo, params }) => {
+      const d = validar(corpo, { motivo: { tipo: 'texto', max: 500 }, versao: { tipo: 'inteiro' } });
+      return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => s.retomar(c, ctx, params.id, d, d.versao));
+    } },
+  { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id/propostas', permissao: 'comercial.editar', descricao: 'fazer propostas',
+    handler: ({ db, ctx, corpo, params }) => {
+      const d = validar(corpo, { descontoPct: { tipo: 'texto', max: 10 }, validade: { obrigatorio: true, tipo: 'texto', max: 10 }, condicoes: { tipo: 'texto', max: 2000 } });
+      if (!Array.isArray(corpo?.itens)) throw new ErroNegocio(400, 'entrada_invalida', 'Informe os itens da proposta.');
+      d.itens = corpo.itens.slice(0, 21).map((i) => ({ produto: String(i?.produto || ''), quantidade: Number(i?.quantidade), valorUnitario: Number(String(i?.valorUnitario ?? '').replace(',', '.')) }));
+      if (d.descontoPct !== undefined) d.descontoPct = Number(String(d.descontoPct).replace(',', '.'));
+      return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, async (c) => com(201, await propostas.criar(c, ctx, await s.buscar(c, params.id, true), d)));
+    } },
+  { metodo: 'POST', caminho: '/api/comercial/propostas/:id/:acao', permissao: 'comercial.editar', descricao: 'enviar e registrar propostas',
+    handler: ({ db, ctx, corpo, params, usuario }) => {
+      if (!['enviar', 'aprovar', 'devolver', 'aceitar', 'recusar'].includes(params.acao)) throw new ErroNegocio(404, 'rota_inexistente', 'Ação de proposta desconhecida.');
+      if (!/^[0-9a-f-]{36}$/i.test(params.id)) throw new ErroNegocio(400, 'entrada_invalida', 'Proposta inválida.');
+      const d = validar(corpo, { parecer: { tipo: 'texto', max: 1000 } });
+      return db.comoTenant(ctx.tenantId, (c) => propostas.agir(c, ctx, params.id, params.acao, d, (perm) => pode(usuario, perm)));
+    } },
+  { metodo: 'POST', caminho: '/api/comercial/oportunidades/:id/atividades', permissao: 'comercial.editar', descricao: 'registrar atividades',
+    handler: ({ db, ctx, corpo, params }) => {
+      const d = validar(corpo, { tipo: { obrigatorio: true, tipo: 'texto', em: Object.keys(atividades.TIPOS) }, assunto: { obrigatorio: true, tipo: 'texto', min: 2, max: 200 },
+        quando: { tipo: 'data' }, feita: { tipo: 'booleano' }, resultado: { tipo: 'texto', max: 2000 } });
+      return comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, async (c) => com(201, await atividades.registrar(c, ctx, await s.buscar(c, params.id, true), d)));
+    } },
+  { metodo: 'POST', caminho: '/api/comercial/atividades/:id/concluir', permissao: 'comercial.editar', descricao: 'concluir atividades',
+    handler: ({ db, ctx, corpo, params }) => {
+      const d = validar(corpo, { resultado: { obrigatorio: true, tipo: 'texto', min: 2, max: 2000 } });
+      if (!/^[0-9a-f-]{36}$/i.test(params.id)) throw new ErroNegocio(400, 'entrada_invalida', 'Atividade inválida.');
+      return db.comoTenant(ctx.tenantId, (c) => atividades.concluir(c, ctx, params.id, d));
+    } },
+  { metodo: 'GET', caminho: '/api/comercial/oportunidades/:id/atividades', permissao: 'comercial.ver',
+    handler: ({ db, ctx, params, query }) => comAuditoriaDeAcesso(db, ctx, 'oportunidade', params.id, (c) => atividades.listar(c, params.id, query.pagina)) },
 ];

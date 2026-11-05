@@ -11,7 +11,7 @@ const iniciais = (nome) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p)
 export async function telaQuadro(el, ctx) {
   const q = ctx.query || new URLSearchParams();
   const filtros = { equipe: q.get('equipe') || '', responsavel: q.get('responsavel') || '', vip: q.get('vip') === '1', vencidas: q.get('vencidas') === '1', q: '' };
-  const quadro = h('div', { class: 'quadro', role: 'list', 'aria-label': 'Colunas por situação' });
+  const quadro = h('div', { class: 'kquadro', role: 'list', 'aria-label': 'Colunas por situação' });
   const resumo = h('p', { class: 'suave quadro-resumo', 'aria-live': 'polite' });
   let arrastando = null; // cartão em arraste: { o, el }
 

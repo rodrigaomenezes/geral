@@ -192,19 +192,19 @@ CRM-001;organizações, pessoas e contatos com deduplicação;PARCIAL;contas, po
 CRM-002;leads, origem, qualificação e atribuição;PARCIAL;oportunidades.origem/etapa novo;comercial;captura externa ausente
 CRM-003;múltiplos pipelines configuráveis;AUSENTE;funil único fixo (comercial/funil.js);—;múltiplos pipelines
 CRM-004;oportunidades com valor, probabilidade e produtos;PARCIAL;oportunidades valor/responsável/produtos;comercial;moeda/probabilidade por etapa parciais
-CRM-005;atividades e calendário;PARCIAL;lembretes, tarefas, telefonia;"meu dia; telefonia";atividade comercial tipada ausente
+CRM-005;atividades e calendário;IMPLEMENTADO E TESTADO;atividades_comerciais (ligação, reunião, e-mail, WhatsApp, visita, nota);comercial-crm.test;
 CRM-006;próxima ação obrigatória;PARCIAL;proxima_acao_em em oportunidade;comercial;alerta/substituição por ausência não testados
-CRM-007;propostas e versões;AUSENTE;—;—;propostas versionadas
-CRM-008;alçadas de desconto;AUSENTE;—;—;alçadas
-CRM-009;catálogo de produtos;AUSENTE;produtos como texto;—;catálogo
-CRM-010;trilha de negociação;PARCIAL;notas/histórico da oportunidade;—;
-CRM-011;ganho/perdido/suspenso/reaberto;PARCIAL;ganha/perdida com motivo;comercial;suspenso/reaberto ausentes
-CRM-012;teste/piloto quando aplicável;IMPLEMENTADO E TESTADO;fase teste com período/critério;funil teste;DECISÃO PENDENTE: obrigatório para todo produto?
+CRM-007;propostas e versões;IMPLEMENTADO E TESTADO;propostas versionadas, enviada imutável (gatilho);comercial-crm.test;anexos ausentes (INT-009)
+CRM-008;alçadas de desconto;IMPLEMENTADO E TESTADO;"alçada de desconto por organização; aprovação por outra pessoa com comercial.gerir";comercial-crm.test;alçadas por faixa/cargo ainda não
+CRM-009;catálogo de produtos;IMPLEMENTADO E TESTADO;produtos_comerciais com exige_teste e preço de referência;comercial-crm.test;vínculo com módulos operacionais ainda por código
+CRM-010;trilha de negociação;IMPLEMENTADO E TESTADO;atividades + auditoria na linha do tempo;comercial-crm.test;
+CRM-011;ganho/perdido/suspenso/reaberto;IMPLEMENTADO E TESTADO;ganha/perdida/suspensa/reaberta com motivo;comercial-crm.test;
+CRM-012;teste/piloto quando aplicável;IMPLEMENTADO E TESTADO;teste por produto (exige_teste) e dispensa registrada;comercial-crm.test;
 CRM-013;handoff venda→onboarding;PARCIAL;ganha → conta em onboarding;comercial ganha;aceite formal e dados mínimos ausentes
 CRM-014;renovação e expansão;AUSENTE;—;—;
 CRM-015;previsões e relatórios;PARCIAL;dashboard comercial;dashboards;
 CRM-016;automações comerciais;PARCIAL;motor de processos genérico;processos;gatilhos comerciais limitados
 CRM-017;RBAC por carteira;PARCIAL;"permissões comercial.*; RLS";dashboards permissão;carteira por vendedor não comprovada
-CRM-018;migração do Pipedrive;BLOQUEADO POR API/DECISÃO;—;—;precisa exportação real do Pipedrive
+CRM-018;migração do Pipedrive;PARCIAL;importador pipedrive_negocios (abertos, dedup por id) com mapeamento de colunas;comercial-crm.test;ganhos/perdidos e histórico completo aguardam exportação real
 CRM-019;experiência do vendedor;PARCIAL;tela Comercial (quadro, lista);—;
 CRM-020;desligamento do Pipedrive;BLOQUEADO POR API/DECISÃO;—;—;homologação

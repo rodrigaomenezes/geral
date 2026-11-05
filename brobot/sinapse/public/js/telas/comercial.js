@@ -1,4 +1,5 @@
-// Comercial: funil de aquisição em quadro (Novo → Qualificação → Demonstração → Proposta → Teste → Negociação → Ganha).
+// Comercial: funil de aquisição em quadro (Novo → Qualificação → Demonstração → Proposta → Teste → Negociação → Ganha),
+// propostas versionadas com alçada, atividades da negociação, suspender/retomar/reabrir e catálogo de produtos.
 import { h, trocar, dataHora, data, relativo, selo, campo, opcoes, aviso, modal, vazio, cnpj } from '../dom.js';
 import { api, textoErro } from '../api.js';
 import { formulario } from './ocorrencias.js';
@@ -10,6 +11,8 @@ let CAT = null;
 const catalogo = async () => (CAT ||= await api.get('/comercial/catalogo'));
 const ABERTAS = ['novo', 'qualificacao', 'demonstracao', 'proposta', 'teste', 'negociacao'];
 const moeda = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }));
+// Centavos aparecem em proposta e preço unitário (o funil arredonda para leitura rápida).
+const moeda2 = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const hoje = (dias = 0) => new Date(Date.now() + dias * 864e5).toISOString().slice(0, 10);
 
 function camposDaEtapa(o, para) {
@@ -25,7 +28,7 @@ function camposDaEtapa(o, para) {
       campo('Início do teste', h('input', { name: 'testeInicio', type: 'date', value: o.teste_inicio?.slice(0, 10) || hoje(), required: true })),
       campo('Fim do teste (até 30 dias)', h('input', { name: 'testeFim', type: 'date', value: o.teste_fim?.slice(0, 10) || hoje(7), required: true })),
       campo('Critério de sucesso', h('textarea', { name: 'testeCriterio', rows: 2, required: true }, o.teste_criterio || ''), 'Ex.: consultar 100% da frota sem erro de credencial em 7 dias.')],
-    negociacao: [h('p', {}, 'Teste aprovado: siga para a negociação.')],
+    negociacao: [h('p', {}, o.etapa === 'proposta' ? 'Os produtos desta oportunidade não exigem teste no catálogo: siga direto para a negociação.' : 'Teste aprovado: siga para a negociação.')],
     ganha: [h('p', {}, 'Ao fechar: a conta é criada em onboarding, o CS recebe o onboarding (define o ponto focal e repassa ao Suporte) e Operações provisiona na Platform.'),
       campo('CNPJ', h('input', { name: 'cnpj', value: o.cnpj || '', required: true })), campo('Valor mensal final (R$)', h('input', { name: 'valorMensal', value: o.valor_mensal ?? '', required: true }))],
   };
@@ -88,7 +91,7 @@ export async function telaComercial(el, ctx, id) {
       k('Ganhas (90 dias)', String(porEtapa.ganha?.n || 0), moeda(porEtapa.ganha?.valor || 0)), k('Ciclo médio', ind.testes.ciclo_dias ? `${Math.round(ind.testes.ciclo_dias)} dias` : '—'),
       h('div', { class: 'kpi' }, h('span', { class: 'kpi-rotulo' }, 'Próxima ação vencida'), h('strong', { class: `kpi-valor${ind.testes.acao_vencida ? ' kpi-alerta' : ''}` }, String(ind.testes.acao_vencida))));
     const agora = new Date();
-    trocar(quadro, [...ABERTAS, 'ganha'].map((e) => {
+    trocar(quadro, [...ABERTAS, 'suspensa', 'ganha'].map((e) => {
       const cards = itens.filter((o) => o.etapa === e);
       return h('section', { class: `coluna coluna-${e}` }, h('div', { class: 'coluna-topo' }, h('strong', {}, CAT.etapas[e].rotulo), h('span', { class: 'suave' }, `${cards.length} · ${moeda(cards.reduce((s, o) => s + Number(o.valor_mensal || 0), 0))}`)),
         cards.length ? cards.map((o) => h('a', { class: `cartao-op ${o.proxima_acao_em && new Date(o.proxima_acao_em) < agora ? 'op-vencida' : ''}`, href: `#/comercial/${o.id}` },
@@ -101,7 +104,9 @@ export async function telaComercial(el, ctx, id) {
   let t; busca.oninput = () => { clearTimeout(t); t = setTimeout(carregar, 350); };
   trocar(el, h('div', { class: 'titulo-tela' }, h('h1', {}, 'Comercial'),
     ctx.pode('comercial.editar') ? h('button', { class: 'btn btn-primario', onclick: () => novaOportunidade((o) => { location.hash = `#/comercial/${o.id}`; }) }, 'Nova oportunidade') : null),
-  h('p', { class: 'suave' }, 'Funil de aquisição: Novo → Qualificação → Demonstração → Proposta → Teste → Negociação → Ganha. Sem teste aprovado não há fechamento.'),
+  h('p', { class: 'suave' }, 'Funil de aquisição: Novo → Qualificação → Demonstração → Proposta → Teste → Negociação → Ganha. Sem teste aprovado não há fechamento, salvo produtos que o catálogo dispensa.'),
+  ctx.pode('comercial.gerir') ? h('div', { class: 'acoes' }, h('button', { class: 'btn btn-fantasma', onclick: () => telaProdutos(() => { CAT = null; telaComercial(el, ctx); }) }, 'Catálogo de produtos'),
+    h('a', { class: 'btn btn-fantasma', href: '#/integracoes' }, 'Migrar do Pipedrive (CSV)')) : null,
   topo, h('div', { class: 'filtros' }, busca, h('label', { class: 'check' }, minhas, 'Só as minhas')), quadro);
   await carregar();
 }
@@ -111,14 +116,17 @@ async function detalhe(el, ctx, id) {
   const recarregar = () => detalhe(el, ctx, id);
   const aberta = ABERTAS.includes(o.etapa);
   const i = ABERTAS.indexOf(o.etapa);
-  const proxima = o.etapa === 'negociacao' ? 'ganha' : o.etapa === 'teste' ? (o.teste_resultado === 'aprovado' ? 'negociacao' : null) : ABERTAS[i + 1];
+  const proxima = o.etapa === 'negociacao' ? 'ganha' : o.etapa === 'teste' ? (o.teste_resultado === 'aprovado' ? 'negociacao' : null)
+    : o.etapa === 'proposta' && !o.exigeTeste ? 'negociacao' : ABERTAS[i + 1];
   const pode = ctx.pode('comercial.editar');
   const par = (r, v) => [h('dt', {}, r), h('dd', {}, v ?? '—')];
   trocar(el,
     h('a', { class: 'voltar', href: '#/comercial' }, '← Comercial'),
     h('div', { class: 'titulo-tela' }, h('h1', {}, `${o.codigo} · ${o.empresa}`)),
     h('div', { class: 'etapas-trilha' }, [...ABERTAS, 'ganha'].map((e, j) => h('span', { class: `etapa-passo ${e === o.etapa ? 'atual' : j < i || o.etapa === 'ganha' ? 'feito' : ''}` }, CAT.etapas[e].rotulo)),
-      o.etapa === 'perdida' ? selo(`Perdida: ${CAT.motivosPerda[o.motivo_perda]}`, 'perigo') : null),
+      o.etapa === 'perdida' ? selo(`Perdida: ${CAT.motivosPerda[o.motivo_perda]}`, 'perigo') : null,
+      o.etapa === 'suspensa' ? selo(`Suspensa (estava em ${CAT.etapas[o.suspensa_de]?.rotulo}): ${o.motivo_suspensao}`, 'alerta') : null,
+      o.fonte === 'pipedrive' ? selo('migrada do Pipedrive', 'neutro') : null, o.teste_dispensado ? selo('teste dispensado pelo catálogo', 'info') : null),
     aberta && pode ? h('div', { class: 'acoes' },
       proxima ? h('button', { class: 'btn btn-primario', onclick: () => mover(o, proxima, recarregar) }, proxima === 'ganha' ? 'Fechar venda' : `Avançar para ${CAT.etapas[proxima].rotulo}`) : null,
       o.etapa === 'teste' ? h('button', { class: `btn ${o.teste_resultado ? '' : 'btn-primario'}`, onclick: () => modal('Resultado do teste', (fechar) => formulario([
@@ -127,7 +135,9 @@ async function detalhe(el, ctx, id) {
       ], 'Registrar', async (d) => { await api.post(`/comercial/oportunidades/${id}/teste`, { ...d, versao: o.version }); fechar(); aviso('Resultado registrado.'); recarregar(); })) }, 'Registrar resultado do teste') : null,
       o.contato_telefone && ctx.pode('telefonia.usar') ? h('button', { class: 'btn', onclick: () => ligar({ oportunidadeId: id, aoEncerrar: recarregar }) }, '📞 Ligar') : null,
       h('button', { class: 'btn', onclick: () => novoLembrete(ctx, recarregar, { oportunidadeId: id }) }, '+ Lembrete'),
+      h('button', { class: 'btn btn-fantasma', onclick: () => suspender(o, recarregar) }, 'Suspender'),
       h('button', { class: 'btn btn-fantasma', onclick: () => perder(o, recarregar) }, 'Marcar perdida')) : null,
+    pode && ['suspensa', 'perdida'].includes(o.etapa) ? h('div', { class: 'acoes' }, h('button', { class: 'btn btn-primario', onclick: () => retomar(o, recarregar) }, o.etapa === 'suspensa' ? 'Retomar agora' : 'Reabrir')) : null,
     o.conta_id ? h('p', {}, 'Conta criada: ', h('a', { href: `#/contas/${o.conta_id}` }, o.conta_nome || 'abrir')) : null,
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Dados'), h('dl', { class: 'dados' },
@@ -138,5 +148,129 @@ async function detalhe(el, ctx, id) {
         ...(o.teste_inicio ? [...par('Teste', `${data(o.teste_inicio)} a ${data(o.teste_fim)} · ${o.teste_criterio}`), ...par('Resultado do teste', o.teste_resultado ? `${o.teste_resultado}: ${o.teste_parecer}` : 'pendente')] : []))),
       h('section', { class: 'cartao' }, h('h2', {}, 'Histórico'), h('ol', { class: 'tempo' }, o.historico.map((a) => h('li', {}, h('span', { class: 'tempo-data' }, dataHora(a.criado_em)),
         h('strong', {}, a.acao.replace('oportunidade.', '').replaceAll('_', ' ')), ` por ${a.ator_nome}`, a.depois?.etapa ? ` → ${CAT.etapas[a.depois.etapa]?.rotulo}` : '', a.motivo ? h('div', { class: 'suave' }, a.motivo) : null))))),
+    secaoPropostas(ctx, o, recarregar), secaoAtividades(ctx, o, recarregar),
     ctx.pode('processo.ver') ? await secaoAutomacoes(ctx, { oportunidade: id }) : null);
+}
+
+function suspender(o, aoMudar) {
+  modal('Suspender a oportunidade', (fechar) => formulario([
+    h('p', { class: 'suave' }, 'Sai do funil ativo, mas volta para o seu Meu dia na data marcada.'),
+    campo('Motivo', h('input', { name: 'motivo', required: true, minlength: 5, maxlength: 300, placeholder: 'ex.: orçamento só em janeiro' })),
+    campo('Retomar em', h('input', { name: 'retomarEm', type: 'datetime-local', required: true })),
+  ], 'Suspender', async (d) => { await api.post(`/comercial/oportunidades/${o.id}/suspender`, { ...d, versao: o.version }); fechar(); aviso('Oportunidade suspensa.'); aoMudar(); }));
+}
+
+function retomar(o, aoMudar) {
+  if (o.etapa === 'suspensa') { api.post(`/comercial/oportunidades/${o.id}/retomar`, { versao: o.version }).then(() => { aviso('Retomada.'); aoMudar(); }, (e) => aviso(textoErro(e), 'erro')); return; }
+  modal('Reabrir a oportunidade', (fechar) => formulario([
+    campo('Por que reabrir', h('textarea', { name: 'motivo', rows: 2, required: true, minlength: 5, maxlength: 500 })),
+  ], 'Reabrir', async (d) => { await api.post(`/comercial/oportunidades/${o.id}/retomar`, { ...d, versao: o.version }); fechar(); aviso('Reaberta na qualificação.'); aoMudar(); }));
+}
+
+const COR_PROPOSTA = { rascunho: 'neutro', aguardando_aprovacao: 'alerta', aprovada: 'info', enviada: 'info', aceita: 'ok', recusada: 'perigo', substituida: 'neutro' };
+
+function novaProposta(o, aoCriar) {
+  const ativos = CAT.catalogo.filter((p) => p.ativo);
+  const linhas = h('div', { class: 'proposta-itens' });
+  const total = h('p', { class: 'proposta-total', 'aria-live': 'polite' });
+  const desconto = h('input', { name: 'descontoPct', inputmode: 'decimal', value: '0', 'aria-label': 'Desconto (%)' });
+  const num = (v) => Number(String(v || '').replace(',', '.')) || 0;
+  const recalcular = () => {
+    const cheio = [...linhas.children].reduce((s, l) => s + num(l.querySelector('[data-q]').value) * num(l.querySelector('[data-v]').value), 0);
+    trocar(total, `Total cheio ${moeda2(cheio)} · com desconto ${moeda2(cheio * (1 - num(desconto.value) / 100))} por mês`);
+  };
+  const linha = (produto = (o.produtos || [])[0] || ativos[0]?.codigo) => {
+    const ref = (c) => CAT.catalogo.find((p) => p.codigo === c)?.preco_referencia;
+    const sel = opcoes(h('select', { 'aria-label': 'Produto' }), Object.fromEntries(ativos.map((p) => [p.codigo, p.nome])));
+    sel.value = produto;
+    const q = h('input', { type: 'number', min: 1, value: o.frota || 1, 'aria-label': 'Quantidade', dataset: { q: '1' } });
+    const v = h('input', { inputmode: 'decimal', value: ref(produto) ?? '', placeholder: 'R$ por unidade', 'aria-label': 'Valor unitário', dataset: { v: '1' } });
+    sel.onchange = () => { if (ref(sel.value) !== null && ref(sel.value) !== undefined) v.value = ref(sel.value); recalcular(); };
+    q.oninput = recalcular; v.oninput = recalcular;
+    const el = h('div', { class: 'proposta-item' }, sel, q, v, h('button', { class: 'btn-icone', type: 'button', 'aria-label': 'Remover item', onclick: () => { el.remove(); recalcular(); } }, '×'));
+    linhas.append(el); recalcular();
+  };
+  desconto.oninput = recalcular;
+  linha();
+  modal('Nova proposta', (fechar) => formulario([
+    h('p', { class: 'suave' }, 'Itens por produto (quantidade × valor por unidade). Desconto acima da alçada vai para aprovação da gestão antes de seguir ao cliente.'),
+    linhas, h('button', { class: 'btn btn-pequeno', type: 'button', onclick: () => linha() }, '+ Item'),
+    campo('Desconto (%)', desconto), total,
+    campo('Validade', h('input', { name: 'validade', type: 'date', required: true, value: hoje(15) })),
+    campo('Condições (opcional)', h('textarea', { name: 'condicoes', rows: 2, maxlength: 2000 })),
+  ], 'Criar proposta', async (d) => {
+    const itens = [...linhas.children].map((l) => ({ produto: l.querySelector('select').value, quantidade: num(l.querySelector('[data-q]').value), valorUnitario: l.querySelector('[data-v]').value }));
+    await api.post(`/comercial/oportunidades/${o.id}/propostas`, { ...d, descontoPct: desconto.value, itens }); fechar(); aviso('Proposta criada. Revise e envie.'); aoCriar();
+  }));
+}
+
+function secaoPropostas(ctx, o, recarregar) {
+  const pode = ctx.pode('comercial.editar');
+  const acao = (p, a, rotulo, cls = '', pedirParecer = false) => h('button', { class: `btn btn-pequeno ${cls}`, type: 'button', onclick: () => {
+    const enviar = async (corpo = {}) => { await api.post(`/comercial/propostas/${p.id}/${a}`, corpo); aviso(`${rotulo}: feito.`); recarregar(); };
+    if (!pedirParecer) { enviar().catch((e) => aviso(textoErro(e), 'erro')); return; }
+    modal(rotulo, (fechar) => formulario([campo('Parecer', h('textarea', { name: 'parecer', rows: 2, minlength: a === 'devolver' ? 5 : 0, required: a === 'devolver' }))],
+      rotulo, async (x) => { await enviar(x); fechar(); }));
+  } }, rotulo);
+  const botoes = (p) => {
+    if (!pode) return null;
+    const b = [];
+    if (['rascunho', 'aprovada'].includes(p.estado)) b.push(acao(p, 'enviar', p.estado === 'rascunho' && p.exige_aprovacao ? 'Pedir aprovação' : 'Marcar como enviada', 'btn-primario'));
+    if (p.estado === 'aguardando_aprovacao' && ctx.pode('comercial.gerir') && p.criado_por !== ctx.usuario.id) b.push(acao(p, 'aprovar', 'Aprovar desconto', 'btn-primario', true), acao(p, 'devolver', 'Devolver', 'btn-fantasma', true));
+    if (p.estado === 'enviada') b.push(acao(p, 'aceitar', 'Cliente aceitou', 'btn-primario', true), acao(p, 'recusar', 'Cliente recusou', 'btn-fantasma', true));
+    return b.length ? h('div', { class: 'acoes' }, b) : null;
+  };
+  return h('section', { class: 'cartao' }, h('div', { class: 'titulo-tela' }, h('h2', {}, 'Propostas'),
+    pode && ['demonstracao', 'proposta', 'teste', 'negociacao'].includes(o.etapa) ? h('button', { class: 'btn btn-pequeno', onclick: () => novaProposta(o, recarregar) }, 'Nova proposta') : null),
+  o.propostas.length ? h('ul', { class: 'itens' }, o.propostas.map((p) => h('li', {},
+    h('div', { class: 'linha-topo' }, h('strong', {}, `v${p.versao}`), selo(CAT.estadosProposta[p.estado], COR_PROPOSTA[p.estado]),
+      h('span', {}, `${moeda2(p.valor_mensal)}/mês`), Number(p.desconto_pct) ? h('span', { class: 'suave' }, `(${Number(p.desconto_pct)}% de ${moeda2(p.valor_cheio)})`) : null,
+      h('span', { class: 'suave' }, `válida até ${data(p.validade)}`), p.exige_aprovacao ? selo(p.aprovador ? `aprovada por ${p.aprovador}` : 'acima da alçada', p.aprovador ? 'ok' : 'alerta') : null),
+    h('div', { class: 'suave' }, p.itens.map((i) => `${CAT.produtos[i.produto] || i.produto}: ${i.quantidade} × ${moeda2(i.valorUnitario)}`).join(' · '), p.condicoes ? ` · ${p.condicoes}` : ''),
+    p.parecer ? h('div', { class: 'suave' }, `Parecer: ${p.parecer}`) : null, botoes(p)))) : vazio('Nenhuma proposta ainda.'));
+}
+
+function secaoAtividades(ctx, o, recarregar) {
+  const pode = ctx.pode('comercial.editar');
+  const nova = () => modal('Registrar atividade', (fechar) => {
+    const feita = h('input', { type: 'checkbox', name: 'feita' });
+    const f = formulario([
+      campo('Tipo', opcoes(h('select', { name: 'tipo', required: true }), CAT.tiposAtividade)),
+      campo('Assunto', h('input', { name: 'assunto', required: true, minlength: 2, maxlength: 200 })),
+      campo('Quando', h('input', { name: 'quando', type: 'datetime-local' }), 'Agendada no futuro vira a próxima ação da oportunidade.'),
+      h('label', { class: 'check' }, feita, ' Já aconteceu'),
+      campo('Resultado (o que foi combinado)', h('textarea', { name: 'resultado', rows: 2, maxlength: 2000 })),
+    ], 'Registrar', async (d) => { await api.post(`/comercial/oportunidades/${o.id}/atividades`, { ...d, feita: feita.checked }); fechar(); aviso('Atividade registrada.'); recarregar(); });
+    return f;
+  });
+  const concluir = (a) => modal(`Concluir: ${a.assunto}`, (fechar) => formulario([campo('Resultado', h('textarea', { name: 'resultado', rows: 3, required: true, minlength: 2 }))],
+    'Concluir', async (x) => { await api.post(`/comercial/atividades/${a.id}/concluir`, x); fechar(); aviso('Atividade concluída.'); recarregar(); }));
+  const lista = o.atividades.itens;
+  return h('section', { class: 'cartao' }, h('div', { class: 'titulo-tela' }, h('h2', {}, 'Atividades'), pode ? h('button', { class: 'btn btn-pequeno', onclick: nova }, 'Registrar atividade') : null),
+    lista.length ? h('ul', { class: 'itens' }, lista.map((a) => h('li', { class: 'linha-acao' },
+      h('span', {}, selo(CAT.tiposAtividade[a.tipo], a.feita ? 'neutro' : 'info'), ' ', h('strong', {}, a.assunto), ` · ${dataHora(a.quando)}${a.autor ? ` · ${a.autor}` : ''}`,
+        a.resultado ? h('div', { class: 'suave' }, a.resultado) : null),
+      !a.feita && pode ? h('button', { class: 'btn btn-pequeno', type: 'button', onclick: () => concluir(a) }, 'Concluir') : null))) : vazio('Nenhuma atividade registrada.'),
+    o.atividades.total > lista.length ? h('p', { class: 'suave' }, `Mostrando ${lista.length} de ${o.atividades.total}.`) : null);
+}
+
+function telaProdutos(aoMudar) {
+  const editar = (p = {}) => modal(p.codigo ? `Produto: ${p.nome}` : 'Novo produto', (fechar) => {
+    const exige = h('input', { type: 'checkbox', checked: p.exige_teste !== false });
+    const ativo = h('input', { type: 'checkbox', checked: p.ativo !== false });
+    return formulario([
+      campo('Código', h('input', { name: 'codigo', required: true, value: p.codigo || '', readonly: !!p.codigo, pattern: '[a-z0-9_]{2,40}', placeholder: 'ex.: multas' })),
+      campo('Nome', h('input', { name: 'nome', required: true, value: p.nome || '', maxlength: 80 })),
+      campo('Preço de referência por unidade (R$)', h('input', { name: 'precoReferencia', inputmode: 'decimal', value: p.preco_referencia ?? '' })),
+      campo('Unidade', h('input', { name: 'unidade', value: p.unidade || 'veículo', maxlength: 30 })),
+      h('label', { class: 'check' }, exige, ' Exige teste aprovado antes do fechamento'),
+      h('label', { class: 'check' }, ativo, ' Ativo (aparece em novas oportunidades e propostas)'),
+    ], 'Salvar', async (d) => { await api.post('/comercial/produtos', { ...d, exigeTeste: exige.checked, ativo: ativo.checked }); fechar(); aviso('Produto salvo.'); aoMudar(); });
+  });
+  modal('Catálogo de produtos', () => h('div', {},
+    h('ul', { class: 'itens' }, CAT.catalogo.map((p) => h('li', { class: 'linha-acao' },
+      h('span', {}, h('strong', {}, p.nome), ' ', p.exige_teste ? selo('exige teste', 'info') : selo('sem teste', 'neutro'), p.ativo ? null : selo('inativo', 'neutro'),
+        p.preco_referencia ? h('span', { class: 'suave' }, ` · ${moeda2(p.preco_referencia)}/${p.unidade}`) : null),
+      h('button', { class: 'btn btn-pequeno', type: 'button', onclick: () => editar(p) }, 'Editar')))),
+    h('div', { class: 'form-acoes' }, h('button', { class: 'btn btn-primario', type: 'button', onclick: () => editar() }, 'Novo produto'))));
 }

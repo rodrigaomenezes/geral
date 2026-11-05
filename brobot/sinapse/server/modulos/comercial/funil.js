@@ -1,6 +1,8 @@
 'use strict';
-// Funil padrão de aquisição da Brobot (regra pura): o fechamento só acontece depois de um TESTE aprovado.
+// Funil padrão de aquisição da Brobot (regra pura): o fechamento só acontece depois de um TESTE aprovado — salvo
+// quando nenhum produto da oportunidade exige teste no catálogo (DP-04, decidido por produto).
 //   novo → qualificação → demonstração → proposta → teste → negociação → ganha  (perdida a qualquer momento)
+//   suspensa: sai do funil ativo com data para retomar; reabrir devolve perdida/suspensa à qualificação.
 // Cada etapa diz o que precisa estar preenchido para entrar nela; o banco confere as regras críticas de novo.
 
 const { erro } = require('../../nucleo/erros');
@@ -13,7 +15,8 @@ const ETAPAS = {
   teste: { rotulo: 'Teste', ordem: 5, exige: ['cnpj', 'teste_inicio', 'teste_fim', 'teste_criterio'] },
   negociacao: { rotulo: 'Negociação', ordem: 6, exige: ['teste_resultado_aprovado'] },
   ganha: { rotulo: 'Ganha', ordem: 7, exige: ['cnpj', 'contato_nome', 'contato_contato', 'produtos', 'valor_mensal', 'teste_resultado_aprovado'] },
-  perdida: { rotulo: 'Perdida', ordem: 8, exige: ['motivo_perda'] },
+  suspensa: { rotulo: 'Suspensa', ordem: 8, exige: [] },
+  perdida: { rotulo: 'Perdida', ordem: 9, exige: ['motivo_perda'] },
 };
 const ABERTAS = ['novo', 'qualificacao', 'demonstracao', 'proposta', 'teste', 'negociacao'];
 
@@ -31,21 +34,22 @@ const NOMES_CAMPOS = {
 
 function faltando(o, etapa) {
   return ETAPAS[etapa].exige.filter((campo) => {
-    if (campo === 'teste_resultado_aprovado') return o.teste_resultado !== 'aprovado';
+    if (campo === 'teste_resultado_aprovado') return o.teste_resultado !== 'aprovado' && !o.teste_dispensado;
     if (campo === 'contato_contato') return !o.contato_telefone && !o.contato_email;
     if (campo === 'produtos') return !o.produtos || !o.produtos.length;
     return o[campo] === null || o[campo] === undefined || o[campo] === '';
   });
 }
 
-/** Valida a mudança de etapa sobre a oportunidade já com os dados novos aplicados. */
+/** Valida a mudança de etapa sobre a oportunidade já com os dados novos aplicados.
+ *  `proposta.teste_dispensado` = nenhum produto exige teste (o serviço calcula pelo catálogo). */
 function validarMudanca(atual, proposta, para) {
-  if (!ETAPAS[para]) throw erro.entrada(`Etapa desconhecida: ${para}.`);
+  if (!ETAPAS[para] || para === 'suspensa') throw erro.entrada(`Etapa desconhecida: ${para}.`);
   if (!ABERTAS.includes(atual.etapa)) throw erro.conflito('Esta oportunidade já foi encerrada (ganha ou perdida).');
   if (para === 'ganha' && atual.etapa !== 'negociacao') {
     throw erro.regra('fechamento_sem_negociacao', 'Só se fecha a partir da Negociação, depois do teste aprovado.');
   }
-  if (para === 'negociacao' && !['teste', 'negociacao'].includes(atual.etapa)) {
+  if (para === 'negociacao' && !['teste', 'negociacao'].includes(atual.etapa) && !(proposta.teste_dispensado && atual.etapa === 'proposta')) {
     throw erro.regra('negociacao_sem_teste', 'Antes da negociação o cliente precisa passar pela fase de Teste.');
   }
   const falta = faltando(proposta, para);

@@ -324,8 +324,8 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .faixa-demo { background: #fff4d6; color: #5c4300; border-bottom: 1px solid #e9c46a; padding: .35rem .75rem; font-size: .8rem; font-weight: 600; text-align: center; }
 @media (prefers-color-scheme: dark) { .faixa-demo { background: #3a2f10; color: #ffe39a; border-color: #6b5520; } }
 
-/* Quadro (Kanban): colunas roláveis na horizontal dentro do quadro; a página não rola para o lado (360 px). */
-.quadro { display: flex; gap: .75rem; overflow-x: auto; padding-bottom: .75rem; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+/* Quadro (Kanban) de ocorrências — classe própria (.kquadro) para não mexer no funil comercial (.quadro). Colunas roláveis na horizontal dentro do quadro; a página não rola para o lado (360 px). */
+.kquadro { display: flex; gap: .75rem; overflow-x: auto; padding-bottom: .75rem; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
 .kcoluna { flex: 0 0 min(86vw, 290px); scroll-snap-align: start; background: var(--neutro-f); border: 2px solid transparent; border-radius: var(--raio); padding: .6rem; display: flex; flex-direction: column; gap: .5rem; max-height: calc(100vh - 14rem); min-height: 8rem; }
 .kcoluna-topo { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
 .kcoluna-topo h2 { font-size: .9rem; margin: 0; }
@@ -353,3 +353,10 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .mapa-linhas { display: grid; grid-template-columns: 1fr; gap: 0 1rem; }
 @media (min-width: 700px) { .mapa-linhas { grid-template-columns: 1fr 1fr; } }
 .integra-frescor { font-size: .8rem; margin: .3rem 0; }
+
+/* Comercial: itens da proposta. */
+.proposta-itens { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .4rem; }
+.proposta-item { display: grid; grid-template-columns: 1fr 5rem 6.5rem auto; gap: .35rem; align-items: center; }
+.proposta-item select, .proposta-item input { min-width: 0; }
+@media (max-width: 420px) { .proposta-item { grid-template-columns: 1fr 1fr auto; } .proposta-item select { grid-column: 1 / -1; } }
+.proposta-total { font-weight: 600; margin: .3rem 0 .6rem; }

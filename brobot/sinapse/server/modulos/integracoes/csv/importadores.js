@@ -166,6 +166,32 @@ const TIPOS = {
       return { resumo: [`Situação financeira de ${n} cliente(s) atualizada`, `${vinculados} código(s) OMIE vinculado(s)`], erros };
     },
   },
+  pipedrive_negocios: {
+    nome: 'Pipedrive → negócios em aberto (migração do Comercial; ganhos e perdidos ficam para a migração completa)',
+    origem: 'pipedrive',
+    // Só a gestão comercial migra a carteira de negócios (além de usar as integrações).
+    permissao: 'comercial.gerir',
+    colunas: ['id', 'organizacao', 'status', 'titulo', 'cnpj', 'valor', 'etapa', 'responsavel_email', 'contato', 'telefone', 'email', 'criado_em', 'observacoes'],
+    opcionais: ['titulo', 'cnpj', 'valor', 'etapa', 'responsavel_email', 'contato', 'telefone', 'email', 'criado_em', 'observacoes'],
+    exemplo: 'id;organizacao;status;titulo;cnpj;valor;etapa;responsavel_email;contato;telefone;email;criado_em;observacoes\n'
+      + '1234;Transportes Exemplo;open;Frota 200 placas;11222333000144;4500,00;Proposta enviada;comercial@brobot.com.br;Ana;11 98888-7777;ana@exemplo.com.br;15/10/2026;Pediu desconto',
+    validar(v) {
+      const e = [];
+      if (!/^[\w.-]{1,40}$/.test(v.id || '')) e.push('id do negócio no Pipedrive vazio ou inválido');
+      if (!v.organizacao || v.organizacao.length < 2) e.push('organização vazia');
+      if (!['open', 'aberto', 'em_aberto', 'won', 'ganho', 'lost', 'perdido'].includes(chave(v.status))) e.push('status deve ser open, won ou lost');
+      else if (!['open', 'aberto', 'em_aberto'].includes(chave(v.status))) e.push('negócio ganho ou perdido: o histórico fechado entra na migração completa (aguarda a exportação real)');
+      if (v.cnpj && !csv.cnpj(v.cnpj)) e.push('CNPJ inválido');
+      if (v.valor && !(Number(String(v.valor).replace(/\./g, '').replace(',', '.')) >= 0)) e.push('valor inválido');
+      if (v.criado_em && !csv.data(v.criado_em)) e.push('criado_em inválido (use dd/mm/aaaa)');
+      return e;
+    },
+    async aplicar(c, ctx, linhas, { comercial }) {
+      return comercial.importarDoPipedrive(c, ctx, linhas.map((l) => ({ ...l.valores, numero: l.numero,
+        valor: l.valores.valor ? Number(String(l.valores.valor).replace(/\./g, '').replace(',', '.')) : undefined, // 4.500,00 → 4500 cnpj: csv.cnpj(l.valores.cnpj) || undefined,
+        criado_em: l.valores.criado_em ? csv.data(l.valores.criado_em) : undefined })));
+    },
+  },
 };
 
 module.exports = { TIPOS, DIA };

@@ -13,7 +13,7 @@ async function enviarCsv(caminho, arquivo, mapa) {
   return d;
 }
 
-const ORIGEM = { platform: 'Platform', omie: 'OMIE' };
+const ORIGEM = { platform: 'Platform', omie: 'OMIE', pipedrive: 'Pipedrive' };
 const LOTE = { aguardando_confirmacao: ['aguardando confirmação', 'alerta'], confirmado: ['aplicado no destino', 'ok'], falhou: ['falhou no destino', 'perigo'] };
 
 export async function telaIntegracoes(el, ctx) {
@@ -21,6 +21,7 @@ export async function telaIntegracoes(el, ctx) {
   const recarregar = () => telaIntegracoes(el, ctx);
 
   const cartaoImport = (tipo, def) => {
+    if (def.permissao && !ctx.pode(def.permissao)) return null; // ex.: migração do Pipedrive só pela gestão comercial
     const saida = h('div', { 'aria-live': 'polite' });
     const entrada = h('input', { type: 'file', accept: '.csv,text/csv', 'aria-label': `Arquivo para ${def.nome}` });
     let mapaEscolhido = null;
