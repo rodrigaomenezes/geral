@@ -15,6 +15,7 @@ const PUBLICO = path.join(__dirname, '..', '..', 'public');
 const COOKIE = 'sinapse_sessao';
 const LIMITE_CORPO = 1024 * 1024;
 const LIMITE_ARQUIVO = 5 * 1024 * 1024; // CSV de integração: upload próprio, não JSON
+const LIMITE_ANEXO = 10 * 1024 * 1024; // INT-009: anexo de ocorrência (binário, rota própria)
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon',
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
@@ -43,20 +44,30 @@ function lerCookie(req, nome) {
   return null;
 }
 
-function lerCorpo(req, { texto = false } = {}) {
-  const limite = texto ? LIMITE_ARQUIVO : LIMITE_CORPO;
+function lerCorpo(req, { texto = false, binario = false } = {}) {
+  const limite = binario ? LIMITE_ANEXO : texto ? LIMITE_ARQUIVO : LIMITE_CORPO;
   return new Promise((resolve, reject) => {
     let tamanho = 0;
+    let excedeu = false;
     const partes = [];
     req.on('data', (ch) => {
       tamanho += ch.length;
+      if (excedeu) {
+        // Descarta o resto sem guardar, para a resposta 413 chegar ao navegador; corta se passar muito do limite.
+        if (tamanho > limite * 4) req.destroy();
+        return;
+      }
       if (tamanho > limite) {
-        reject(new ErroNegocio(413, 'corpo_grande', texto ? 'Arquivo acima de 5 MB. Divida em partes menores.' : 'Conteúdo acima de 1 MB. Envie arquivos pelo upload próprio.'));
-        req.destroy(); return;
+        excedeu = true; partes.length = 0;
+        reject(new ErroNegocio(413, 'corpo_grande', binario ? 'Anexo acima de 10 MB. Reduza o arquivo (PDF comprimido, foto menor) e envie de novo.'
+          : texto ? 'Arquivo acima de 5 MB. Divida em partes menores.' : 'Conteúdo acima de 1 MB. Envie arquivos pelo upload próprio.'));
+        return;
       }
       partes.push(ch);
     });
     req.on('end', () => {
+      if (excedeu) return;
+      if (binario) return resolve(Buffer.concat(partes));
       if (texto) return resolve(Buffer.concat(partes).toString('utf8'));
       if (!partes.length) return resolve({});
       try { resolve(JSON.parse(Buffer.concat(partes).toString('utf8'))); } catch { reject(erro.entrada('O corpo da requisição não é um JSON válido.')); }
@@ -118,7 +129,7 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
         const origem = req.headers.origin;
         if (origem && new URL(origem).host !== req.headers.host) throw new ErroNegocio(403, 'origem_invalida', 'Requisição de outra origem recusada.');
         const tipo = req.headers['content-type'] || '';
-        if (rota.texto ? !/text\/(csv|plain)/.test(tipo) : !rota.publica && !/application\/json/.test(tipo)) {
+        if (rota.binario ? !/application\/octet-stream/.test(tipo) : rota.texto ? !/text\/(csv|plain)/.test(tipo) : !rota.publica && !/application\/json/.test(tipo)) {
           throw new ErroNegocio(415, 'tipo_invalido', rota.texto ? 'Envie o arquivo como CSV (Content-Type: text/csv).' : 'Envie os dados como JSON (Content-Type: application/json).');
         }
       }
@@ -138,7 +149,7 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
         if (rota.permissao && !pode(usuario, rota.permissao)) throw erro.semPermissao(rota.descricao || 'esta ação');
         if (rota.demo && !cfg.demo) throw new ErroNegocio(404, 'rota_inexistente', 'O simulador está desligado neste ambiente.');
       }
-      let corpo = req.method === 'GET' ? {} : await lerCorpo(req, { texto: !!(rota.texto || rota.cru) });
+      let corpo = req.method === 'GET' ? {} : await lerCorpo(req, { texto: !!(rota.texto || rota.cru), binario: !!rota.binario });
       let bruto = null;
       if (rota.cru && req.method !== 'GET') { bruto = corpo; try { corpo = JSON.parse(bruto || '{}'); } catch { throw erro.entrada('JSON inválido.'); } }
       const ctx = usuario ? { tenantId: usuario.tenant_id, usuario, correlacao } : { correlacao };
@@ -150,7 +161,7 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
     } catch (e) {
       const t = traduzir(e);
       if (t) {
-        responder(res, t.status, { error: { code: t.code, message: t.message, details: t.details } });
+        responder(res, t.status, { error: { code: t.code, message: t.message, details: t.details } }, t.status === 413 ? { Connection: 'close' } : {});
         registrar(t.status);
       } else {
         log(JSON.stringify({ t: new Date().toISOString(), nivel: 'erro', rota: url.pathname, correlacao, erro: String(e && e.message).slice(0, 300) }));
