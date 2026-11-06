@@ -20,6 +20,7 @@ const TODAS = {
   'agenda.usar': 'usar o Meu dia e os lembretes',
   'comercial.ver': 'ver o funil comercial',
   'comercial.editar': 'cadastrar e mover oportunidades',
+  'dev.gerir': 'registrar incidentes, melhorias e releases',
   'treinamento.gerir': 'organizar treinamentos de clientes (sessões, convites, presença)',
   'comercial.gerir': 'gerir o catálogo de produtos e aprovar descontos acima da alçada',
   'integracao.usar': 'importar e exportar arquivos da Platform e do OMIE',
@@ -40,7 +41,7 @@ const PAPEIS = {
   cs: [...OPERACIONAL, 'conta.editar', 'rodada.operar', 'comercial.ver', 'treinamento.gerir'],
   operacoes: [...OPERACIONAL, 'rodada.operar', 'conta.editar', 'integracao.usar'],
   comercial: ['comercial.ver', 'comercial.editar', 'conta.ver', 'agenda.usar', 'processo.ver', 'ocorrencia.ver', 'telefonia.usar'],
-  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar', 'telefonia.usar'],
+  dev: ['ocorrencia.ver', 'ocorrencia.atender', 'conta.ver', 'rodada.ver', 'processo.ver', 'agenda.usar', 'telefonia.usar', 'dev.gerir'],
   financeiro: ['ocorrencia.ver', 'conta.ver', 'financeiro.detalhe', 'financeiro.bloqueio', 'agenda.usar', 'integracao.usar', 'comercial.ver'],
 };
 
