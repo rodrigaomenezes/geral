@@ -192,3 +192,16 @@ resto segue a equipe da conta (VIP → CS). Credencial com status OK vencendo em
 `tenants.config.credenciais.avisoDias`) e reincidência são conferidas na varredura do supervisor.
 **Fora:** fechar o alerta sozinho quando a consulta normaliza (exige evidência: fica para a equipe), limites por
 organização, aviso automático ao ponto focal (a ocorrência traz a próxima ação; o envio segue pelos processos).
+
+# T-028 — Treinamentos coletivos do CS (F6)
+**Contexto:** CS-004…009 e a reunião de 03/11 (treinamento coletivo por link, conta de demonstração, documento por
+tela). A foto "Treinamentos CS" não chegou; a fatia segue a especificação.
+**Decisão:** módulo `treinamentos`. Roteiro versionado por código (`treinamento_roteiros`, um ativo; a sessão aponta
+para a versão usada) com passos por tela, imprimível como documento. Sessão com link `https://` e conta de
+demonstração (o CNPJ de um cliente é recusado: todos veem a tela). Convite pelo modelo editável
+`convite_treinamento`, ao ponto focal, pelo canal permitido (consentimento e opt-out da comunicação). No convite o
+uso da Platform (`uso_contas`) é fotografado; a efetividade compara com o uso de hoje, presentes × ausentes (CS-009).
+Presença e avaliação só depois do início; concluir exige toda presença marcada; quem faltou vira tarefa do CS para
+reagendar. Conta ativa sem acesso há 30 dias ou sem consulta no mês vira alerta para o CS (uma vez, `alerta_chave`),
+salvo se já estiver numa sessão agendada (CS-004). Permissão nova `treinamento.gerir` (CS e gestão).
+**Fora:** inscrição pelo próprio cliente (link de inscrição), lista de presença automática pela ferramenta de chamada.

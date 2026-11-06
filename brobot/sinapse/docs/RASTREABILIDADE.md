@@ -180,3 +180,14 @@ dimensionamento e da infraestrutura definitiva.
 | Uma ocorrência ativa por alerta (REC-003) | ✔ testado | `ocorrencias.alerta_chave` (índice único) · `monitoramento.test.js` |
 | Credencial vencendo em até 15 dias (CRE-004) e reincidência na 3ª vez (POS-009) | ✔ testado | supervisor · `monitoramento.test.js` |
 | Tela Consultas: esperado × gerado, erros por tipo, alertas abertos (REC-008) | ✔ | `public/js/telas/consultas.js` |
+
+## Entrega de 06/11/2026 (F6 · treinamentos coletivos do CS)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Conta sem uso vira alerta para o CS oferecer treinamento (CS-004) | ✔ testado | `treinamentos.verificarInatividade` (supervisor) · `test/treinamentos.test.js` |
+| Sessões coletivas, convites ao ponto focal, presença (CS-005) | ✔ testado | `treinamentos/servico.js`, migração 012 · `treinamentos.test.js` |
+| Roteiro versionado por tela, imprimível (CS-006) | ✔ testado | `treinamento_roteiros` · `treinamentos.test.js` |
+| Conta de demonstração, nunca de cliente (CS-007) | ✔ testado | `criarSessao` · `treinamentos.test.js` |
+| Dúvidas, avaliação e próximo passo; ausente vira tarefa de reagendar (CS-008) | ✔ testado | `treinamentos.test.js` |
+| Efetividade pelo uso antes × depois, presentes × ausentes (CS-009) | ✔ testado | `detalhe.efetividade` · `treinamentos.test.js` |

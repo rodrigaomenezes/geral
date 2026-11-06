@@ -384,3 +384,10 @@ a.g-linha:hover { background: var(--destaque-claro); }
 /* Consultas: barra de esperado × gerado. */
 .consulta-barra { display: block; height: .45rem; background: var(--perigo-f); border-radius: 4px; overflow: hidden; margin: .35rem 0; }
 .consulta-barra > span { display: block; height: 100%; background: var(--ok); }
+
+/* Treinamentos: editor de roteiro e documento imprimível. */
+.roteiro-passos { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .4rem; }
+.roteiro-passo { display: grid; grid-template-columns: 9rem 1fr auto; gap: .35rem; align-items: center; }
+.roteiro-passo input { min-width: 0; }
+@media (max-width: 480px) { .roteiro-passo { grid-template-columns: 1fr auto; } .roteiro-passo input:first-child { grid-column: 1 / -1; } }
+@media print { .topo, .menu, .faixa-demo, .acoes, .voltar, button { display: none !important; } .roteiro-doc { border: 0; box-shadow: none; } }
