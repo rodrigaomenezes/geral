@@ -45,6 +45,8 @@ apagado): `TESTE_DATABASE_URL=postgres://... npm test`.
 | `SINAPSE_DB_CA` | se o banco usar certificado próprio | Certificado da autoridade (PEM) do PostgreSQL; com `sslmode` na URL o certificado é sempre verificado |
 | `SINAPSE_DB_TLS_INSEGURO` | não | `1` aceita certificado sem verificação (só fora de produção; fica registrado no log) |
 | `SINAPSE_TOKEN_ENTRADA` | não | Token (24+ caracteres) do webhook `POST /api/entrada/{organização}/{canal}`; sem ele, a rota fica desligada |
+| `SINAPSE_MFA_OBRIGATORIO` | recomendado | `1` exige a verificação em duas etapas (aplicativo autenticador) para Administração e Supervisão. Sempre ligado com `SINAPSE_AMBIENTE=producao`. Precisa de `SINAPSE_CHAVE` |
+| `SINAPSE_SESSAO_INATIVIDADE_MIN` | não | Minutos sem uso até a sessão expirar (padrão 120) |
 | `SINAPSE_SENHA_TESTE` | para testar com e-mail e senha | Senha (12+) dos usuários de teste abaixo; trocar a variável troca a senha de todos no próximo deploy. Recusada com `SINAPSE_AMBIENTE=producao` |
 | `SINAPSE_SENHA_ADMIN` | não | Senha (12+) do `admin@sinapse.demo`, usada só ao criar a demonstração |
 | `SINAPSE_CHAVE` | para guardar segredos | Chave (32+ caracteres) que cifra a senha dos ramais SIP e o token do WhatsApp |
@@ -76,3 +78,15 @@ Monitor externo (ex.: UptimeRobot) em `/api/health/supervisor`: responde 503 se 
 
 Roteiro de 15 minutos em [`docs/ROTEIRO_APRESENTACAO.md`](docs/ROTEIRO_APRESENTACAO.md). Mapa dos requisitos:
 [`docs/RASTREABILIDADE.md`](docs/RASTREABILIDADE.md). Como está montado: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Operação em produção (o que configurar fora do código)
+
+- **Banco:** use o PostgreSQL gerenciado do Railway (`DATABASE_URL`) com backup diário ligado no provedor. Antes de
+  ir para dados reais, faça um teste de restauração (restaurar o backup num banco novo e subir o Sinapse apontando
+  para ele) e registre a data. O banco embutido (PGlite no Volume) é para demonstração.
+- **Monitor externo:** cadastre `https://SEU-LINK/api/health/supervisor` num monitor (ex.: UptimeRobot, a cada 5 min,
+  alerta por e-mail para a gestão). Ele responde 503 se o supervisor (filas, prazos, alertas) parar.
+- **Web e worker separados (opcional, com volume):** suba dois serviços com a mesma imagem; no de atendimento web,
+  `SINAPSE_WORKER=0`; no outro, deixe o worker ligado. Os dois apontam para o mesmo `DATABASE_URL`.
+- **Segurança:** `SINAPSE_AMBIENTE=producao`, `SINAPSE_CHAVE` (32+ caracteres), MFA obrigatório (automático em
+  produção) e sem `SINAPSE_DEMO`.

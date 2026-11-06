@@ -7,6 +7,10 @@ const { uma } = require('../../db');
 const { erro } = require('../../nucleo/erros');
 
 const SESSAO_HORAS = 12;
+// R-19: sessão parada por mais que isto deixa de valer (o uso renova; a gravação do uso é no máximo a cada 5 min).
+const INATIVIDADE_MIN = Number(process.env.SINAPSE_SESSAO_INATIVIDADE_MIN || 120);
+const totp = require('../../nucleo/totp');
+const { cifrar, decifrar } = require('../../nucleo/cifra');
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 function hashSenha(senha) {
@@ -23,7 +27,8 @@ function conferirSenha(senha, guardado) {
 }
 
 const COLUNAS_USUARIO = `u.id, u.tenant_id, u.nome, u.email, u.papel, u.equipe_id, u.disponivel, u.substituto_id,
-  e.codigo AS equipe_codigo, e.nome AS equipe_nome, t.slug AS tenant_slug, t.nome AS tenant_nome, t.demonstracao, t.config -> 'marca' AS marca`;
+  e.codigo AS equipe_codigo, e.nome AS equipe_nome, t.slug AS tenant_slug, t.nome AS tenant_nome, t.demonstracao, t.config -> 'marca' AS marca,
+  u.mfa_ativo`;
 
 async function autenticar(db, email, senha) {
   const r = await db.sistema((c) => c.query(
@@ -55,11 +60,11 @@ async function personas(db) {
   ))).rows;
 }
 
-async function criarSessao(db, usuario) {
+async function criarSessao(db, usuario, { mfaPendente = false } = {}) {
   const token = crypto.randomBytes(32).toString('base64url');
   await db.sistema((c) => c.query(
-    `INSERT INTO sessoes (token_hash, tenant_id, usuario_id, expira_em) VALUES ($1, $2, $3, now() + interval '${SESSAO_HORAS} hours')`,
-    [sha256(token), usuario.tenant_id, usuario.id],
+    `INSERT INTO sessoes (token_hash, tenant_id, usuario_id, expira_em, mfa_pendente) VALUES ($1, $2, $3, now() + interval '${SESSAO_HORAS} hours', $4)`,
+    [sha256(token), usuario.tenant_id, usuario.id, mfaPendente],
   ));
   return { token, maxAge: SESSAO_HORAS * 3600 };
 }
@@ -69,9 +74,74 @@ async function sessaoPorToken(db, token) {
   const r = await db.sistema((c) => c.query(
     `SELECT ${COLUNAS_USUARIO} FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id JOIN equipes e ON e.id = u.equipe_id
      JOIN tenants t ON t.id = u.tenant_id
-     WHERE s.token_hash = $1 AND s.expira_em > now() AND u.ativo AND t.status = 'ativo'`, [sha256(token)],
+     WHERE s.token_hash = $1 AND s.expira_em > now() AND NOT s.mfa_pendente AND s.ultimo_uso_em > now() - $2::int * interval '1 minute'
+       AND u.ativo AND t.status = 'ativo'`, [sha256(token), INATIVIDADE_MIN],
   ));
+  const u = r.rows[0] || null;
+  if (u) await db.query("UPDATE sessoes SET ultimo_uso_em = now() WHERE token_hash = $1 AND ultimo_uso_em < now() - interval '5 minutes'", [sha256(token)]);
+  return u;
+}
+
+// ---------- Verificação em duas etapas (MFA) ----------
+const segredoDe = async (db, usuarioId) => (await db.sistema((c) => c.query('SELECT mfa_segredo_cifrado, mfa_ativo, mfa_ultimo_passo FROM usuarios WHERE id = $1', [usuarioId]))).rows[0];
+
+/** Confere o código e grava o passo usado; código já usado (mesmo passo ou anterior) é recusado. */
+async function usarCodigo(db, usuarioId, s, informado) {
+  const passo = totp.passoAceito(decifrar(s.mfa_segredo_cifrado), informado);
+  if (passo === false || (s.mfa_ultimo_passo !== null && s.mfa_ultimo_passo !== undefined && passo <= Number(s.mfa_ultimo_passo))) return false;
+  const r = await db.query('UPDATE usuarios SET mfa_ultimo_passo = $2 WHERE id = $1 AND (mfa_ultimo_passo IS NULL OR mfa_ultimo_passo < $2)', [usuarioId, passo]);
+  return r.rowCount === 1; // duas abas usando o mesmo código ao mesmo tempo: só uma vale
+}
+
+/** Sessão aberta com senha, esperando o código. Devolve o usuário ou null. */
+async function sessaoPendente(db, token) {
+  if (!token || token.length > 100) return null;
+  const r = await db.sistema((c) => c.query(
+    `SELECT ${COLUNAS_USUARIO} FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id JOIN equipes e ON e.id = u.equipe_id JOIN tenants t ON t.id = u.tenant_id
+     WHERE s.token_hash = $1 AND s.mfa_pendente AND s.criada_em > now() - interval '10 minutes' AND u.ativo`, [sha256(token)]));
   return r.rows[0] || null;
+}
+
+/** Confere o código da sessão pendente; certo, a sessão passa a valer. */
+async function confirmarMfaDaSessao(db, token, codigoInformado) {
+  const u = await sessaoPendente(db, token);
+  if (!u) throw erro.naoAutenticado();
+  const s = await segredoDe(db, u.id);
+  if (!s?.mfa_ativo || !(await usarCodigo(db, u.id, s, codigoInformado))) {
+    throw erro.regra('codigo_invalido', 'Código inválido. Confira no aplicativo autenticador (ele muda a cada 30 segundos).');
+  }
+  await db.query('UPDATE sessoes SET mfa_pendente = false, ultimo_uso_em = now() WHERE token_hash = $1', [sha256(token)]);
+  return u;
+}
+
+/** Começa a ativação: gera e guarda o segredo (cifrado), ainda inativo; devolve o endereço para o QR Code. */
+async function iniciarMfa(db, usuario) {
+  const atual = await segredoDe(db, usuario.id);
+  if (atual?.mfa_ativo) throw erro.conflito('A verificação em duas etapas já está ativa. Para trocar o aparelho, desative primeiro.');
+  const segredo = totp.gerarSegredo();
+  await db.sistema((c) => c.query('UPDATE usuarios SET mfa_segredo_cifrado = $2 WHERE id = $1', [usuario.id, cifrar(segredo)]));
+  return { segredo, uri: totp.uri('Sinapse Brobot', usuario.email, segredo) };
+}
+
+async function confirmarMfa(db, usuario, codigoInformado) {
+  const s = await segredoDe(db, usuario.id);
+  if (!s?.mfa_segredo_cifrado) throw erro.regra('mfa_nao_iniciado', 'Comece a ativação para gerar o QR Code.');
+  if (s.mfa_ativo) throw erro.conflito('A verificação em duas etapas já está ativa.');
+  if (!(await usarCodigo(db, usuario.id, s, codigoInformado))) throw erro.regra('codigo_invalido', 'Código inválido. Confira no aplicativo e tente de novo.');
+  await db.sistema((c) => c.query('UPDATE usuarios SET mfa_ativo = true, mfa_ativado_em = now() WHERE id = $1', [usuario.id]));
+  return { ativo: true };
+}
+
+/** Desativa com um código válido (a própria pessoa) ou por redefinição da Administração (aparelho perdido). */
+async function desativarMfa(db, usuarioId, { codigo: codigoInformado, redefinicao = false } = {}) {
+  const s = await segredoDe(db, usuarioId);
+  if (!s?.mfa_ativo) throw erro.conflito('A verificação em duas etapas não está ativa.');
+  if (!redefinicao && !(await usarCodigo(db, usuarioId, s, codigoInformado))) throw erro.regra('codigo_invalido', 'Código inválido.');
+  await db.sistema(async (c) => {
+    await c.query('UPDATE usuarios SET mfa_ativo = false, mfa_segredo_cifrado = NULL, mfa_ativado_em = NULL, mfa_ultimo_passo = NULL WHERE id = $1', [usuarioId]);
+    await c.query('DELETE FROM sessoes WHERE usuario_id = $1', [usuarioId]); // quem estava logado entra de novo
+  });
+  return { ativo: false };
 }
 
 async function encerrarSessao(db, token) {
@@ -111,5 +181,6 @@ async function usuarios(c) {
 
 module.exports = {
   hashSenha, conferirSenha, autenticar, usuarioDemo, personas, criarSessao, sessaoPorToken, encerrarSessao,
+  sessaoPendente, confirmarMfaDaSessao, iniciarMfa, confirmarMfa, desativarMfa,
   resolverResponsavel, equipes, equipePorCodigo, usuarios,
 };

@@ -19,6 +19,8 @@ import { telaQuadro } from './telas/quadro.js';
 import { telaConsultas } from './telas/consultas.js';
 import { telaTreinamentos } from './telas/treinamentos.js';
 import { telaDesenvolvimento } from './telas/desenvolvimento.js';
+import { telaLgpd } from './telas/lgpd.js';
+import { abrirSeguranca } from './telas/seguranca.js';
 import { telaDashboards } from './telas/dashboards.js';
 import { telaMensagens } from './telas/mensagens.js';
 
@@ -42,6 +44,7 @@ const MENU = [
   { rota: 'canais', rotulo: 'Canais', perm: 'canais.gerir' },
   { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', perm: 'auditoria.ver' },
+  { rota: 'lgpd', rotulo: 'Privacidade (LGPD)', perm: 'lgpd.gerir' },
   { rota: 'simulador', rotulo: 'Simulador', perm: 'demo.simular', demo: true },
 ];
 
@@ -54,6 +57,7 @@ const ROTAS = {
   consultas: telaConsultas,
   treinamentos: telaTreinamentos,
   desenvolvimento: telaDesenvolvimento,
+  lgpd: telaLgpd,
   dashboards: telaDashboards,
   mensagens: telaMensagens,
   painel: telaPainel,
@@ -100,7 +104,8 @@ function montarCasca() {
     h('a', { class: 'marca', href: '#/', 'aria-label': 'Início' }, ctx.usuario.marca?.logo ? h('img', { src: logo, alt: '', height: 28 }) : h('span', { class: 'wordmark' }, h('b', {}, 'b'), 'robot'),
       h('small', {}, `Sinapse · ${ctx.usuario.marca?.nome || ctx.usuario.organizacao}`)),
     h('div', { class: 'quem' },
-      h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}`),
+      h('button', { class: 'quem-botao', type: 'button', title: 'Segurança da conta', onclick: () => abrirSeguranca(ctx) },
+        h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}${ctx.usuario.mfaAtivo ? ' · 2 etapas' : ''}`)),
     ),
     ctx.pode('agenda.usar') ? sinoNotificacoes() : null,
     h('button', { class: 'btn btn-fantasma', type: 'button', onclick: sair }, 'Sair'));
@@ -144,6 +149,8 @@ async function iniciar() {
     [ctx.catalogos, ctx.equipes] = await Promise.all([api.get('/catalogos'), api.get('/equipes')]);
     montarCasca();
     rotear();
+    // R-05: quem é obrigado e ainda não ativou já vê a ativação ao entrar.
+    if (ctx.usuario.mfaObrigatorio && !ctx.usuario.mfaAtivo) abrirSeguranca(ctx, () => location.reload());
   } catch (e) {
     trocar(raiz, h('div', { class: 'cartao erro centro' }, h('h2', {}, 'Sem conexão'), h('p', {}, textoErro(e)),
       h('button', { class: 'btn', onclick: iniciar }, 'Tentar de novo')));
@@ -151,6 +158,7 @@ async function iniciar() {
 }
 
 window.addEventListener('hashchange', rotear);
+window.addEventListener('mfa-obrigatorio', () => { if (ctx.usuario) abrirSeguranca(ctx, () => location.reload()); });
 window.addEventListener('sessao-expirada', () => { if (ctx.usuario) { ctx.usuario = null; aviso('Sua sessão terminou. Entre novamente.', 'erro'); iniciar(); } });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 iniciar();

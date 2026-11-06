@@ -20,6 +20,7 @@ const TODAS = {
   'agenda.usar': 'usar o Meu dia e os lembretes',
   'comercial.ver': 'ver o funil comercial',
   'comercial.editar': 'cadastrar e mover oportunidades',
+  'lgpd.gerir': 'atender pedidos de titulares de dados (LGPD): exportar e anonimizar',
   'dev.gerir': 'registrar incidentes, melhorias e releases',
   'treinamento.gerir': 'organizar treinamentos de clientes (sessões, convites, presença)',
   'comercial.gerir': 'gerir o catálogo de produtos e aprovar descontos acima da alçada',

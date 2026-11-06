@@ -1,12 +1,16 @@
 import { h, trocar, aviso } from '../dom.js';
 import { api, textoErro } from '../api.js';
+import { pedirCodigoLogin } from './seguranca.js';
 
 export async function telaLogin(raiz, { demo, aoEntrar }) {
   const email = h('input', { type: 'email', name: 'email', autocomplete: 'username', required: true });
   const senha = h('input', { type: 'password', name: 'senha', autocomplete: 'current-password', required: true });
   const form = h('form', { class: 'login-form', onsubmit: async (e) => {
     e.preventDefault();
-    try { aoEntrar((await api.post('/sessao/entrar', { email: email.value, senha: senha.value })).usuario); } catch (err) { aviso(textoErro(err), 'erro'); }
+    try {
+      const r = await api.post('/sessao/entrar', { email: email.value, senha: senha.value });
+      if (r.mfaNecessario) pedirCodigoLogin(aoEntrar); else aoEntrar(r.usuario);
+    } catch (err) { aviso(textoErro(err), 'erro'); }
   } },
   h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'E-mail'), email),
   h('label', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Senha'), senha),
