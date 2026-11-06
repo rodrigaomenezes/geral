@@ -14,7 +14,7 @@ Navegador (PWA, JS puro)          Webhooks (WhatsApp/e-mail/portal/API)      Mon
         ▼                                ▼                                      ▼
 server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), CSP, JSON ≤ 1 MB, erro padronizado
         │
-        ├─ modulos/identidade    sessão (token aleatório, hash no banco), RBAC, substituto, personas da demo
+        ├─ modulos/identidade    sessão (token aleatório, hash no banco), RBAC, MFA, cadastro de pessoas e equipes, substituto, personas da demo
         ├─ modulos/clientes      carteira, VIP, roteamento RN-001, pontos focais com histórico, bloqueio (recusado sem regra)
         ├─ modulos/entrada       inbox durável + deduplicação, identificação por telefone E.164, classificação, triagem
         ├─ modulos/ocorrencias   máquina de estados (pura), SLA por calendário (puro), handoff, tarefas, resposta no canal
@@ -25,6 +25,7 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/telefonia     central de ligações (portada do Lumen): treino, SIP/WebRTC (JsSIP), celular; conclui a tarefa de ligação
         ├─ modulos/processos     motor de processos escritos pela operação: gatilho → condições → passos → "para sozinho se"
         ├─ modulos/comunicacao   mensagens padrão editáveis (rascunho → revisão → aprovada), consentimento, janela, retentativa, fallback, template Meta
+        ├─ modulos/organizacao   implantação de uma organização (real ou demonstração): equipes, rotinas, processos, matriz
         ├─ modulos/governanca    delegação temporária, matriz RACI com responsável vigente, plantão por equipe, SLA de contrato
         ├─ modulos/supervisor    varredura de invariantes, escalonamento, handoff vencido, heartbeat, fila de falhas
         ├─ modulos/painel        indicadores da seção 13 e 6 dashboards (blocos = tabela de dados; gráfico, tabela e CSV leem a mesma)

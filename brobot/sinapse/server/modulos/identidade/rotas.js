@@ -4,11 +4,12 @@ const { validar, erro, ErroNegocio } = require('../../nucleo/erros');
 const { permissoesDe, NOMES_PAPEIS } = require('./permissoes');
 const supervisor = require('../supervisor/servico');
 const s = require('./servico');
+const pessoas = require('./pessoas');
 
 const publicoUsuario = (u, cfg) => u && ({
   id: u.id, nome: u.nome, papel: u.papel, papelNome: NOMES_PAPEIS[u.papel], equipe: u.equipe_nome, equipeCodigo: u.equipe_codigo,
   organizacao: u.tenant_nome, permissoes: permissoesDe(u.papel), demo: cfg.demo && u.demonstracao, marca: marcaSegura(u.marca),
-  mfaAtivo: !!u.mfa_ativo, mfaObrigatorio: !!cfg.mfaObrigatorio && ['admin', 'supervisor'].includes(u.papel),
+  mfaAtivo: !!u.mfa_ativo, senhaTrocar: !!u.senha_trocar, disponivel: u.disponivel !== false, mfaObrigatorio: !!cfg.mfaObrigatorio && ['admin', 'supervisor'].includes(u.papel),
 });
 
 /** Marca da organização (white-label): só cores hex, nome curto e logo servido pelo próprio sistema. */
@@ -111,5 +112,60 @@ module.exports = [
       const r = await s.desativarMfa(db, params.id, { redefinicao: true });
       await db.comoTenant(ctx.tenantId, (c) => auditar(c, ctx, { acao: 'usuario.mfa_redefinido', entidade: 'usuario', entidadeId: params.id, motivo: d.motivo }));
       return r;
+    } },
+  // ---------- Própria conta ----------
+  { metodo: 'POST', caminho: '/api/senha',
+    handler: async ({ db, ctx, corpo, token }) => {
+      const d = validar(corpo, { atual: { obrigatorio: true, tipo: 'texto', max: 200 }, nova: { obrigatorio: true, tipo: 'texto', max: 200 } });
+      const r = await db.comoTenant(ctx.tenantId, (c) => pessoas.trocarPropria(c, ctx, d));
+      await s.encerrarSessoesDe(db, ctx.usuario.id, { excetoToken: token }); // outros aparelhos entram de novo
+      return r;
+    } },
+  { metodo: 'POST', caminho: '/api/eu/disponivel', permissao: 'agenda.usar', descricao: 'marcar a própria disponibilidade',
+    handler: ({ db, ctx, corpo }) => {
+      const d = validar(corpo, { disponivel: { obrigatorio: true, tipo: 'booleano' } });
+      return db.comoTenant(ctx.tenantId, (c) => pessoas.minhaDisponibilidade(c, ctx, d.disponivel));
+    } },
+  // ---------- Pessoas e equipes (Administração) ----------
+  { metodo: 'GET', caminho: '/api/pessoas', permissao: 'usuario.gerir', descricao: 'ver o cadastro de pessoas',
+    handler: ({ db, ctx, query }) => db.comoTenant(ctx.tenantId, async (c) => ({
+      ...(await pessoas.listar(c, { pagina: query.pagina, q: String(query.q || '').slice(0, 80), inativos: query.inativos === '1' })),
+      equipes: await s.equipes(c), papeis: NOMES_PAPEIS })) },
+  { metodo: 'POST', caminho: '/api/pessoas', permissao: 'usuario.gerir', descricao: 'cadastrar pessoas',
+    handler: ({ db, ctx, corpo }) => {
+      const d = validar(corpo, { nome: { obrigatorio: true, tipo: 'texto', min: 3, max: 120 }, email: { obrigatorio: true, tipo: 'texto', max: 200 },
+        papel: { obrigatorio: true, tipo: 'texto', em: Object.keys(NOMES_PAPEIS) }, equipeId: { obrigatorio: true, tipo: 'uuid' } });
+      return db.comoTenant(ctx.tenantId, async (c) => com(201, await pessoas.criar(c, ctx, d)));
+    } },
+  { metodo: 'POST', caminho: '/api/pessoas/:id', permissao: 'usuario.gerir', descricao: 'alterar pessoas',
+    handler: async ({ db, ctx, params, corpo }) => {
+      const id = validar(params, { id: { obrigatorio: true, tipo: 'uuid' } }).id;
+      const d = validar(corpo, { nome: { tipo: 'texto', min: 3, max: 120 }, papel: { tipo: 'texto', em: Object.keys(NOMES_PAPEIS) }, equipeId: { tipo: 'uuid' },
+        disponivel: { tipo: 'booleano' }, motivo: { tipo: 'texto', max: 300 } });
+      if (corpo && 'substitutoId' in corpo) d.substitutoId = corpo.substitutoId ? validar(corpo, { substitutoId: { tipo: 'uuid' } }).substitutoId : null;
+      const r = await db.comoTenant(ctx.tenantId, (c) => pessoas.alterar(c, ctx, id, d));
+      if (r.campos.includes('papel')) await s.encerrarSessoesDe(db, id); // perfil novo vale no próximo login
+      return r;
+    } },
+  { metodo: 'POST', caminho: '/api/pessoas/:id/:acao', permissao: 'usuario.gerir', descricao: 'desativar, reativar ou redefinir a senha',
+    handler: async ({ db, ctx, params, corpo }) => {
+      const id = validar(params, { id: { obrigatorio: true, tipo: 'uuid' } }).id;
+      if (!['desativar', 'reativar', 'senha'].includes(params.acao)) throw new ErroNegocio(404, 'rota_inexistente', 'Ação desconhecida.');
+      const d = validar(corpo, { motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 300 } });
+      const r = await db.comoTenant(ctx.tenantId, (c) => (params.acao === 'senha' ? pessoas.redefinirSenha(c, ctx, id, d.motivo)
+        : pessoas.definirAtivo(c, ctx, id, params.acao === 'reativar', d.motivo)));
+      if (params.acao !== 'reativar') await s.encerrarSessoesDe(db, id);
+      return r;
+    } },
+  { metodo: 'POST', caminho: '/api/equipes', permissao: 'usuario.gerir', descricao: 'cadastrar equipes',
+    handler: ({ db, ctx, corpo }) => {
+      const d = validar(corpo, { codigo: { obrigatorio: true, tipo: 'texto', max: 30 }, nome: { obrigatorio: true, tipo: 'texto', min: 2, max: 60 } });
+      return db.comoTenant(ctx.tenantId, async (c) => com(201, await pessoas.criarEquipe(c, ctx, d)));
+    } },
+  { metodo: 'POST', caminho: '/api/equipes/:id', permissao: 'usuario.gerir', descricao: 'renomear equipes',
+    handler: ({ db, ctx, params, corpo }) => {
+      const id = validar(params, { id: { obrigatorio: true, tipo: 'uuid' } }).id;
+      const d = validar(corpo, { nome: { obrigatorio: true, tipo: 'texto', min: 2, max: 60 } });
+      return db.comoTenant(ctx.tenantId, (c) => pessoas.renomearEquipe(c, ctx, id, d.nome));
     } },
 ];

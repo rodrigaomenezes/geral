@@ -21,6 +21,7 @@ async function chamar(metodo, caminho, corpo) {
     const e = new ErroApi(r.status, dados);
     if (r.status === 401) window.dispatchEvent(new CustomEvent('sessao-expirada'));
     if (r.status === 403 && e.code === 'mfa_obrigatorio') window.dispatchEvent(new CustomEvent('mfa-obrigatorio'));
+    if (r.status === 403 && e.code === 'senha_temporaria') window.dispatchEvent(new CustomEvent('sessao-expirada'));
     throw e;
   }
   return dados;

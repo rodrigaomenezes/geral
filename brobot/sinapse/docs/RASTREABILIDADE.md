@@ -222,3 +222,12 @@ dimensionamento e da infraestrutura definitiva.
 | Plantão por equipe: ocorrência nova vai ao plantonista (GOV-008) | ✔ testado | `ocorrencias/servico.js` · `governanca.test.js` |
 | SLA por contrato na conta, sem fator VIP (GOV-008) | ✔ testado | `ocorrencias/sla.js`, `contas.sla_contrato` · `governanca.test.js` |
 | Unidades e cadastro de equipes/usuários por tela (GOV-001) | ○ pendente | — |
+
+## Entrega de 06/11/2026 (F9b · Implantação real e Pessoas)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Implantação real sem demonstração: organização, feriados, matriz e primeira Administração por variável (GOV-001) | ✔ testado | `organizacao/implantacao.js` · `test/implantacao.test.js` |
+| Cadastro de pessoas e equipes, senha temporária com troca obrigatória, perfil, substituto, desativar sem apagar (GOV-001) | ✔ testado | `identidade/pessoas.js` · `test/pessoas.test.js` |
+| Trocar a própria senha e marcar ausência | ✔ testado | `/api/senha`, `/api/eu/disponivel` · `pessoas.test.js` |
+| Unidades | ○ pendente | — |

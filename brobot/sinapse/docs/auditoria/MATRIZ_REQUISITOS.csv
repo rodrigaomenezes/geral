@@ -1,5 +1,5 @@
 id;requisito (resumo);status;evidencia_codigo;teste;lacuna_ou_dependencia
-GOV-001;Cadastrar organizações, unidades, equipes e perfis com isolamento de acesso.;PARCIAL;"identidade/permissoes.js; 001 tenants/equipes/usuarios";"regras API 401/403; AT-014";"""unidades"" não existem; cadastro de usuário/equipe só por seed (sem tela)"
+GOV-001;Cadastrar organizações, unidades, equipes e perfis com isolamento de acesso.;PARCIAL;"implantação real (organizacao/implantacao.js); cadastro de pessoas e equipes por tela; RLS; RBAC";"implantacao.test; pessoas.test; AT-014";unidades
 GOV-002;Configurar perfis VIP com critérios, validade, aprovador e histórico.;PARCIAL;"contas.vip_* (001); clientes/servico.js";—;"critério/aprovador/validade gravados; sem tela de aprovação nem teste"
 GOV-003;Manter matriz de responsáveis por processo, carteira, horário e substituto.;IMPLEMENTADO E TESTADO;"substituto; delegação temporária; matriz RACI por processo; plantão por equipe";"AT-003; governanca.test";
 GOV-004;Impedir tarefas ativas sem dono ou fila de contingência.;IMPLEMENTADO E TESTADO;"CHECK tarefas.equipe_id; supervisor; quadro mostra fila sem responsável";"AT-010; quadro.test";

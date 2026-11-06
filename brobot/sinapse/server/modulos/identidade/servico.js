@@ -30,7 +30,7 @@ function conferirSenha(senha, guardado) {
 
 const COLUNAS_USUARIO = `u.id, u.tenant_id, u.nome, u.email, u.papel, u.equipe_id, u.disponivel, u.substituto_id,
   e.codigo AS equipe_codigo, e.nome AS equipe_nome, t.slug AS tenant_slug, t.nome AS tenant_nome, t.demonstracao, t.config -> 'marca' AS marca,
-  u.mfa_ativo`;
+  u.mfa_ativo, u.senha_trocar`;
 
 async function autenticar(db, email, senha) {
   const r = await db.sistema((c) => c.query(
@@ -146,6 +146,11 @@ async function desativarMfa(db, usuarioId, { codigo: codigoInformado, redefinica
   return { ativo: false };
 }
 
+/** Derruba todas as sessões da pessoa (perfil trocado, desativada, senha redefinida). */
+async function encerrarSessoesDe(db, usuarioId, { excetoToken = null } = {}) {
+  await db.sistema((c) => c.query('DELETE FROM sessoes WHERE usuario_id = $1 AND ($2::text IS NULL OR token_hash <> $2)', [usuarioId, excetoToken ? sha256(excetoToken) : null]));
+}
+
 async function encerrarSessao(db, token) {
   if (token) await db.sistema((c) => c.query('DELETE FROM sessoes WHERE token_hash = $1', [sha256(token)]));
 }
@@ -188,7 +193,7 @@ async function usuarios(c) {
 }
 
 module.exports = {
-  hashSenha, conferirSenha, autenticar, usuarioDemo, personas, criarSessao, sessaoPorToken, encerrarSessao,
+  hashSenha, conferirSenha, autenticar, usuarioDemo, personas, criarSessao, sessaoPorToken, encerrarSessao, encerrarSessoesDe,
   sessaoPendente, confirmarMfaDaSessao, iniciarMfa, confirmarMfa, desativarMfa,
   resolverResponsavel, equipes, equipePorCodigo, usuarios,
 };

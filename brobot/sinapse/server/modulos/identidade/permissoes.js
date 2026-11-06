@@ -20,6 +20,7 @@ const TODAS = {
   'agenda.usar': 'usar o Meu dia e os lembretes',
   'comercial.ver': 'ver o funil comercial',
   'comercial.editar': 'cadastrar e mover oportunidades',
+  'usuario.gerir': 'cadastrar pessoas e equipes, mudar perfil, desativar e redefinir senha',
   'governanca.gerir': 'definir a matriz de responsáveis, plantões, SLA de contrato e delegar por outra pessoa',
   'lgpd.gerir': 'atender pedidos de titulares de dados (LGPD): exportar e anonimizar',
   'dev.gerir': 'registrar incidentes, melhorias e releases',
@@ -38,7 +39,7 @@ const OPERACIONAL = ['ocorrencia.ver', 'ocorrencia.atender', 'ocorrencia.triar',
 
 const PAPEIS = {
   admin: Object.keys(TODAS),
-  supervisor: Object.keys(TODAS).filter((p) => p !== 'financeiro.bloqueio'),
+  supervisor: Object.keys(TODAS).filter((p) => !['financeiro.bloqueio', 'usuario.gerir'].includes(p)),
   suporte: [...OPERACIONAL, 'conta.editar', 'rodada.operar'],
   cs: [...OPERACIONAL, 'conta.editar', 'rodada.operar', 'comercial.ver', 'treinamento.gerir'],
   operacoes: [...OPERACIONAL, 'rodada.operar', 'conta.editar', 'integracao.usar'],
