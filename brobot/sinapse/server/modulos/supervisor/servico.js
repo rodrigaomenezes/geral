@@ -21,6 +21,7 @@ const treinamentos = require('../treinamentos/servico');
 const governanca = require('../governanca/servico');
 const vip = require('../clientes/vip');
 const saudeCanais = require('./saude-canais');
+const anexos = require('../ocorrencias/anexos');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -88,9 +89,11 @@ async function jobVarrer(c, ctx) {
   // GOV-002: VIP perto de vencer vira tarefa do CS; vencido sai (com auditoria).
   const vipVal = await vip.verificarValidades(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   resumo.vipAvisos = vipVal.avisos; resumo.vipExpirados = vipVal.expirados;
+  // INT-009: retenção de anexos (só com política configurada).
+  resumo.anexosExpurgados = await anexos.aplicarRetencao(c, ctx);
   // SUP-002: canal em silêncio, entrada parada e rotina parada.
   Object.assign(resumo, await saudeCanais.verificarCanais(c, ctx, { carregarCalendario: ocorrencias.carregarCalendario, criarTarefa: (t) => tarefas.criar(c, ctx, t) }));
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas) {
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };

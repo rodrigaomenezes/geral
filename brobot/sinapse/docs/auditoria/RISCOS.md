@@ -39,3 +39,5 @@ no banco; `npm audit` sem vulnerabilidades.
   R-18, R-19, R-20 — ver o plano.
 - **Mitigados em 06/11 (F8a, com teste):** R-05 (MFA TOTP, obrigatório para a gestão), R-19 (sessão por
   inatividade), R-11 parcial (exportação e anonimização do titular; retenção automática segue em aberto).
+- **Mitigado em parte em 06/11 (F16, com teste):** R-12 — anexos com lista fechada de tipos conferidos pelo conteúdo,
+  10 MB, download sempre como anexo com CSP `sandbox`; falta antivírus no servidor.

@@ -189,6 +189,7 @@ export async function telaOcorrencia(el, ctx, id) {
       ativa && ctx.pode('ocorrencia.ver') ? h('div', { class: 'responder' }, texto, h('div', { class: 'form-acoes' },
         h('button', { class: 'btn', onclick: enviarMsg('notas') }, 'Nota interna'),
         ctx.pode('ocorrencia.atender') && o.conta_id ? h('button', { class: 'btn btn-primario', onclick: enviarMsg('respostas') }, 'Responder ao cliente') : null)) : null),
+    secaoAnexos(ctx, o, recarregar),
     ctx.pode('processo.ver') ? await secaoAutomacoes(ctx, { ocorrencia: id }) : null,
     h('section', { class: 'cartao' }, h('h2', {}, 'Linha do tempo (auditoria)'), h('ol', { class: 'tempo' }, o.linhaDoTempo.map((a) => h('li', {},
       h('span', { class: 'tempo-data' }, dataHora(a.criado_em)), h('strong', {}, a.acao.replace('ocorrencia.', '').replaceAll('_', ' ')),
@@ -205,6 +206,30 @@ function ciencia(o, recarregar) {
     campo('O que será feito', h('input', { name: 'acao', required: true, minlength: 5, maxlength: 200, placeholder: 'ex.: Rafael liga para o cliente hoje às 15h' }), 'Vira a próxima ação da ocorrência.'),
     campo('Até quando', h('input', { name: 'proximaAcaoEm', type: 'datetime-local', required: true, value: em4h() }), 'Se vencer de novo, o nível sobe.'),
   ], 'Registrar ciência', async (d) => { const r = await api.post(`/ocorrencias/${o.id}/ciencia`, { ...d, versao: o.version }); fechar(); aviso(`Ciência registrada; ${r.tarefasConcluidas} tarefa(s) de escalonamento concluída(s).`); recarregar(); }));
+}
+/** INT-009: anexos (PDF, imagem, texto/CSV, XLSX, DOCX até 10 MB; o servidor confere o tipo pelo conteúdo). */
+function secaoAnexos(ctx, o, recarregar) {
+  const ativa = !['resolvida', 'encerrada_sem_resolucao'].includes(o.estado);
+  const kb = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const entrada = h('input', { type: 'file', accept: '.pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.xlsx,.docx', 'aria-label': 'Escolher arquivo' });
+  const enviar = async () => {
+    const f = entrada.files[0];
+    if (!f) { aviso('Escolha um arquivo.', 'erro'); return; }
+    if (f.size > 10 * 1048576) { aviso('Anexo acima de 10 MB. Reduza o arquivo e envie de novo.', 'erro'); return; }
+    try { await api.enviarArquivo(`/ocorrencias/${o.id}/anexos`, f); aviso('Arquivo anexado.'); recarregar(); } catch (e) { aviso(textoErro(e), 'erro'); }
+  };
+  const arquivar = (a) => modal('Arquivar anexo', (fechar) => formulario([h('p', {}, `${a.nome} sai da lista; o registro fica na auditoria.`),
+    campo('Motivo', h('input', { name: 'motivo', required: true, minlength: 5, maxlength: 300 }))], 'Arquivar', async (d) => {
+    await api.post(`/anexos/${a.id}/arquivar`, d); fechar(); aviso('Anexo arquivado.'); recarregar();
+  }));
+  return h('section', { class: 'cartao' }, h('h2', {}, `Anexos (${o.anexos.length})`),
+    o.anexos.length ? h('ul', { class: 'itens' }, o.anexos.map((a) => h('li', {},
+      a.expurgado ? h('span', {}, `${a.nome} `, selo('apagado pela retenção', 'neutro')) : h('a', { href: `/api/anexos/${a.id}`, download: a.nome }, a.nome),
+      h('span', { class: 'suave' }, ` · ${kb(a.tamanho)} · ${a.enviado_por_nome || '—'} · ${dataHora(a.criado_em)} `),
+      ativa && ctx.pode('ocorrencia.atender') && (a.enviado_por === ctx.usuario.id || ctx.pode('ocorrencia.intervir'))
+        ? h('button', { class: 'btn btn-pequeno btn-fantasma', type: 'button', onclick: () => arquivar(a) }, 'Arquivar') : null))) : vazio('Sem anexos.'),
+    ativa && ctx.pode('ocorrencia.atender') ? h('div', { class: 'acoes' }, entrada, h('button', { class: 'btn', type: 'button', onclick: enviar }, 'Anexar')) : null,
+    ativa && ctx.pode('ocorrencia.atender') ? h('p', { class: 'suave' }, 'PDF, imagem, texto/CSV, XLSX ou DOCX, até 10 MB. Nunca anexe senhas ou certificados com chave.') : null);
 }
 const VINCULO = { relacionada: 'Relacionada a', mesclada_em: 'Mesclada em', dividida_de: 'Dividida de', reaberta_por: 'Reaberta por' };
 

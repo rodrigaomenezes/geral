@@ -270,3 +270,10 @@ dimensionamento e da infraestrutura definitiva.
 | Insights do CaçaCondutores 1x por semana, opt-out, sem repetir na semana, começa desligado (CS-010, BL-05, COM-010) | ✔ testado | processo padrão + `jobAgenda` · `test/insights-semanais.test.js` |
 | Correção posterior ligada ao histórico original (POS-008) | ✔ testado | `rodadas.revalidar/marcarCorrigida` · `test/correcao-posterior.test.js` |
 | Escalonar risco de rodada bloqueada (PRE-010) | ○ pendente | precisa de nova versão do processo padrão de pré-rodada (decisão do cliente sobre quando escalar) |
+
+## Entrega de 06/11/2026 (F16 · Anexos)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Anexos com tipo pelo conteúdo, limite, sem repetição, download seguro, arquivar e retenção (INT-009) | ✔ testado | `ocorrencias/anexos.js` · `test/anexos.test.js` |
+| Verificação de malware | ○ pendente | sem antivírus no servidor (R-12) |

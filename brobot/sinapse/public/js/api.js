@@ -30,6 +30,14 @@ async function chamar(metodo, caminho, corpo) {
 export const api = {
   get: (c) => chamar('GET', c),
   post: (c, corpo = {}) => chamar('POST', c, corpo),
+  /** Upload binário (anexos): o arquivo vai como está, o nome no cabeçalho. */
+  async enviarArquivo(c, arquivo) {
+    const r = await fetch(`/api${c}`, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-Nome-Arquivo': encodeURIComponent(arquivo.name) }, body: arquivo });
+    const dados = await r.json().catch(() => null);
+    if (!r.ok) { if (r.status === 401) window.dispatchEvent(new CustomEvent('sessao-expirada')); throw new ErroApi(r.status, dados); }
+    return dados;
+  },
 };
 
 /** Mensagem de erro com os campos que faltam, para mostrar à pessoa. */

@@ -6,6 +6,8 @@ const maquina = require('./maquina');
 const s = require('./servico');
 const vinculos = require('./vinculos');
 const escalonamento = require('./escalonamento');
+const anexos = require('./anexos');
+const { pode } = require('../identidade/permissoes');
 const tarefas = require('./tarefas');
 
 const TIPOS = { nao_classificada: 'Não classificada', duvida: 'Dúvida', erro_consulta: 'Erro de consulta', credencial: 'Credencial',
@@ -48,7 +50,8 @@ module.exports = [
       return db.comoTenant(ctx.tenantId, (c) => s.quadro(c, usuario, { ...d, vip: d.vip === '1', vencidas: d.vencidas === '1' }));
     } },
   { metodo: 'GET', caminho: '/api/ocorrencias/:id', permissao: 'ocorrencia.ver',
-    handler: ({ db, ctx, usuario, params }) => comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => s.detalhe(c, usuario, params.id)) },
+    handler: ({ db, ctx, usuario, params }) => comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id,
+      async (c) => ({ ...(await s.detalhe(c, usuario, params.id)), anexos: await anexos.listar(c, params.id) })) },
   { metodo: 'POST', caminho: '/api/ocorrencias/:id/transicoes', permissao: 'ocorrencia.ver',
     handler: async ({ db, ctx, corpo, params }) => {
       const d = validar(corpo, { acao: { obrigatorio: true, tipo: 'texto', em: Object.keys(maquina.TRANSICOES) }, versao: { tipo: 'inteiro' } });
@@ -74,6 +77,31 @@ module.exports = [
     handler: async ({ db, ctx, corpo, params }) => {
       const d = validar(corpo, { equipeCodigo: { tipo: 'texto', max: 30 }, responsavelId: { tipo: 'uuid' }, motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 }, versao: { tipo: 'inteiro' } });
       return comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => s.reatribuir(c, ctx, params.id, d));
+    } },
+  // INT-009: anexos (upload binário próprio, até 10 MB; nome no cabeçalho X-Nome-Arquivo).
+  { metodo: 'POST', caminho: '/api/ocorrencias/:id/anexos', permissao: 'ocorrencia.atender', descricao: 'anexar arquivos', binario: true,
+    handler: async ({ db, ctx, corpo, params, req }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      let nome = 'anexo';
+      try { nome = decodeURIComponent(String(req.headers['x-nome-arquivo'] || 'anexo')); } catch { /* nome inválido: usa o padrão */ }
+      return com(201, await comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => anexos.anexar(c, ctx, params.id, { nome, conteudo: corpo })));
+    } },
+  { metodo: 'GET', caminho: '/api/anexos/:id', permissao: 'ocorrencia.ver',
+    handler: async ({ db, ctx, params, res }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      const a = await comAuditoriaDeAcesso(db, ctx, 'anexo', params.id, (c) => anexos.baixar(c, ctx, params.id));
+      const ascii = a.nome.replace(/[^\x20-\x7e]/g, '_');
+      res.writeHead(200, { 'Content-Type': a.tipo_mime, 'Content-Length': a.tamanho, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
+        'Content-Security-Policy': "sandbox; default-src 'none'",
+        'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(a.nome)}` });
+      res.end(Buffer.from(a.conteudo));
+      return { __bruto: true, status: 200 };
+    } },
+  { metodo: 'POST', caminho: '/api/anexos/:id/arquivar', permissao: 'ocorrencia.atender', descricao: 'arquivar anexos',
+    handler: ({ db, ctx, params, corpo, usuario }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      const d = validar(corpo, { motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 300 } });
+      return db.comoTenant(ctx.tenantId, (c) => anexos.arquivar(c, ctx, params.id, d.motivo, pode(usuario, 'ocorrencia.intervir')));
     } },
   // WFL-007: a gestão registra ciência do escalonamento com a ação e o novo prazo.
   { metodo: 'POST', caminho: '/api/ocorrencias/:id/ciencia', permissao: 'ocorrencia.intervir', descricao: 'registrar ciência do escalonamento',

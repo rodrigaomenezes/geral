@@ -310,3 +310,17 @@ a próxima mensagem fecha a divergência. Entrada gravada e não processada há 
 recorrente na fila de falhas (`rotina_parada`) seguem o mesmo padrão. Noite, fim de semana e feriado não contam.
 **Fora:** teste ativo do webhook (mensagem sintética do provedor) e alerta fora do sistema; o worker parado continua
 coberto pelo monitor externo de `/api/health/supervisor` (AT-013).
+
+# T-038 — Anexos de ocorrência (F16, INT-009, R-12)
+**Contexto:** não havia como guardar o comprovante, a tela de erro ou a planilha do cliente junto da ocorrência.
+**Decisão:** tabela `anexos` (020) no próprio PostgreSQL (`bytea`), sem serviço de arquivos novo: volume baixo (até 30 por
+ocorrência, 10 MB cada) e o backup do banco já cobre. Upload por rota própria (`application/octet-stream`, nome em
+`X-Nome-Arquivo`), nunca dentro de JSON. Tipo conferido pelo conteúdo (assinatura): PDF, PNG, JPEG, WEBP, texto/CSV,
+XLSX e DOCX; executável, ZIP solto, HTML/SVG e script são recusados. SHA-256 impede o mesmo arquivo duas vezes na
+mesma ocorrência. Download sempre como anexo, com `nosniff` e CSP `sandbox`, auditado. Arquivar (quem enviou ou a
+gestão) tira da lista sem apagar. Retenção: com `tenants.config.retencao_anexos_dias` (mínimo 30), o supervisor expurga o
+conteúdo de anexos de ocorrências encerradas há mais tempo; fica o registro. Sem a política, nada é expurgado.
+Corrigido junto: upload acima do limite derrubava a conexão (o navegador via "sem conexão"); agora recebe o 413 com a
+mensagem.
+**Fora:** antivírus no servidor (R-12 segue parcial: a lista fechada de tipos e o download como anexo reduzem o risco);
+anexos em mensagens de WhatsApp/e-mail recebidas.
