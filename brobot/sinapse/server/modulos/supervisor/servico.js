@@ -16,6 +16,7 @@ const tarefas = require('../ocorrencias/tarefas');
 const identidade = require('../identidade/servico');
 const lotesCsv = require('../integracoes/csv/lotes');
 const onboarding = require('../onboarding/servico');
+const monitoramento = require('../monitoramento/servico');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -66,7 +67,10 @@ async function jobVarrer(c, ctx) {
   resumo.lotesSemConfirmacao = await lotesCsv.verificarLotesAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // ONB-003/010: item obrigatório de onboarding/offboarding vencido vira tarefa para a equipe dele.
   resumo.checklistAtrasados = await onboarding.verificarAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados) {
+  // CRE-004 e POS-009: credencial perto de vencer e reincidência viram ocorrência (uma por alerta).
+  resumo.credenciaisVencendo = await monitoramento.verificarExpiracoes(c, ctx);
+  resumo.reincidencias = await monitoramento.verificarReincidencia(c, ctx);
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };

@@ -62,11 +62,11 @@ async function criar(c, ctx, d) {
   const protocolo = await proximoProtocolo(c, ctx);
   const oc = uma(await c.query(
     `INSERT INTO ocorrencias (tenant_id, protocolo, tipo, origem, conta_id, ponto_focal_id, rodada_id, titulo, descricao, estado,
-       prioridade, equipe_id, responsavel_id, prazo_em, sla_resposta_em, proxima_acao, proxima_acao_em, conversa_chave)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+       prioridade, equipe_id, responsavel_id, prazo_em, sla_resposta_em, proxima_acao, proxima_acao_em, conversa_chave, alerta_chave)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
     [ctx.tenantId, protocolo, colunas.tipo, d.origem, triagem ? null : conta.id, d.pontoFocalId || null, d.rodadaId || null,
       d.titulo.slice(0, 200), d.descricao || null, colunas.estado, colunas.prioridade, colunas.equipe_id, colunas.responsavel_id || null,
-      colunas.prazo_em, colunas.sla_resposta_em, colunas.proxima_acao, colunas.proxima_acao_em, d.conversaChave || null],
+      colunas.prazo_em, colunas.sla_resposta_em, colunas.proxima_acao, colunas.proxima_acao_em, d.conversaChave || null, d.alertaChave || null],
   ));
   for (const item of d.itens || []) {
     await c.query(

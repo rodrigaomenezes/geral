@@ -169,3 +169,14 @@ dimensionamento e da infraestrutura definitiva.
 | Item vencido vira tarefa da equipe (ONB-003 parcial) | ✔ testado | supervisor · `onboarding.test.js` |
 | Modelo versionado, aberto não muda (ONB-011 parcial) | ✔ testado | `checklist_modelos` · `onboarding.test.js` |
 | Offboarding com motivo, pendências conferidas, conta encerrada sem apagar (ONB-012, CS-012) | ✔ testado | `onboarding.test.js` |
+
+## Entrega de 06/11/2026 (F5 · monitoramento de consultas, credenciais e reincidência)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Volumetria de consultas por CSV, por conta/produto/dia (REC-001, REC-002) | ✔ testado | importador `platform_consultas`, migração 011 · `test/monitoramento.test.js` |
+| Consultas esperadas não geradas = erro invisível, com causa provável na credencial (CRE-003, BL-03) | ✔ testado | `monitoramento/regras.js` · `monitoramento.test.js` |
+| Robô parado há 3 dias (REC-007) e erro técnico para o Desenvolvimento (REC-004) | ✔ testado | `monitoramento.test.js` |
+| Uma ocorrência ativa por alerta (REC-003) | ✔ testado | `ocorrencias.alerta_chave` (índice único) · `monitoramento.test.js` |
+| Credencial vencendo em até 15 dias (CRE-004) e reincidência na 3ª vez (POS-009) | ✔ testado | supervisor · `monitoramento.test.js` |
+| Tela Consultas: esperado × gerado, erros por tipo, alertas abertos (REC-008) | ✔ | `public/js/telas/consultas.js` |

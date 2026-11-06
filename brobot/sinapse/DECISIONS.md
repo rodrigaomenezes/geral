@@ -179,3 +179,16 @@ concluir offboarding encerra (status `encerrada`, nada apagado). Venda de client
 item obrigatório vencido vira tarefa da equipe dele na varredura do supervisor (uma vez por item).
 **Fora:** tela para editar o modelo (há a API, para a gestão); pedido de dados ao cliente com mensagem automática
 (ONB-003 parcial); provisionamento real na Platform (ONB-004, bloqueado: CSV).
+
+# T-027 — Monitoramento de consultas, credenciais e reincidência (F5)
+**Contexto:** REC-001…008, CRE-003/004, POS-009 e as melhorias 3 (erros invisíveis) e 6 (visão de sucesso) da reunião.
+A Platform fica no CSV nesta fase (adendo CSV).
+**Decisão:** importador `platform_consultas` (volumetria por conta, produto e dia: esperadas, geradas, erros técnicos,
+de usuário e indisponibilidade), guardada em `consultas_volume` (o mesmo dia reimportado é atualizado: vale o arquivo
+mais recente). As regras ficam em `monitoramento/regras.js` com os limites nomeados (5% de tolerância, 3 dias sem
+execução, 5% de erro técnico com mínimo de 3, reincidência na 3ª vez). Cada alerta tem `alerta_chave`; o índice único
+do banco garante no máximo uma ocorrência ativa por alerta. Erro técnico vai para o Desenvolvimento (tipo técnica); o
+resto segue a equipe da conta (VIP → CS). Credencial com status OK vencendo em até 15 dias (configurável em
+`tenants.config.credenciais.avisoDias`) e reincidência são conferidas na varredura do supervisor.
+**Fora:** fechar o alerta sozinho quando a consulta normaliza (exige evidência: fica para a equipe), limites por
+organização, aviso automático ao ponto focal (a ocorrência traz a próxima ação; o envio segue pelos processos).

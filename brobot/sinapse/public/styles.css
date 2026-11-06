@@ -380,3 +380,7 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .checklist-barra > span { display: block; height: 100%; background: var(--ok); }
 .checklist-item.atrasado { border-left: 3px solid var(--perigo); padding-left: .5rem; }
 .texto-perigo { color: var(--perigo); }
+
+/* Consultas: barra de esperado × gerado. */
+.consulta-barra { display: block; height: .45rem; background: var(--perigo-f); border-radius: 4px; overflow: hidden; margin: .35rem 0; }
+.consulta-barra > span { display: block; height: 100%; background: var(--ok); }
