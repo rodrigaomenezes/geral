@@ -110,6 +110,13 @@ async function jobAvisar(c, ctx) {
     await notificar(c, ctx, await membros(c, h.para_equipe_id), { titulo: '↪ Transferência para sua equipe', texto: `${h.protocolo} · ${h.titulo}`,
       gravidade: 'alerta', link: `#/ocorrencias/${h.oc}`, chave: `handoff:${h.id}` });
   }
+  // DEV-004: transferência que não foi aceita no prazo avisa a equipe que pediu (a ocorrência foi para a contingência).
+  for (const h of (await c.query(`SELECT h.id, h.de_equipe_id, o.id AS oc, o.protocolo, o.titulo, pe.nome AS para_nome FROM handoffs h
+      JOIN ocorrencias o ON o.id = h.ocorrencia_id JOIN equipes pe ON pe.id = h.para_equipe_id
+      WHERE h.estado = 'expirado' AND h.resolvido_em > now() - interval '2 days' LIMIT 100`)).rows) {
+    await notificar(c, ctx, await membros(c, h.de_equipe_id), { titulo: '⚠ Transferência não aceita', gravidade: 'critica',
+      texto: `${h.protocolo} · ${h.titulo}: ${h.para_nome} não aceitou no prazo; foi para a fila de contingência.`, link: `#/ocorrencias/${h.oc}`, chave: `handoff-expirado:${h.id}` });
+  }
   return { proximaEm: new Date(agora.getTime() + 60e3) };
 }
 
