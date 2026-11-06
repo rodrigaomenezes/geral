@@ -65,7 +65,7 @@ POS-004;Gerar comunicação ao grupo/canal autorizado com resumo e evidências.;
 POS-005;Programar follow-up em três dias ao ponto focal.;IMPLEMENTADO E TESTADO;follow-up D+3;AT-009;
 POS-006;Distinguir encerramento de contato de resolução efetiva.;IMPLEMENTADO E TESTADO;contato encerra, pendência fica;AT-009;
 POS-007;Manter pendência não resolvida visível e elegível para revalidação.;IMPLEMENTADO E TESTADO;pendência persistente;AT-009;
-POS-008;Vincular correção posterior ao histórico original.;PARCIAL;pendencias ligadas à ocorrência;—;sem teste da correção posterior
+POS-008;Vincular correção posterior ao histórico original.;IMPLEMENTADO E TESTADO;"pendência persistente corrigida na mesma linha; ocorrência original resolvida";correcao-posterior.test;
 POS-009;Monitorar reincidência e recomendar análise de causa raiz.;IMPLEMENTADO E TESTADO;reincidência na 3ª vez recomenda análise de causa raiz;monitoramento.test;
 POS-010;Publicar métricas de sucesso, falha e recuperação por rodada.;IMPLEMENTADO SEM TESTE;dashboards rodadas;dashboards respondem;fórmulas sem teste próprio
 REC-001;Ingerir volumetria e erros de consulta de placas recorrentes da Platform.;PARCIAL;importador platform_consultas + consultas_volume;monitoramento.test;layout CSV pendente de validação com arquivo real
@@ -93,7 +93,7 @@ COM-006;Aplicar retentativa e canal alternativo quando permitido.;IMPLEMENTADO E
 COM-007;Permitir comunicação humana sem perder trilha do atendimento.;IMPLEMENTADO E TESTADO;"responder; eco do celular (QR)";WhatsApp QR;
 COM-008;Oferecer central de pendências na experiência do cliente por integração à Platform.;BLOQUEADO POR API/DECISÃO;—;—;central do cliente fica na Platform
 COM-009;"Evitar alertas incessantes; aplicar severidade, frequência e acessibilidade.";PARCIAL;sino sem repetição;meu dia notificação uma vez;severidade/acessibilidade parcial
-COM-010;Publicar campanhas de adoção de produto com controle de frequência.;PARCIAL;processo semanal (desligado);—;sem teste
+COM-010;Publicar campanhas de adoção de produto com controle de frequência.;IMPLEMENTADO E TESTADO;"gatilho contas.semanal com chave por semana (1x); opt-out";insights-semanais.test;
 CS-001;Gerir carteira VIP, responsáveis, contatos e plano de relacionamento.;IMPLEMENTADO SEM TESTE;carteira VIP;—;
 CS-002;Calcular saúde de conta com indicadores transparentes e configuráveis.;IMPLEMENTADO SEM TESTE;saúde da conta com motivos;dashboards;fórmula configurável ausente
 CS-003;Ler últimos acessos e uso por módulo via eventos autorizados da Platform.;PARCIAL;uso_contas via CSV;—;layout não homologado
@@ -103,7 +103,7 @@ CS-006;Versionar roteiro de treinamento por tela e produto.;IMPLEMENTADO E TESTA
 CS-007;Utilizar conta de demonstração, sem expor dados reais de clientes.;IMPLEMENTADO E TESTADO;"conta de demonstração obrigatória; CNPJ de cliente recusado";treinamentos.test;
 CS-008;Registrar dúvidas, avaliação e ações posteriores ao treinamento.;IMPLEMENTADO E TESTADO;"dúvidas, avaliação 1-5, próximo passo; ausente vira tarefa";treinamentos.test;
 CS-009;Acompanhar efetividade do treinamento por evolução de uso.;IMPLEMENTADO E TESTADO;uso fotografado no convite × uso atual, presentes × ausentes;treinamentos.test;depende do CSV de uso
-CS-010;Programar insights do Caça Condutores com frequência e opt-out.;PARCIAL;processo CaçaCondutores semanal desligado;—;sem teste
+CS-010;Programar insights do Caça Condutores com frequência e opt-out.;IMPLEMENTADO E TESTADO;"processo padrão semanal (desligado até revisão do texto); opt-out";insights-semanais.test;
 CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;IMPLEMENTADO E TESTADO;encaminhar expansão/renovação ao Comercial pela Carteira;comercial-funis.test;
 CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;IMPLEMENTADO E TESTADO;iniciar offboarding pela Carteira com motivo do cancelamento;onboarding.test;
 DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;IMPLEMENTADO E TESTADO;ocorrência técnica + sanitização de segredos em incidente/melhoria/evidência;desenvolvimento.test;
@@ -183,7 +183,7 @@ BL-01;"Coluna VIP em Consultas Identificação operacional; verificar se a infor
 BL-02;Classificação VIP em Credenciais Visualização por carteira e roteamento no ERP.;IMPLEMENTADO SEM TESTE;carteira VIP;—;
 BL-03;Erros invisíveis Detectar consultas não geradas por ausência de credencial.;PARCIAL;erros invisíveis pela volumetria da Platform (CSV);monitoramento.test;layout CSV pendente de validação
 BL-04;"Central de pendências Notificações persistentes e acessíveis ao cliente; evitar pop-up invasivo sem limite.";BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
-BL-05;Insights Caça Condutores Mensagens de adoção 1x/semana, com preferências.;PARCIAL;processo semanal desligado;—;
+BL-05;Insights Caça Condutores Mensagens de adoção 1x/semana, com preferências.;IMPLEMENTADO E TESTADO;"processo padrão semanal; opt-out";insights-semanais.test;
 BL-06;Visões de sucesso pré/pós Painéis ERP de correção e falha.;IMPLEMENTADO E TESTADO;dashboard de rodadas + tela Consultas;"dashboards; monitoramento.test";
 BL-07;Último login e mapa de uso Telemetria Platform, análise ERP e consentimento.;BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
 BL-08;Frequência de consulta Indicação Condutores;BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform

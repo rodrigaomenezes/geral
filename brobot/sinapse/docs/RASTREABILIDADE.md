@@ -262,3 +262,11 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Filas paradas, rotinas inativas e webhooks interrompidos detectados (SUP-002) | ✔ testado | `supervisor/saude-canais.js` · `test/saude-canais.test.js` |
+
+## Entrega de 06/11/2026 (F15 · Testes do que já existia)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Insights do CaçaCondutores 1x por semana, opt-out, sem repetir na semana, começa desligado (CS-010, BL-05, COM-010) | ✔ testado | processo padrão + `jobAgenda` · `test/insights-semanais.test.js` |
+| Correção posterior ligada ao histórico original (POS-008) | ✔ testado | `rodadas.revalidar/marcarCorrigida` · `test/correcao-posterior.test.js` |
+| Escalonar risco de rodada bloqueada (PRE-010) | ○ pendente | precisa de nova versão do processo padrão de pré-rodada (decisão do cliente sobre quando escalar) |
