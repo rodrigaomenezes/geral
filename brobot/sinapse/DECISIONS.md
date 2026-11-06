@@ -259,3 +259,13 @@ derrubam as sessões. Desativar não apaga, marca indisponível (o supervisor de
 substituta; a organização nunca fica sem Administração ativa. A pessoa troca a própria senha (12+, sem o e-mail) e
 marca ausência em "Minha conta".
 **Fora:** convite por e-mail (não há envio de e-mail real ainda), unidades (GOV-001), SSO.
+
+# T-033 — Relacionar, mesclar e dividir ocorrências (F10, INT-006)
+**Contexto:** a tabela `ocorrencia_vinculos` existia desde a 001 sem uso; duplicadas eram encerradas à mão.
+**Decisão:** `ocorrencias/vinculos.js`, sem migração. Relacionar grava o vínculo nos dois sentidos. Mesclar só na
+mesma conta: a duplicada é encerrada com desfecho `duplicada` e motivo "Mesclada em …", as placas que faltam são
+copiadas para a principal (a duplicada mantém as suas) e a conversa da duplicada passa para a principal, para as
+próximas mensagens caírem nela. Dividir cria uma ocorrência da mesma conta (com SLA e roteamento normais) e move as
+placas escolhidas; a original nunca fica vazia por divisão. Referência pelo protocolo ou pelo id; o protocolo é por
+organização, a RLS isola. Tudo com motivo na linha do tempo das duas.
+**Fora:** mesclar entre contas diferentes (use relacionar); desfazer uma mescla (reabrir a duplicada continua possível).

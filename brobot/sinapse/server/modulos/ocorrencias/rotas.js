@@ -4,6 +4,7 @@ const { auditar } = require('../../nucleo/registro');
 const { com } = require('../../http/servidor');
 const maquina = require('./maquina');
 const s = require('./servico');
+const vinculos = require('./vinculos');
 const tarefas = require('./tarefas');
 
 const TIPOS = { nao_classificada: 'Não classificada', duvida: 'Dúvida', erro_consulta: 'Erro de consulta', credencial: 'Credencial',
@@ -72,6 +73,28 @@ module.exports = [
     handler: async ({ db, ctx, corpo, params }) => {
       const d = validar(corpo, { equipeCodigo: { tipo: 'texto', max: 30 }, responsavelId: { tipo: 'uuid' }, motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 }, versao: { tipo: 'inteiro' } });
       return comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => s.reatribuir(c, ctx, params.id, d));
+    } },
+  // INT-006: relacionar, mesclar (duplicada → principal) e dividir, sem apagar nada.
+  { metodo: 'POST', caminho: '/api/ocorrencias/:id/relacionar', permissao: 'ocorrencia.atender', descricao: 'relacionar ocorrências',
+    handler: async ({ db, ctx, corpo, params }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      const d = validar(corpo, { outra: { obrigatorio: true, tipo: 'texto', max: 40 }, motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 } });
+      return comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, async (c) => vinculos.relacionar(c, ctx, params.id, await vinculos.porReferencia(c, d.outra), d.motivo));
+    } },
+  { metodo: 'POST', caminho: '/api/ocorrencias/:id/mesclar', permissao: 'ocorrencia.atender', descricao: 'mesclar ocorrências',
+    handler: async ({ db, ctx, corpo, params }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      const d = validar(corpo, { principal: { obrigatorio: true, tipo: 'texto', max: 40 }, motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 } });
+      return comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, async (c) => vinculos.mesclar(c, ctx, params.id, await vinculos.porReferencia(c, d.principal), d.motivo));
+    } },
+  { metodo: 'POST', caminho: '/api/ocorrencias/:id/dividir', permissao: 'ocorrencia.atender', descricao: 'dividir ocorrências',
+    handler: async ({ db, ctx, corpo, params }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      const d = validar(corpo, { titulo: { obrigatorio: true, tipo: 'texto', min: 5, max: 200 }, descricao: { tipo: 'texto', max: 4000 },
+        tipo: { tipo: 'texto', em: Object.keys(TIPOS).filter((t) => t !== 'nao_classificada') }, prioridade: { tipo: 'texto', em: Object.keys(PRIORIDADES) },
+        motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 } });
+      const itemIds = Array.isArray(corpo?.itemIds) ? corpo.itemIds.map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 500) : [];
+      return com(201, await comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => vinculos.dividir(c, ctx, params.id, { ...d, itemIds })));
     } },
   { metodo: 'GET', caminho: '/api/tarefas', permissao: 'ocorrencia.ver',
     handler: ({ db, ctx, usuario, query }) => db.comoTenant(ctx.tenantId, (c) => tarefas.listar(c, usuario, { minhas: query.minhas === '1', pagina: Number(query.pagina) || 1 })) },

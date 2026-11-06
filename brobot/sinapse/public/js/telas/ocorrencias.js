@@ -143,7 +143,8 @@ export async function telaOcorrencia(el, ctx, id) {
     class: `btn ${['resolver', 'assumir', 'classificar', 'aceitar_handoff'].includes(a.acao) ? 'btn-primario' : ''}`, onclick: () => executar(a.acao, a.rotulo),
   }, a.rotulo)),
   o.conta_id && ctx.pode('telefonia.usar') ? h('button', { class: 'btn', onclick: () => ligar({ ocorrenciaId: o.id, aoEncerrar: recarregar }) }, '📞 Ligar') : null,
-  ctx.pode('ocorrencia.intervir') && !['resolvida', 'encerrada_sem_resolucao'].includes(o.estado) ? h('button', { class: 'btn btn-fantasma', onclick: () => reatribuir(ctx, o, recarregar) }, 'Reatribuir (intervenção)') : null);
+  ctx.pode('ocorrencia.intervir') && !['resolvida', 'encerrada_sem_resolucao'].includes(o.estado) ? h('button', { class: 'btn btn-fantasma', onclick: () => reatribuir(ctx, o, recarregar) }, 'Reatribuir (intervenção)') : null,
+  ctx.pode('ocorrencia.atender') ? h('button', { class: 'btn btn-fantasma', onclick: () => organizar(ctx, o, recarregar) }, 'Relacionar, mesclar ou dividir') : null);
 
   const conversa = h('div', { class: 'conversa' }, o.interacoes.length ? o.interacoes.map((i) => h('div', { class: `msg msg-${i.direcao}` },
     h('div', { class: 'msg-meta' }, h('strong', {}, i.direcao === 'entrada' ? (i.remetente || 'Cliente') : i.direcao === 'nota' ? `Nota interna · ${i.autor_nome || ''}` : (i.autor_nome || 'Sinapse (automático)')),
@@ -176,6 +177,8 @@ export async function telaOcorrencia(el, ctx, id) {
       h('section', { class: 'cartao' }, h('h2', {}, 'Veículos e pendências'), o.itens.length ? h('ul', { class: 'itens' }, o.itens.map((i) => h('li', {},
         h('strong', {}, i.placa || '—'), ` ${i.descricao} `, i.pendencia_estado ? selo(i.pendencia_estado, i.pendencia_estado === 'corrigida' ? 'ok' : 'alerta') : null))) : vazio('Sem veículos vinculados.'),
       o.handoffs.length ? [h('h3', {}, 'Transferências'), h('ul', { class: 'itens' }, o.handoffs.map((x) => h('li', {}, `${x.de_nome} → ${x.para_nome}: `, selo(x.estado, x.estado === 'aceito' ? 'ok' : x.estado === 'expirado' ? 'perigo' : 'alerta'), ` prazo ${dataHora(x.prazo_aceite_em)} · ${x.motivo}`)))] : null,
+      o.vinculos.length ? [h('h3', {}, 'Ocorrências ligadas'), h('ul', { class: 'itens' }, o.vinculos.map((v) => h('li', {},
+        `${VINCULO[v.tipo] || v.tipo} `, h('a', { href: `#/ocorrencias/${v.id}` }, v.protocolo), ' ', seloEstado(ctx, v.estado))))] : null,
       o.tarefas.length ? [h('h3', {}, 'Tarefas'), h('ul', { class: 'itens' }, o.tarefas.map((t) => h('li', {}, `${t.titulo} · ${t.equipe_nome} · `, selo(t.estado, t.estado === 'aberta' ? 'alerta' : 'neutro'), t.resultado ? ` — ${t.resultado}` : '')))] : null)),
     h('section', { class: 'cartao' }, h('h2', {}, 'Conversa'), conversa,
       ativa && ctx.pode('ocorrencia.ver') ? h('div', { class: 'responder' }, texto, h('div', { class: 'form-acoes' },
@@ -188,6 +191,36 @@ export async function telaOcorrencia(el, ctx, id) {
 }
 
 const par = (rotulo, valor) => [h('dt', {}, rotulo), h('dd', {}, valor)];
+const VINCULO = { relacionada: 'Relacionada a', mesclada_em: 'Mesclada em', dividida_de: 'Dividida de', reaberta_por: 'Reaberta por' };
+
+/** INT-006: relacionar, mesclar (esta é a duplicada) ou dividir (itens escolhidos vão para uma nova). Nada é apagado. */
+function organizar(ctx, o, recarregar) {
+  const ativa = !['resolvida', 'encerrada_sem_resolucao'].includes(o.estado);
+  const protocolo = (nome, rotulo) => campo(rotulo, h('input', { name: nome, required: true, maxlength: 40, placeholder: 'SIN-000123', autocapitalize: 'characters' }));
+  const motivo = () => campo('Motivo', h('textarea', { name: 'motivo', rows: 2, required: true, minlength: 5, maxlength: 500 }), 'Fica na linha do tempo das duas.');
+  modal('Organizar ocorrências', (fechar) => h('div', {},
+    h('details', {}, h('summary', {}, 'Relacionar a outra'), h('p', { class: 'suave' }, 'Mesmo problema em outra conta, ou assuntos ligados. As duas continuam abertas.'),
+      formulario([protocolo('outra', 'Protocolo da outra ocorrência'), motivo()], 'Relacionar', async (d) => {
+        await api.post(`/ocorrencias/${o.id}/relacionar`, d); fechar(); aviso('Ocorrências relacionadas.'); recarregar();
+      })),
+    ativa ? h('details', {}, h('summary', {}, 'Esta é duplicada: mesclar na principal'),
+      h('p', { class: 'suave' }, `${o.protocolo} será encerrada como duplicada; as placas e a conversa passam para a principal (mesma conta).`),
+      formulario([protocolo('principal', 'Protocolo da principal'), motivo()], 'Mesclar', async (d) => {
+        const r = await api.post(`/ocorrencias/${o.id}/mesclar`, d); fechar(); aviso(`Mesclada em ${r.principal}.`); recarregar();
+      })) : null,
+    ativa && o.conta_id ? h('details', {}, h('summary', {}, 'Dividir em uma nova'),
+      formulario([
+        campo('Título da nova', h('input', { name: 'titulo', required: true, minlength: 5, maxlength: 200 })),
+        campo('Prioridade', opcoes(h('select', { name: 'prioridade' }), ctx.catalogos.prioridades, 'Mesma desta')),
+        o.itens.length ? h('fieldset', {}, h('legend', {}, 'Placas que vão para a nova'), o.itens.map((i) => h('label', { class: 'check' },
+          h('input', { type: 'checkbox', name: `item_${i.id}` }), `${i.placa || '—'} · ${i.descricao}`))) : null,
+        motivo(),
+      ], 'Dividir', async (d) => {
+        const itemIds = Object.entries(d).filter(([k, v]) => k.startsWith('item_') && v === true).map(([k]) => k.slice(5));
+        const r = await api.post(`/ocorrencias/${o.id}/dividir`, { titulo: d.titulo, prioridade: d.prioridade, motivo: d.motivo, itemIds });
+        fechar(); aviso(`${r.protocolo} criada com ${r.itensMovidos} placa(s).`); location.hash = `#/ocorrencias/${r.id}`;
+      })) : null));
+}
 
 function reatribuir(ctx, o, recarregar) {
   const pessoas = Object.fromEntries(ctx.equipes.usuarios.map((u) => [u.id, `${u.nome} (${u.equipe_nome})${u.disponivel ? '' : ' · indisponível'}`]));
