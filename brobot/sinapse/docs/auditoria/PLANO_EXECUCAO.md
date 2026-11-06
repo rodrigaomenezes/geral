@@ -42,7 +42,7 @@ Checklist configurável por produto (dados, contrato, ponto focal, certificados 
 rodada), pedidos de faltantes com prazo, ativação administrativa × técnica × sinalização ao OMIE, exceção aprovada,
 offboarding com revogação e retenção.
 
-## F5 · Pré/pós-rodada, recorrentes e credenciais — fechar parciais (PRE-010/011, POS-008/009, REC, CRE-003/004)
+## F5 · Pré/pós-rodada, recorrentes e credenciais — ✔ FEITA em 06/11 (volumetria, erros invisíveis, robô parado, erro técnico, vencimento, reincidência); falta PRE-011 (DP-08)
 ## F6 · CS: treinamentos coletivos (CS-004…009), insights (CS-010) e encaminhamento ao Comercial (CS-011)
 ## F7 · Desenvolvimento: incidentes, RCA, melhorias e releases (DEV-003/006/007/008)
 ## F8 · Infra e conformidade: papéis web/worker, monitor externo, backup/restauração testados, LGPD (SUP-008), MFA (R-05), métricas

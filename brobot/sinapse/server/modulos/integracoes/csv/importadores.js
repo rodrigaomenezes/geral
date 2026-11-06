@@ -166,6 +166,39 @@ const TIPOS = {
       return { resumo: [`Situação financeira de ${n} cliente(s) atualizada`, `${vinculados} código(s) OMIE vinculado(s)`], erros };
     },
   },
+  platform_consultas: {
+    nome: 'Platform → volumetria de consultas por cliente, produto e dia (esperadas, geradas, erros) — erros invisíveis e robô parado',
+    origem: 'platform',
+    colunas: ['cnpj', 'produto', 'data', 'esperadas', 'geradas', 'erros_tecnicos', 'erros_usuario', 'indisponiveis'],
+    opcionais: ['erros_tecnicos', 'erros_usuario', 'indisponiveis'],
+    exemplo: 'cnpj;produto;data;esperadas;geradas;erros_tecnicos;erros_usuario;indisponiveis\n12345678000190;Multas e Notificações;04/11/2026;620;598;3;12;0',
+    validar(v) {
+      const e = [];
+      const inteiro = (x) => x === undefined || x === '' || /^\d{1,9}$/.test(String(x).trim());
+      if (!csv.cnpj(v.cnpj)) e.push('CNPJ inválido');
+      if (!v.produto) e.push('produto vazio');
+      if (!csv.data(v.data)) e.push('data inválida (use dd/mm/aaaa)');
+      for (const k of ['esperadas', 'geradas']) if (!/^\d{1,9}$/.test(String(v[k] ?? '').trim())) e.push(`${k}: número inteiro`);
+      for (const k of ['erros_tecnicos', 'erros_usuario', 'indisponiveis']) if (!inteiro(v[k])) e.push(`${k}: número inteiro`);
+      return e;
+    },
+    async aplicar(c, ctx, linhas, { monitoramento }) {
+      const contas = await contasPorCnpj(c, linhas.map((l) => csv.cnpj(l.valores.cnpj)));
+      const erros = []; const validas = [];
+      const n = (x) => Number(String(x || '0').trim()) || 0;
+      for (const l of linhas) {
+        const v = l.valores; const conta = contas.get(csv.cnpj(v.cnpj));
+        if (!conta) { erros.push({ linha: l.numero, erro: `CNPJ ${v.cnpj} não é cliente no Sinapse` }); continue; }
+        validas.push({ contaId: conta.id, produto: v.produto.trim().slice(0, 80), dia: csv.data(v.data).toISOString().slice(0, 10), esperadas: n(v.esperadas),
+          geradas: n(v.geradas), errosTecnicos: n(v.erros_tecnicos), errosUsuario: n(v.erros_usuario), indisponiveis: n(v.indisponiveis) });
+      }
+      await monitoramento.registrarVolumes(c, ctx, validas);
+      const pares = [...new Map(validas.map((x) => [`${x.contaId}|${x.produto}`, { contaId: x.contaId, produto: x.produto }])).values()];
+      const r = await monitoramento.avaliarConsultas(c, ctx, pares);
+      return { resumo: [`${validas.length} dia(s) de volumetria registrado(s) em ${r.avaliados} conta×produto`,
+        `${r.alertasNovos} alerta(s) novo(s) aberto(s) como ocorrência`, `${r.jaAbertos} alerta(s) que já estavam abertos (sem repetir)`], erros };
+    },
+  },
   pipedrive_negocios: {
     nome: 'Pipedrive → negócios em aberto (migração do Comercial; ganhos e perdidos ficam para a migração completa)',
     origem: 'pipedrive',

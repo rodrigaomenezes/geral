@@ -16,6 +16,7 @@ const { TIPOS } = require('./importadores');
 const { EXPORTS } = require('./exportadores');
 const rodadas = require('../../rodadas/servico');
 const comercial = require('../../comercial/servico');
+const monitoramento = require('../../monitoramento/servico');
 
 const MAX_ERROS = 200;
 const PRAZO_CONFIRMACAO_MS = 2 * DIA;
@@ -91,7 +92,7 @@ async function aplicar(c, ctx, tipo, nomeArquivo, texto, mapaEnviado) {
     `INSERT INTO importacoes (tenant_id, tipo, arquivo, hash, linhas, aplicadas, com_erro, criado_por, mapa_id) VALUES ($1,$2,$3,$4,$5,0,0,$6,$7)
      ON CONFLICT (tenant_id, tipo, hash) DO NOTHING RETURNING id`, [ctx.tenantId, tipo, nomeArquivo, a.hash, a.tabela.linhas.length, ctx.usuario?.id || null, mapaId]));
   if (!reg) throw erro.conflito('Este mesmo arquivo já foi importado. Nada foi alterado.');
-  const r = a.validas.length ? await a.def.aplicar(c, ctx, a.validas, { rodadas, comercial }) : { resumo: [], erros: [] };
+  const r = a.validas.length ? await a.def.aplicar(c, ctx, a.validas, { rodadas, comercial, monitoramento }) : { resumo: [], erros: [] };
   const erros = [...a.erros, ...(r.erros || [])];
   const aplicadas = a.validas.length - (r.erros || []).length;
   const estado = erros.length ? 'parcial' : 'concluido';
