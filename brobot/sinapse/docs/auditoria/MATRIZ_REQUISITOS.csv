@@ -131,7 +131,7 @@ SUP-004;Executar reconciliação Platform↔ERP↔OMIE nas fronteiras permitidas
 SUP-005;Gerir dead-letter queue e reprocessamento com autorização.;IMPLEMENTADO SEM TESTE;jobs morto + reprocessar com motivo;—;sem teste do reprocessamento
 SUP-006;Produzir painéis por área, carteira, produto, cliente, período e SLA.;IMPLEMENTADO E TESTADO;6 dashboards;dashboards;
 SUP-007;Registrar toda alteração sensível com trilha auditável.;IMPLEMENTADO E TESTADO;auditoria só anexação;regras banco;
-SUP-008;Gerir retenção, exportação, anonimização e direitos de titulares conforme LGPD.;AUSENTE;—;—;LGPD
+SUP-008;Gerir retenção, exportação, anonimização e direitos de titulares conforme LGPD.;PARCIAL;exportar e anonimizar titular, auditado;mfa-lgpd.test;política de retenção a definir
 SUP-009;Disponibilizar logs, métricas, traces e alertas por correlação.;PARCIAL;correlação por requisição;—;sem métricas/traces
 SUP-010;Permitir parametrização de regras com aprovação, simulação e rollback.;IMPLEMENTADO E TESTADO;processos com simulação/restauração;processos;
 SUP-011;Controlar indisponibilidades e contingência de canais.;PARCIAL;integracoes.disponivel;AT-005/007;
@@ -155,10 +155,10 @@ RNF-001;Disponibilidade Meta inicial sugerida 99,9% mensal do ERP, com janelas e
 RNF-002;"Durabilidade Nenhum evento confirmado ao emissor deve ser descartado; backups e recuperação testados.";PARCIAL;entrada antes de 202;AT-002;backup/restauração não testados
 RNF-003;Performance P95 de páginas operacionais até 2 s em carga nominal, a validar em dimensionamento.;AUSENTE;—;—;sem teste de carga
 RNF-004;Processamento Eventos críticos reconhecidos em até 60 s em condições normais, salvo dependência externa.;PARCIAL;ciclo 2 s;—;sem medição
-RNF-005;Segurança TLS, criptografia em repouso, MFA administrativo, segregação por tenant, secrets manager.;PARCIAL;"RLS; AES-GCM; scrypt; TLS do banco verificado; limite de login";"AT-014; cifra; seguranca.test";MFA ausente
-RNF-006;Privacidade LGPD, minimização, base legal, retenção, consentimento quando aplicável, logs protegidos.;AUSENTE;—;—;LGPD
+RNF-005;Segurança TLS, criptografia em repouso, MFA administrativo, segregação por tenant, secrets manager.;PARCIAL;"RLS; AES-GCM; scrypt; TLS verificado; limite de login; MFA TOTP obrigatório para gestão";"mfa-lgpd.test; seguranca.test";secrets manager do provedor
+RNF-006;Privacidade LGPD, minimização, base legal, retenção, consentimento quando aplicável, logs protegidos.;PARCIAL;"exportação e anonimização do titular; logs sem dado pessoal";mfa-lgpd.test;retenção automática por prazo a definir
 RNF-007;Auditabilidade 100% de transições críticas com ator, data, motivo, correlação e evidência.;IMPLEMENTADO E TESTADO;auditoria + eventos;AT-002/014;
-RNF-008;"Recuperação RPO/RTO a homologar por criticidade; exercícios de restauração regulares.";AUSENTE;—;—;RPO/RTO
+RNF-008;"Recuperação RPO/RTO a homologar por criticidade; exercícios de restauração regulares.";PARCIAL;procedimento de backup e teste de restauração documentado (README);—;teste de restauração a executar no ambiente real
 RNF-009;Escalabilidade Workers horizontais e limites de concorrência por integração/tenant.;PARCIAL;SKIP LOCKED;AT-011;PGlite é processo único
 RNF-010;Manutenibilidade Módulos coesos, contratos versionados, testes e documentação obrigatória.;PARCIAL;"módulos coesos; CI";CI pglite+pg;sem lint
 RNF-011;Observabilidade Métricas, traces, logs estruturados, dashboards e alertas com dono.;AUSENTE;—;—;sem métricas/alertas

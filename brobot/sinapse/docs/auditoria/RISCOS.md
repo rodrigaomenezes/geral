@@ -37,3 +37,5 @@ no banco; `npm audit` sem vulnerabilidades.
   organização (`processos/padroes.js`); agora só a falta de equipe é tolerada e há teste de guarda.
 - **Em aberto:** R-05 (MFA), R-06/R-07/R-08 (banco de produção, papéis, monitor externo), R-09, R-11, R-12, R-15, R-16,
   R-18, R-19, R-20 — ver o plano.
+- **Mitigados em 06/11 (F8a, com teste):** R-05 (MFA TOTP, obrigatório para a gestão), R-19 (sessão por
+  inatividade), R-11 parcial (exportação e anonimização do titular; retenção automática segue em aberto).

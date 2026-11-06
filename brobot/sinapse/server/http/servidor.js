@@ -127,6 +127,10 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
       const usuario = token ? await identidade.sessaoPorToken(db, token) : null;
       if (!rota.publica) {
         if (!usuario) throw erro.naoAutenticado();
+        // R-05: com MFA obrigatório, Administração e Supervisão só usam o sistema depois de ativar (a ativação fica liberada).
+        if (cfg.mfaObrigatorio && ['admin', 'supervisor'].includes(usuario.papel) && !usuario.mfa_ativo && !url.pathname.startsWith('/api/mfa/')) {
+          throw new ErroNegocio(403, 'mfa_obrigatorio', 'Ative a verificação em duas etapas para continuar: clique no seu nome, no topo, e siga os passos.');
+        }
         if (rota.permissao && !pode(usuario, rota.permissao)) throw erro.semPermissao(rota.descricao || 'esta ação');
         if (rota.demo && !cfg.demo) throw new ErroNegocio(404, 'rota_inexistente', 'O simulador está desligado neste ambiente.');
       }

@@ -217,3 +217,16 @@ libera e cria a tarefa de validação para a operação; validar é de quem cuid
 com evidência (DEV-005), e avisa as ocorrências ligadas (DEV-007). Todo texto passa por `nucleo/sanitizar.js`
 (DEV-001: tira senha, token e chave; preserva placa, protocolo e UUID). Permissão nova `dev.gerir`.
 **Fora:** sincronizar com a ferramenta técnica (DEV-003, sem API autorizada), status público para os clientes.
+
+# T-030 — Verificação em duas etapas, sessão por inatividade e pedidos de titulares (F8a)
+**Contexto:** R-05 (sem MFA), R-19 (sessão de 12 h sem inatividade), R-11/SUP-008 (LGPD) da auditoria.
+**Decisão:** TOTP próprio (`nucleo/totp.js`, RFC 6238, testado com os vetores oficiais), sem dependência. O segredo
+fica cifrado (AES-256-GCM, `SINAPSE_CHAVE`); com MFA ativo o login cria a sessão "pendente" e ela só vale depois do
+código (5 erros por sessão bloqueiam); o mesmo código não vale duas vezes (`mfa_ultimo_passo`). MFA obrigatório para
+Administração e Supervisão com `SINAPSE_MFA_OBRIGATORIO=1` e sempre em `SINAPSE_AMBIENTE=producao`: sem ele, só a
+ativação responde. Aparelho perdido: a Administração redefine (não a própria), com motivo; as sessões da pessoa caem.
+Sessão parada mais de 120 min (`SINAPSE_SESSAO_INATIVIDADE_MIN`) deixa de valer; o uso grava no máximo a cada 5 min.
+LGPD: `lgpd.gerir` localiza o titular por telefone/e-mail, exporta (acesso) e anonimiza (eliminação: nome, telefone e
+e-mail viram marcadores, o papel de contato é encerrado, o destinatário das mensagens é trocado); confirmação digitada;
+auditoria só com o hash do identificador.
+**Fora:** retenção automática por prazo (política a definir com o jurídico), MFA por e-mail/SMS, chaves de acesso (passkeys).

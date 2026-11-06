@@ -391,3 +391,7 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .roteiro-passo input { min-width: 0; }
 @media (max-width: 480px) { .roteiro-passo { grid-template-columns: 1fr auto; } .roteiro-passo input:first-child { grid-column: 1 / -1; } }
 @media print { .topo, .menu, .faixa-demo, .acoes, .voltar, button { display: none !important; } .roteiro-doc { border: 0; box-shadow: none; } }
+
+/* Nome no topo abre a segurança da conta. */
+.quem-botao { background: none; border: 0; color: inherit; text-align: right; cursor: pointer; padding: 0; display: flex; flex-direction: column; align-items: flex-end; min-width: 0; max-width: 100%; font: inherit; }
+.quem-botao:hover .quem-nome, .quem-botao:focus .quem-nome { text-decoration: underline; }

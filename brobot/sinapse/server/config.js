@@ -24,6 +24,8 @@ function carregarConfig(env = process.env) {
     senhaAdmin: env.SINAPSE_SENHA_ADMIN || null,
     // Senha dos usuários de teste (gestor@brobot.com.br, suporte1@…); sem ela, eles não são criados.
     senhaTeste: env.SINAPSE_SENHA_TESTE || null,
+    // MFA obrigatório para Administração e Supervisão: com SINAPSE_MFA_OBRIGATORIO=1, e sempre em produção real.
+    mfaObrigatorio: env.SINAPSE_MFA_OBRIGATORIO === '1' || env.SINAPSE_AMBIENTE === 'producao',
     // Intervalo do ciclo do worker (ms). Os jobs ficam no banco; o ciclo só verifica o que venceu.
     cicloWorkerMs: Number(env.SINAPSE_CICLO_MS || 2000),
     worker: env.SINAPSE_WORKER !== '0',

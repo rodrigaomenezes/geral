@@ -202,3 +202,13 @@ dimensionamento e da infraestrutura definitiva.
 | Problema recorrente ligado à ação preventiva; ocorrências avisadas (DEV-007) | ✔ testado | `melhoria_ocorrencias` · `desenvolvimento.test.js` |
 | Backlog com aprovação por outra pessoa e releases (DEV-008) | ✔ testado | `melhorias`, `releases` · `desenvolvimento.test.js` |
 | Sincronizar com ferramenta técnica (DEV-003) | ○ bloqueado | sem API autorizada |
+
+## Entrega de 06/11/2026 (F8a · MFA, sessão e LGPD)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Verificação em duas etapas (TOTP) com ativação por QR, login em duas etapas, sem reuso de código (RNF-005, R-05) | ✔ testado | `nucleo/totp.js`, `identidade` · `test/mfa-lgpd.test.js` |
+| MFA obrigatório para Administração e Supervisão; redefinição pela Administração | ✔ testado | `http/servidor.js` · `mfa-lgpd.test.js` |
+| Sessão expira por inatividade (R-19) | ✔ testado | `sessaoPorToken` · `mfa-lgpd.test.js` |
+| Pedido do titular: localizar, exportar e anonimizar, auditado sem o dado (SUP-008, RNF-006) | ✔ testado | `modulos/lgpd` · `mfa-lgpd.test.js` |
+| Backup/restauração, monitor externo, web × worker | ○ configuração | README, seção "Operação em produção" |
