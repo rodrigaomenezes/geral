@@ -302,3 +302,9 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Orquestrar alteração de módulos, dados, carteira e ponto focal (ONB-011) | ✔ testado | `onboarding` tipo `alteracao` (023) · `test/alteracao.test.js` |
+
+## Entrega de 06/11/2026 (F21 · Ponto focal válido)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Conta operacional sem ponto focal válido vira tarefa; risco com pendência de rodada; fecha sozinha ao corrigir (RN-002, GOV-007) | ✔ testado | `clientes/ponto-focal-saude.js` · `test/ponto-focal.test.js` |
