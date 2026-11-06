@@ -256,3 +256,9 @@ dimensionamento e da infraestrutura definitiva.
 | --- | --- | --- |
 | Escalonamento por níveis com ciência e ação registradas (WFL-007) | ✔ testado | `ocorrencias/escalonamento.js`, supervisor · `test/escalonamento.test.js` |
 | Intervenção excepcional com justificativa e auditoria (WFL-014) | ✔ testado | `ocorrencias/servico.js reatribuir` · `escalonamento.test.js` |
+
+## Entrega de 06/11/2026 (F14 · O que para em silêncio)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Filas paradas, rotinas inativas e webhooks interrompidos detectados (SUP-002) | ✔ testado | `supervisor/saude-canais.js` · `test/saude-canais.test.js` |

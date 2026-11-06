@@ -125,7 +125,7 @@ FIN-008;Registrar divergências de identificadores, contratos e status com trata
 FIN-009;Separar permissões de visualização operacional de dados financeiros sensíveis.;IMPLEMENTADO E TESTADO;financeiro.detalhe;regras financeiro mínimo;
 FIN-010;Exibir apenas informações financeiras mínimas e justificadas no contexto operacional.;IMPLEMENTADO E TESTADO;situacaoVisivel;regras FIN-010;
 SUP-001;Verificar periodicamente ocorrências órfãs, vencidas ou sem próxima ação.;IMPLEMENTADO E TESTADO;supervisor varrer;"regras painel sem órfãs; AT-010";
-SUP-002;Detectar filas paradas, agendadores inativos e webhooks interrompidos.;PARCIAL;supervisor jobs vencidos;—;webhooks interrompidos não detectados
+SUP-002;Detectar filas paradas, agendadores inativos e webhooks interrompidos.;IMPLEMENTADO E TESTADO;supervisor: canal em silêncio, entrada parada, rotina parada (saude-canais.js);saude-canais.test;
 SUP-003;Manter heartbeat e monitor externo do supervisor.;PARCIAL;/api/health/supervisor;AT-013;monitor externo não configurado
 SUP-004;Executar reconciliação Platform↔ERP↔OMIE nas fronteiras permitidas.;PARCIAL;reconciliação OMIE;AT-006;Platform ausente
 SUP-005;Gerir dead-letter queue e reprocessamento com autorização.;IMPLEMENTADO SEM TESTE;jobs morto + reprocessar com motivo;—;sem teste do reprocessamento

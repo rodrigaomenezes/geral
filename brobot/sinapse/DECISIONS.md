@@ -300,3 +300,13 @@ linha do tempo registra. Uma ciência por nível (019: `escalonamento_ciente_*`,
 Se o novo prazo vencer, o nível sobe; sem ciência no nível anterior, a tarefa diz "sem ciência da gestão".
 A intervenção excepcional (reatribuir) ganhou teste próprio: só gestão, justificativa, trava otimista, não em encerrada.
 **Fora:** notificação fora do sistema (e-mail/SMS) para nível 3.
+
+# T-037 — Supervisor detecta canal em silêncio, entrada parada e rotina parada (F14, SUP-002)
+**Contexto:** webhook interrompido ou número desconectado não davam sinal: as mensagens simplesmente não chegavam.
+**Decisão:** `supervisor/saude-canais.js`, sem migração, na varredura do supervisor. Canal que já recebeu mensagens e
+está sem nada há mais que o limite em horas úteis (padrão WhatsApp 4 h, e-mail 24 h; `tenants.config.canais_silencio_horas`
+muda) vira divergência `canal_silencio` e tarefa da Supervisão, uma vez por episódio (chave = canal + última mensagem);
+a próxima mensagem fecha a divergência. Entrada gravada e não processada há mais de 15 min (`entrada_parada`) e rotina
+recorrente na fila de falhas (`rotina_parada`) seguem o mesmo padrão. Noite, fim de semana e feriado não contam.
+**Fora:** teste ativo do webhook (mensagem sintética do provedor) e alerta fora do sistema; o worker parado continua
+coberto pelo monitor externo de `/api/health/supervisor` (AT-013).
