@@ -231,3 +231,9 @@ dimensionamento e da infraestrutura definitiva.
 | Cadastro de pessoas e equipes, senha temporária com troca obrigatória, perfil, substituto, desativar sem apagar (GOV-001) | ✔ testado | `identidade/pessoas.js` · `test/pessoas.test.js` |
 | Trocar a própria senha e marcar ausência | ✔ testado | `/api/senha`, `/api/eu/disponivel` · `pessoas.test.js` |
 | Unidades | ○ pendente | — |
+
+## Entrega de 06/11/2026 (F10 · Ocorrências ligadas)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Relacionar, mesclar (duplicada → principal) e dividir ocorrências sem apagar (INT-006) | ✔ testado | `ocorrencias/vinculos.js` · `test/vinculos.test.js` |
