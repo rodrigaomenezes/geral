@@ -51,12 +51,33 @@ function somarHorasUteis(inicio, horas, cal) {
   return new Date(local.getTime() - off);
 }
 
-/** Prazos de resposta e resolução por prioridade; VIP tem prazo reduzido pelo fator configurado. */
-function prazos(prioridade, { agora, vip = false, cal }) {
-  const regra = cal.sla[prioridade] || cal.sla.media;
-  const fator = vip ? cal.fatorVip : 1;
+/**
+ * Prazos de resposta e resolução por prioridade; VIP tem prazo reduzido pelo fator configurado. SLA de contrato
+ * (GOV-008, `contas.sla_contrato`) substitui as horas da prioridade e vale como acordado (sem o fator VIP).
+ */
+function prazos(prioridade, { agora, vip = false, cal, contrato = null }) {
+  const doContrato = contrato && contrato[prioridade];
+  const regra = { ...(cal.sla[prioridade] || cal.sla.media), ...(doContrato || {}) };
+  const fator = vip && !doContrato ? cal.fatorVip : 1;
   const somar = (h) => (regra.corrido ? new Date(agora.getTime() + h * fator * HORA) : somarHorasUteis(agora, h * fator, cal));
   return { respostaEm: somar(regra.resposta), resolucaoEm: somar(regra.resolucao) };
 }
 
-module.exports = { calendario, somarHorasUteis, prazos, PADRAO };
+/** Valida o SLA de contrato: só as prioridades conhecidas, horas entre 0,25 e 720, resolução ≥ resposta. */
+function validarSlaContrato(v) {
+  if (v === null) return null;
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return { erro: 'Informe as horas por prioridade.' };
+  const saida = {};
+  for (const [prio, r] of Object.entries(v)) {
+    if (!PADRAO.sla[prio]) return { erro: `Prioridade desconhecida: ${String(prio).slice(0, 20)}.` };
+    if (!r || typeof r !== 'object') return { erro: `Informe resposta e resolução para "${prio}".` };
+    const resposta = Number(r.resposta); const resolucao = Number(r.resolucao);
+    const ok = (n) => Number.isFinite(n) && n >= 0.25 && n <= 720;
+    if (!ok(resposta) || !ok(resolucao)) return { erro: `As horas de "${prio}" vão de 0,25 a 720.` };
+    if (resolucao < resposta) return { erro: `Em "${prio}", a resolução não pode vir antes da resposta.` };
+    saida[prio] = { resposta, resolucao };
+  }
+  return Object.keys(saida).length ? saida : null;
+}
+
+module.exports = { calendario, somarHorasUteis, prazos, validarSlaContrato, PADRAO };

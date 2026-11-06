@@ -25,6 +25,7 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/telefonia     central de ligações (portada do Lumen): treino, SIP/WebRTC (JsSIP), celular; conclui a tarefa de ligação
         ├─ modulos/processos     motor de processos escritos pela operação: gatilho → condições → passos → "para sozinho se"
         ├─ modulos/comunicacao   mensagens padrão editáveis (rascunho → revisão → aprovada), consentimento, janela, retentativa, fallback, template Meta
+        ├─ modulos/governanca    delegação temporária, matriz RACI com responsável vigente, plantão por equipe, SLA de contrato
         ├─ modulos/supervisor    varredura de invariantes, escalonamento, handoff vencido, heartbeat, fila de falhas
         ├─ modulos/painel        indicadores da seção 13 e 6 dashboards (blocos = tabela de dados; gráfico, tabela e CSV leem a mesma)
         ├─ modulos/integracoes   Platform e OMIE (demonstração + CSV), WhatsApp oficial (Meta Cloud API, webhook assinado) ou por QR Code (Baileys, sessão no Volume), e-mail (demonstração)

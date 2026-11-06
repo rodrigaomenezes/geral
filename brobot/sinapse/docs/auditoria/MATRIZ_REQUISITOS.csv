@@ -1,14 +1,14 @@
 id;requisito (resumo);status;evidencia_codigo;teste;lacuna_ou_dependencia
 GOV-001;Cadastrar organizações, unidades, equipes e perfis com isolamento de acesso.;PARCIAL;"identidade/permissoes.js; 001 tenants/equipes/usuarios";"regras API 401/403; AT-014";"""unidades"" não existem; cadastro de usuário/equipe só por seed (sem tela)"
 GOV-002;Configurar perfis VIP com critérios, validade, aprovador e histórico.;PARCIAL;"contas.vip_* (001); clientes/servico.js";—;"critério/aprovador/validade gravados; sem tela de aprovação nem teste"
-GOV-003;Manter matriz de responsáveis por processo, carteira, horário e substituto.;PARCIAL;"usuarios.substituto_id; identidade.resolverResponsavel";AT-003;"sem matriz por processo/horário; substituto único"
+GOV-003;Manter matriz de responsáveis por processo, carteira, horário e substituto.;IMPLEMENTADO E TESTADO;"substituto; delegação temporária; matriz RACI por processo; plantão por equipe";"AT-003; governanca.test";
 GOV-004;Impedir tarefas ativas sem dono ou fila de contingência.;IMPLEMENTADO E TESTADO;"CHECK tarefas.equipe_id; supervisor; quadro mostra fila sem responsável";"AT-010; quadro.test";
 GOV-005;Aplicar regras VIP→CS e demais→Suporte, com exceções justificadas.;IMPLEMENTADO E TESTADO;"clientes.equipeDaConta; CHECK justificativa";regras roteamento RN-001;
 GOV-006;Cadastrar ponto focal principal e suplente com canais válidos e histórico.;IMPLEMENTADO E TESTADO;pontos_focais (vigente, histórico);regras ponto focal histórico;
 GOV-007;Alertar e bloquear marcos críticos quando faltar ponto focal obrigatório.;PARCIAL;"alerta sem ponto focal; item obrigatório do onboarding bloqueia a ativação";onboarding.test;
-GOV-008;Gerir calendário de feriados, expediente, plantões e SLA por contrato.;PARCIAL;"ocorrencias/sla.js; feriados";regras SLA;plantões e SLA por contrato ausentes
-GOV-009;Permitir delegação temporária com auditoria e expiração.;AUSENTE;—;—;delegação temporária
-GOV-010;Exibir matriz RACI e responsáveis vigentes por processo.;AUSENTE;—;—;tela RACI
+GOV-008;Gerir calendário de feriados, expediente, plantões e SLA por contrato.;IMPLEMENTADO E TESTADO;"ocorrencias/sla.js; feriados; plantoes; contas.sla_contrato";"regras SLA; governanca.test";
+GOV-009;Permitir delegação temporária com auditoria e expiração.;IMPLEMENTADO E TESTADO;"delegacoes (015); resolverResponsavel; supervisor registra expiração";governanca.test;
+GOV-010;Exibir matriz RACI e responsáveis vigentes por processo.;IMPLEMENTADO E TESTADO;"raci (015); tela Governança com responsável vigente";governanca.test;
 INT-001;Receber e persistir demandas de e-mail, WhatsApp, portal, API e Platform.;PARCIAL;"entrada/servico.js; whatsapp-rotas.js";"AT-001/002; WhatsApp oficial; QR";"e-mail e portal só pelo webhook genérico; sem conector de e-mail real"
 INT-002;Gerar identificador único e correlação de conversas, anexos e eventos.;IMPLEMENTADO E TESTADO;"protocolo; conversa_chave; causacao em eventos";AT-002;
 INT-003;Deduplicar mensagens, webhooks e tickets correlatos.;IMPLEMENTADO E TESTADO;entradas.chave_idempotencia única;"AT-002; WhatsApp dedup";

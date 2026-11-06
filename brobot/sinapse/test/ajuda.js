@@ -24,7 +24,7 @@ async function subir() {
   if (url) await limparBancoExterno(url);
   const cfg = carregarConfig({ SINAPSE_DATA: ':memoria:', SINAPSE_DEMO: '0', SINAPSE_WORKER: '0', SINAPSE_TOKEN_ENTRADA: TOKEN,
     ...(url ? { DATABASE_URL: url } : {}) });
-  const app = await criarApp(cfg, { log: () => {} });
+  const app = await criarApp(cfg, { log: process.env.TESTE_LOG ? console.error : () => {} });
   await relogio.salvar(app.db, INICIO.getTime() - Date.now());
   cfg.demo = true;
   await seed.semearSeVazio(app.db, cfg);

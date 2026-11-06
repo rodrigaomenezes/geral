@@ -18,6 +18,7 @@ const lotesCsv = require('../integracoes/csv/lotes');
 const onboarding = require('../onboarding/servico');
 const monitoramento = require('../monitoramento/servico');
 const treinamentos = require('../treinamentos/servico');
+const governanca = require('../governanca/servico');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -41,14 +42,19 @@ async function jobVarrer(c, ctx) {
     resumo.handoffsExpirados++;
   }
 
+  // Responsável indisponível ou com delegação vigente (GOV-009): repassa ao delegado, ao substituto ou volta à fila.
   for (const o of (await c.query(
-    `SELECT o.id, o.responsavel_id FROM ocorrencias o JOIN usuarios u ON u.id = o.responsavel_id
-     WHERE NOT u.disponivel AND o.estado NOT IN ('resolvida','encerrada_sem_resolucao') LIMIT 100`)).rows) {
+    `SELECT o.id, o.responsavel_id, d.id IS NOT NULL AS delegou FROM ocorrencias o JOIN usuarios u ON u.id = o.responsavel_id
+     LEFT JOIN LATERAL (SELECT dl.id FROM delegacoes dl JOIN usuarios p ON p.id = dl.para_id AND p.ativo AND p.disponivel
+       WHERE dl.de_id = u.id AND dl.revogada_em IS NULL AND dl.inicio <= $1 AND dl.fim > $1 LIMIT 1) d ON true
+     WHERE (NOT u.disponivel OR d.id IS NOT NULL) AND o.estado NOT IN ('resolvida','encerrada_sem_resolucao') LIMIT 100`, [agora])).rows) {
     const novo = await identidade.resolverResponsavel(c, o.responsavel_id);
+    if (novo === o.responsavel_id) continue;
+    const quem = o.delegou ? 'ao delegado' : 'ao substituto';
     await ocorrencias.alterarComMotivo(c, ctx, o.id, novo ? 'em_atendimento' : 'aberta', { responsavel_id: novo,
-      proxima_acao: novo ? 'Dar andamento (assumida pelo substituto)' : 'Assumir (responsável indisponível)',
+      proxima_acao: novo ? `Dar andamento (assumida pelo ${o.delegou ? 'delegado' : 'substituto'})` : 'Assumir (responsável indisponível)',
       proxima_acao_em: new Date(agora.getTime() + 2 * HORA) },
-    'ocorrencia.reatribuida', novo ? 'Responsável indisponível: repassada ao substituto' : 'Responsável indisponível e sem substituto: volta à fila');
+    'ocorrencia.reatribuida', novo ? `Responsável ${o.delegou ? 'com delegação vigente' : 'indisponível'}: repassada ${quem}` : 'Responsável indisponível e sem substituto: volta à fila');
     resumo.reatribuidas++;
   }
 
@@ -73,7 +79,9 @@ async function jobVarrer(c, ctx) {
   resumo.reincidencias = await monitoramento.verificarReincidencia(c, ctx);
   // CS-004: conta sem uso vira alerta para o CS oferecer treinamento.
   resumo.contasSemUso = await treinamentos.verificarInatividade(c, ctx);
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso) {
+  // GOV-009: delegação que venceu fica registrada na auditoria (uma vez).
+  resumo.delegacoesExpiradas = await governanca.registrarExpiracoes(c, ctx);
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };

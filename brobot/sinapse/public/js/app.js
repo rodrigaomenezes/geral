@@ -20,6 +20,7 @@ import { telaConsultas } from './telas/consultas.js';
 import { telaTreinamentos } from './telas/treinamentos.js';
 import { telaDesenvolvimento } from './telas/desenvolvimento.js';
 import { telaLgpd } from './telas/lgpd.js';
+import { telaGovernanca } from './telas/governanca.js';
 import { abrirSeguranca } from './telas/seguranca.js';
 import { telaDashboards } from './telas/dashboards.js';
 import { telaMensagens } from './telas/mensagens.js';
@@ -42,6 +43,7 @@ const MENU = [
   { rota: 'treinamentos', rotulo: 'Treinamentos', perm: 'treinamento.gerir' },
   { rota: 'integracoes', rotulo: 'Integrações', perm: 'integracao.usar' },
   { rota: 'canais', rotulo: 'Canais', perm: 'canais.gerir' },
+  { rota: 'governanca', rotulo: 'Governança', perm: 'ocorrencia.ver' },
   { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', perm: 'auditoria.ver' },
   { rota: 'lgpd', rotulo: 'Privacidade (LGPD)', perm: 'lgpd.gerir' },
@@ -58,6 +60,7 @@ const ROTAS = {
   treinamentos: telaTreinamentos,
   desenvolvimento: telaDesenvolvimento,
   lgpd: telaLgpd,
+  governanca: telaGovernanca,
   dashboards: telaDashboards,
   mensagens: telaMensagens,
   painel: telaPainel,

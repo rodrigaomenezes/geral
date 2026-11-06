@@ -11,6 +11,8 @@ const SESSAO_HORAS = 12;
 const INATIVIDADE_MIN = Number(process.env.SINAPSE_SESSAO_INATIVIDADE_MIN || 120);
 const totp = require('../../nucleo/totp');
 const { cifrar, decifrar } = require('../../nucleo/cifra');
+const { relogio } = require('../../nucleo/relogio');
+const vigencia = require('../governanca/vigencia');
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 function hashSenha(senha) {
@@ -152,13 +154,19 @@ async function encerrarSessao(db, token) {
  * Responsável efetivo (AT-003): se a pessoa está indisponível, vai para o substituto disponível;
  * sem substituto, devolve null e a ocorrência fica na fila da equipe (nunca sem dono).
  */
+/**
+ * Quem recebe o que é atribuído a `usuarioId` agora: o delegado, se houver delegação vigente e ele estiver
+ * disponível (GOV-009); senão a própria pessoa, se disponível; senão o substituto disponível; senão ninguém (fila).
+ */
 async function resolverResponsavel(c, usuarioId) {
   if (!usuarioId) return null;
   const u = uma(await c.query(
     `SELECT u.id, u.disponivel, s.id AS sub_id, s.disponivel AS sub_disponivel
-     FROM usuarios u LEFT JOIN usuarios s ON s.id = u.substituto_id WHERE u.id = $1 AND u.ativo`, [usuarioId],
+     FROM usuarios u LEFT JOIN usuarios s ON s.id = u.substituto_id AND s.ativo WHERE u.id = $1 AND u.ativo`, [usuarioId],
   ));
   if (!u) return null;
+  const d = await vigencia.delegadoDe(c, u.id, relogio.agora());
+  if (d && d.para_disponivel) return d.para_id;
   if (u.disponivel) return u.id;
   return u.sub_id && u.sub_disponivel ? u.sub_id : null;
 }
