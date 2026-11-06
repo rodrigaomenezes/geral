@@ -357,3 +357,15 @@ terceiro pedido, abre ligação para o CS (uma vez). Item feito sai do pedido. C
 focal, nada é enviado (o item de ponto focal já vira tarefa). A mensagem avisa para nunca enviar senha. Organizações com
 modelo salvo ganham os pedidos ao editar o modelo; checklist já aberto não muda.
 **Fora:** canal de resposta estruturado (o cliente responde pela conversa, que vira ocorrência normal).
+
+# T-042 — Checklist de alteração de cliente ativo (F20, ONB-011)
+**Contexto:** mudar módulos, dados, carteira ou ponto focal de um cliente ativo dependia de lembrar de avisar a Platform,
+o Financeiro e o cliente.
+**Decisão:** terceiro tipo de checklist, `alteracao` (023), no mesmo motor do onboarding/offboarding: motivo obrigatório
+(o que muda), só para conta ativa, um aberto por vez. Itens padrão: combinado por escrito com o cliente (CS), Platform
+atualizada com arquivo confirmado (Operações; verificação `carteira_confirmada`: exportação de carteira ou
+provisionamento confirmada depois da abertura), Financeiro avisado (OMIE é dele), ponto focal conferido (automático),
+VIP revisto (opcional) e cliente avisado. Concluir não muda a situação da conta e publica `conta.alteracao_concluida`.
+Volta da migração cancela as abertas e mantém o histórico.
+**Fora:** abrir a alteração sozinho a partir de um evento (ex.: venda de expansão ganha) — fica para a configuração de
+processos.

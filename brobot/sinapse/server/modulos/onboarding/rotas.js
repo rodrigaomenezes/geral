@@ -7,7 +7,7 @@ const { comAuditoriaDeAcesso } = require('../ocorrencias/rotas');
 const s = require('./servico');
 
 const uuid = (v, o) => { if (!/^[0-9a-f-]{36}$/i.test(v)) throw new ErroNegocio(400, 'entrada_invalida', `${o} inválido.`); };
-const TIPOS = ['onboarding', 'offboarding'];
+const TIPOS = ['onboarding', 'offboarding', 'alteracao'];
 
 const placas = require('./placas');
 

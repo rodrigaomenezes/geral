@@ -12,7 +12,7 @@ const { relogio, DIA, HORA } = require('../../nucleo/relogio');
 const { pode } = require('../identidade/permissoes');
 const { PADRAO, GRUPOS, validarItens, progresso } = require('./modelos');
 
-const ROTULO = { onboarding: 'Onboarding', offboarding: 'Offboarding' };
+const ROTULO = { onboarding: 'Onboarding', offboarding: 'Offboarding', alteracao: 'Alteração' };
 
 // Verificações automáticas: devolvem a evidência (texto) quando o dado do sistema comprova o item; senão null.
 const placas = require('./placas');
@@ -37,6 +37,12 @@ const VERIFICACOES = {
   },
   // ONB-006: último lote sem rejeição pendente e exportação para a Platform confirmada.
   placas_conferidas: (c, ck) => placas.verificarItem(c, ck.conta_id),
+  // ONB-011: a carteira (módulos, VIP, ponto focal) foi reenviada à Platform e confirmada depois da abertura.
+  async carteira_confirmada(c, ck) {
+    const r = uma(await c.query(`SELECT arquivo FROM exportacoes WHERE tipo IN ('platform_carteira', 'platform_provisionamento') AND estado = 'confirmado'
+      AND resolvido_em >= $1 ORDER BY resolvido_em DESC LIMIT 1`, [ck.aberto_em]));
+    return r ? `Arquivo ${r.arquivo} confirmado como aplicado na Platform` : null;
+  },
   async credenciais_ok(c, ck) {
     const r = uma(await c.query("SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'ok')::int AS ok FROM credenciais_ref WHERE conta_id = $1", [ck.conta_id]));
     return r.total && r.total === r.ok ? `${r.ok} credencial(is) com status OK na Platform` : null;
@@ -91,6 +97,10 @@ async function abrir(c, ctx, { contaId, tipo, motivo, ocorrenciaId, oportunidade
   if (!conta) throw erro.naoEncontrado('Conta');
   const aberto = uma(await c.query("SELECT * FROM checklists WHERE conta_id = $1 AND tipo = $2 AND estado = 'aberto'", [contaId, tipo]));
   if (aberto) return aberto;
+  if (tipo === 'alteracao') {
+    if (!(motivo && motivo.trim().length >= 5)) throw erro.entrada('Diga o que muda (ex.: inclusão do módulo CaçaCondutores a partir de 01/12).', [{ campo: 'motivo', problema: 'obrigatório' }]);
+    if (conta.status !== 'ativa') throw erro.regra('conta_nao_ativa', 'Alteração é para cliente ativo. Em onboarding, ajuste no próprio onboarding.');
+  }
   if (tipo === 'offboarding') {
     if (!(motivo && motivo.trim().length >= 5)) throw erro.entrada('Diga o motivo do encerramento (ex.: cancelamento pedido pelo cliente).', [{ campo: 'motivo', problema: 'obrigatório' }]);
     if (conta.status === 'encerrada') throw erro.conflito('Esta conta já está encerrada.');
@@ -186,10 +196,10 @@ async function concluir(c, ctx, checklistId) {
   const agora = relogio.agora();
   await c.query("UPDATE checklists SET estado = 'concluido', concluido_por = $2, concluido_em = $3 WHERE id = $1", [ck.id, ctx.usuario?.id || null, agora]);
   const conta = uma(await c.query('SELECT status FROM contas WHERE id = $1', [ck.conta_id]));
-  const novo = ck.tipo === 'onboarding' ? (conta.status === 'onboarding' ? 'ativa' : conta.status) : 'encerrada';
+  const novo = ck.tipo === 'onboarding' ? (conta.status === 'onboarding' ? 'ativa' : conta.status) : ck.tipo === 'alteracao' ? conta.status : 'encerrada';
   if (novo !== conta.status) await c.query('UPDATE contas SET status = $2, version = version + 1, atualizado_em = now() WHERE id = $1', [ck.conta_id, novo]);
   await auditar(c, ctx, { acao: `checklist.${ck.tipo}_concluido`, entidade: 'conta', entidadeId: ck.conta_id, antes: { status: conta.status }, depois: { status: novo, checklist: ck.id } });
-  await publicar(c, ctx, { tipo: ck.tipo === 'onboarding' ? 'conta.onboarding_concluido' : 'conta.encerrada', agregado: 'conta', agregadoId: ck.conta_id,
+  await publicar(c, ctx, { tipo: { onboarding: 'conta.onboarding_concluido', alteracao: 'conta.alteracao_concluida' }[ck.tipo] || 'conta.encerrada', agregado: 'conta', agregadoId: ck.conta_id,
     chave: `checklist:${ck.id}:concluido`, payload: { checklistId: ck.id, status: novo } });
   return { id: ck.id, estado: 'concluido', contaStatus: novo };
 }

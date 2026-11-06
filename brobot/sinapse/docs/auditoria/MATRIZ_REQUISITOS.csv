@@ -44,7 +44,7 @@ ONB-007;Acompanhar configurações e agendamentos de robôs na Platform.;PARCIAL
 ONB-008;Validar rodada inicial e critério de sucesso por produto.;PARCIAL;item primeira rodada com sucesso verificado pelo sistema;onboarding.test;critério por produto: DP-09
 ONB-009;Separar ativação administrativa, operacional e sinalização financeira ao OMIE.;IMPLEMENTADO E TESTADO;grupos ativação administrativa, técnica e sinalização financeira separados com progresso;onboarding.test;
 ONB-010;Impedir conclusão sem critérios e permitir exceção formal aprovada.;IMPLEMENTADO E TESTADO;conclusão exige obrigatórios feitos ou dispensa aprovada por outra pessoa (CHECK no banco);onboarding.test;
-ONB-011;Orquestrar alteração de módulos, dados, carteira e ponto focal.;PARCIAL;"modelo versionado; expansão de conta pela venda";onboarding.test;checklist de mudança de módulos/carteira ainda não
+ONB-011;Orquestrar alteração de módulos, dados, carteira e ponto focal.;IMPLEMENTADO E TESTADO;checklist alteracao (023) com itens por área e verificação carteira_confirmada;alteracao.test;
 ONB-012;Executar offboarding com checklist de acessos, pendências, evidências e retenção.;IMPLEMENTADO E TESTADO;"offboarding com motivo, itens de acesso, pendências, financeiro e dados (LGPD); conta encerrada";onboarding.test;
 PRE-001;Detectar calendário de rodadas por conta/produto na Platform.;MOCK/DEMO;"platform-demo.js; CSV rodadas";CSV Platform;calendário real depende de CSV homologado
 PRE-002;Iniciar pré-rodada D-4 e registrar execução e resultado.;IMPLEMENTADO E TESTADO;rodadas/servico.js jobPreRodada;AT-005;execução real é da Platform (CSV/demo)
