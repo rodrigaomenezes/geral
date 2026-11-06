@@ -82,6 +82,11 @@ Monitor externo (ex.: UptimeRobot) em `/api/health/supervisor`: responde 503 se 
 Roteiro de 15 minutos em [`docs/ROTEIRO_APRESENTACAO.md`](docs/ROTEIRO_APRESENTACAO.md). Mapa dos requisitos:
 [`docs/RASTREABILIDADE.md`](docs/RASTREABILIDADE.md). Como está montado: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
+## Conferência das telas
+
+`npm run telas` abre todas as telas em 360 px com a demonstração e aponta rolagem lateral, campo sem rótulo, botão sem
+nome, imagem sem alt e erro de JavaScript. Precisa do Playwright com Chromium instalado na máquina.
+
 ## Operação em produção (o que configurar fora do código)
 
 - **Banco:** use o PostgreSQL gerenciado do Railway (`DATABASE_URL`) com backup diário ligado no provedor. Antes de
