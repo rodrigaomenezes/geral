@@ -334,3 +334,15 @@ totais de todas as organizações e sem nome de cliente, pessoa ou organização
 Prometheus, só com `SINAPSE_TOKEN_METRICAS` (24+) e `Authorization: Bearer`; sem a variável, a rota responde 404. Os
 contadores zeram ao reiniciar (padrão do Prometheus).
 **Fora:** traces distribuídos; com vários processos (web e worker), cada um expõe os seus contadores.
+
+# T-040 — Lote de placas do onboarding (F18, ONB-006)
+**Contexto:** o item "Placas e Renavam importados" do onboarding era marcado à mão; a planilha do cliente chegava à
+Platform sem conferência e os erros só apareciam na pré-rodada.
+**Decisão:** a Platform continua dona dos veículos; o Sinapse confere a planilha antes. `lotes_placas` e
+`lote_placas_linhas` (021): cada linha fica aceita ou rejeitada com motivo (placa antiga ou Mercosul, dígito verificador
+do Renavam, repetida no arquivo, já enviada em lote anterior). O mesmo arquivo não entra duas vezes. As aceitas do
+último lote vão para a Platform pela exportação `platform_placas_onboarding` (com a confirmação já existente). Rejeições
+voltam ao cliente; quando ficam de fora de propósito, Operações registra o tratamento com motivo. O item `placas` do
+modelo padrão ganhou a verificação `placas_conferidas` (último lote sem rejeição pendente e exportação confirmada depois
+dele). Organizações que já têm modelo salvo ganham a verificação ao editar o modelo; o checklist já aberto não muda.
+**Fora:** conferir placa × CNPJ no Detran/SNE (é a Platform que consulta).

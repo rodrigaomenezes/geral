@@ -21,6 +21,15 @@ const EXPORTS = {
           FROM contas c LEFT JOIN pontos_focais p ON p.conta_id = c.id AND p.vigente AND p.papel = 'principal'
           WHERE c.status = 'onboarding' AND c.arquivada_em IS NULL ORDER BY c.nome`,
   },
+  platform_placas_onboarding: {
+    nome: 'Para a Platform: placas e Renavam conferidos no onboarding (último lote de cada cliente em onboarding)',
+    destino: 'platform', permissao: 'integracao.exportar',
+    colunas: [{ titulo: 'cnpj', campo: 'cnpj' }, { titulo: 'cliente', campo: 'nome' }, { titulo: 'placa', campo: 'placa' }, { titulo: 'renavam', campo: 'renavam' }],
+    sql: `SELECT c.cnpj, c.nome, l.placa, l.renavam FROM contas c
+          JOIN LATERAL (SELECT id FROM lotes_placas p WHERE p.conta_id = c.id ORDER BY p.criado_em DESC LIMIT 1) ul ON true
+          JOIN lote_placas_linhas l ON l.lote_id = ul.id AND l.aceita
+          WHERE c.status = 'onboarding' AND c.arquivada_em IS NULL ORDER BY c.nome, l.linha`,
+  },
   platform_carteira: {
     nome: 'Para a Platform: carteira com VIP, equipe responsável e ponto focal (coluna VIP em Consultas e Credenciais)',
     destino: 'platform', permissao: 'integracao.exportar',

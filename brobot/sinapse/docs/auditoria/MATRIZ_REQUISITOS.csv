@@ -39,7 +39,7 @@ ONB-002;Verificar dados cadastrais, módulos, contrato, VIP e ponto focal.;IMPLE
 ONB-003;Solicitar dados faltantes à área ou cliente responsável com prazo.;PARCIAL;"item com prazo e equipe; vencido vira tarefa";onboarding.test;pedido automático ao cliente ainda não
 ONB-004;Provisionar conta e módulos na Platform por integração autorizada.;BLOQUEADO POR API/DECISÃO;exportação CSV de provisionamento;—;"Platform: só CSV nesta fase; capacidade de importação não homologada"
 ONB-005;Registrar checklist de certificados, placas, Renavam, SNE e permissões.;IMPLEMENTADO E TESTADO;itens de credenciais (verificação automática), placas, Renavam, SNE;onboarding.test;sem copiar segredo (só status)
-ONB-006;Importar lotes de placas com validação, resultado parcial e rejeições.;PARCIAL;"item de placas no checklist; importação de veículos por CSV de rodada";CSV Platform;lote de placas do onboarding com rejeições ainda não
+ONB-006;Importar lotes de placas com validação, resultado parcial e rejeições.;IMPLEMENTADO E TESTADO;"lotes_placas (021); onboarding/placas.js; exportação platform_placas_onboarding; verificação placas_conferidas";placas.test;
 ONB-007;Acompanhar configurações e agendamentos de robôs na Platform.;PARCIAL;item de robôs e agendamentos (manual com evidência);onboarding.test;leitura da Platform depende de CSV
 ONB-008;Validar rodada inicial e critério de sucesso por produto.;PARCIAL;item primeira rodada com sucesso verificado pelo sistema;onboarding.test;critério por produto: DP-09
 ONB-009;Separar ativação administrativa, operacional e sinalização financeira ao OMIE.;IMPLEMENTADO E TESTADO;grupos ativação administrativa, técnica e sinalização financeira separados com progresso;onboarding.test;

@@ -284,3 +284,9 @@ dimensionamento e da infraestrutura definitiva.
 | --- | --- | --- |
 | Métricas de requisições, fila, heartbeat, entrada e divergências para coletor externo (SUP-009, RNF-011, RNF-004) | ✔ testado | `nucleo/metricas.js`, `/api/metricas` · `test/metricas.test.js` |
 | Dashboards e alertas no coletor (Grafana/Prometheus) | ○ configuração | README: `SINAPSE_TOKEN_METRICAS` |
+
+## Entrega de 06/11/2026 (F18 · Lote de placas do onboarding)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Lote de placas com validação, resultado parcial e rejeições; envio à Platform com confirmação; item do checklist automático (ONB-006) | ✔ testado | `onboarding/placas.js` · `test/placas.test.js` |

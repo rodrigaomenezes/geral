@@ -39,7 +39,26 @@ export async function telaContas(el, ctx) {
 export async function telaConta(el, ctx, id) {
   const c = await api.get(`/contas/${id}`);
   const recarregar = () => telaConta(el, ctx, id);
-  const [checklists, vipHist] = await Promise.all([secaoChecklists(ctx, { id, status: c.status }, recarregar), api.get(`/contas/${id}/vip`)]);
+  const [checklists, vipHist, lotes] = await Promise.all([secaoChecklists(ctx, { id, status: c.status }, recarregar), api.get(`/contas/${id}/vip`), api.get(`/contas/${id}/placas`)]);
+  // ONB-006: lote de placas conferido antes de ir para a Platform.
+  const ultimoLote = lotes.lotes[0];
+  const arquivoPlacas = h('input', { type: 'file', accept: '.csv,text/csv', 'aria-label': 'Planilha de placas (CSV)' });
+  const enviarPlacas = async () => {
+    const f = arquivoPlacas.files[0];
+    if (!f) { aviso('Escolha a planilha (CSV com as colunas placa e renavam).', 'erro'); return; }
+    try { const r = await api.enviarArquivo(`/contas/${id}/placas`, f, 'text/csv'); aviso(`${r.aceitas} placa(s) aceita(s), ${r.rejeitadas} rejeitada(s).`); recarregar(); } catch (e) { aviso(textoErro(e), 'erro'); }
+  };
+  const tratarRejeicoes = () => modal('Tratar as rejeições', (fechar) => formulario([
+    h('p', {}, `${ultimoLote.rejeitadas} linha(s) rejeitada(s) ficam fora sem novo arquivo.`),
+    campo('Motivo', h('input', { name: 'motivo', required: true, minlength: 5, maxlength: 300, placeholder: 'ex.: cliente confirmou que os veículos foram vendidos' })),
+  ], 'Registrar', async (d) => { await api.post(`/lotes-placas/${ultimoLote.id}/tratar`, d); fechar(); aviso('Rejeições tratadas.'); recarregar(); }));
+  const secaoPlacas = c.status === 'onboarding' || lotes.lotes.length ? h('section', { class: 'cartao' }, h('h2', {}, 'Placas do onboarding'),
+    ultimoLote ? h('p', {}, `Último lote: ${ultimoLote.arquivo} · ${ultimoLote.aceitas} aceita(s) · ${ultimoLote.rejeitadas} rejeitada(s) · ${dataHora(ultimoLote.criado_em)}`,
+      ultimoLote.rejeicoes_tratadas_em ? h('span', { class: 'suave' }, ` · rejeições tratadas: ${ultimoLote.rejeicoes_motivo}`) : null) : h('p', { class: 'suave' }, 'Nenhum lote ainda.'),
+    lotes.rejeicoesDoUltimo.length && !ultimoLote.rejeicoes_tratadas_em ? h('ul', { class: 'itens' }, lotes.rejeicoesDoUltimo.map((x) => h('li', {}, `Linha ${x.linha}: ${x.placa || '—'} · ${x.motivo}`))) : null,
+    ctx.pode('rodada.operar') ? h('div', { class: 'acoes' }, arquivoPlacas, h('button', { class: 'btn', type: 'button', onclick: enviarPlacas }, 'Conferir planilha'),
+      ultimoLote && ultimoLote.rejeitadas && !ultimoLote.rejeicoes_tratadas_em ? h('button', { class: 'btn btn-fantasma', type: 'button', onclick: tratarRejeicoes }, 'Tratar rejeições sem novo arquivo') : null) : null,
+    ctx.pode('rodada.operar') ? h('p', { class: 'suave' }, 'CSV com as colunas placa e renavam. As aceitas vão para a Platform pela exportação "placas e Renavam conferidos" em Integrações; confirmada, o item do onboarding se marca sozinho.') : null) : null;
   // GOV-002: VIP por pedido; outra pessoa da gestão aprova (Governança).
   const pendenteVip = vipHist.pedidos.find((p) => p.estado === 'pendente');
   const umAno = () => { const d = new Date(Date.now() + 365 * 864e5); return d.toISOString().slice(0, 10); };
@@ -117,6 +136,7 @@ export async function telaConta(el, ctx, id) {
       ctx.pode('governanca.gerir') ? h('button', { class: 'btn', onclick: sla }, 'SLA de contrato') : null,
       ctx.pode('financeiro.bloqueio') ? h('button', { class: 'btn btn-fantasma', onclick: bloqueio }, 'Pedir bloqueio por inadimplência') : null),
     checklists,
+    secaoPlacas,
     secaoVip,
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Cadastro'), h('dl', { class: 'dados' },

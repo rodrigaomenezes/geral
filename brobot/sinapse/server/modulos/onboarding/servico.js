@@ -15,6 +15,8 @@ const { PADRAO, GRUPOS, validarItens, progresso } = require('./modelos');
 const ROTULO = { onboarding: 'Onboarding', offboarding: 'Offboarding' };
 
 // Verificações automáticas: devolvem a evidência (texto) quando o dado do sistema comprova o item; senão null.
+const placas = require('./placas');
+
 const VERIFICACOES = {
   async conta_com_produtos(c, ck) {
     const r = uma(await c.query('SELECT produtos FROM contas WHERE id = $1', [ck.conta_id]));
@@ -32,6 +34,8 @@ const VERIFICACOES = {
       AND resolvido_em >= $1 ORDER BY resolvido_em DESC LIMIT 1`, [ck.aberto_em]));
     return r ? `Arquivo ${r.arquivo} confirmado como aplicado na Platform` : null;
   },
+  // ONB-006: último lote sem rejeição pendente e exportação para a Platform confirmada.
+  placas_conferidas: (c, ck) => placas.verificarItem(c, ck.conta_id),
   async credenciais_ok(c, ck) {
     const r = uma(await c.query("SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'ok')::int AS ok FROM credenciais_ref WHERE conta_id = $1", [ck.conta_id]));
     return r.total && r.total === r.ok ? `${r.ok} credencial(is) com status OK na Platform` : null;
