@@ -97,7 +97,7 @@ test('meu dia e lembretes: lembrete vence, vira notificação uma vez, adia e co
 
 test('CSV OMIE: prévia não grava, aplicar grava, mesmo arquivo não entra duas vezes, CNPJ desconhecido vira divergência', async () => {
   const carla = await cookieDe('Carla Mendes');
-  const texto = 'codigo_omie;cnpj;situacao\nOM-777;23.456.789/0001-01;em_dia\nOM-888;99999999000199;em_atraso\nX;123;nada\n';
+  const texto = 'codigo_omie;cnpj;situacao\nOM-502;23.456.789/0001-01;em_dia\nOM-888;99999999000199;em_atraso\nX;123;nada\n';
   const p = await (await csvPost(carla, '/integracoes/csv/omie_clientes/previa', texto)).json();
   assert.equal(p.validas, 2);
   assert.equal(p.erros.length, 1);
@@ -108,7 +108,7 @@ test('CSV OMIE: prévia não grava, aplicar grava, mesmo arquivo não entra duas
   assert.equal(a.aplicadas, 1);
   assert.equal(a.erros.length, 2);
   const [depois] = await t.sql("SELECT c.id_omie, s.situacao FROM contas c JOIN status_financeiro s ON s.conta_id = c.id WHERE c.cnpj = '23456789000101'");
-  assert.deepEqual([depois.id_omie, depois.situacao], ['OM-777', 'em_dia']);
+  assert.deepEqual([depois.id_omie, depois.situacao], ['OM-502', 'em_dia'], 'mesmo código: situação atualizada (código diferente vira divergência, FIN-002)');
   assert.equal((await csvPost(carla, '/integracoes/csv/omie_clientes/aplicar', texto)).status, 409);
   assert.equal((await t.sql("SELECT count(*)::int AS n FROM divergencias WHERE tipo = 'omie_sem_conta'"))[0].n, 1);
   const rafael = await cookieDe('Rafael Lima');

@@ -115,7 +115,7 @@ DEV-006;Gerir incidentes críticos, comunicação, mitigação e post-mortem.;IM
 DEV-007;Vincular problemas recorrentes a causa raiz e ações preventivas.;IMPLEMENTADO E TESTADO;"ocorrências ligadas à melhoria preventiva; reincidência (F5) recomenda RCA";"desenvolvimento.test; monitoramento.test";
 DEV-008;Gerir solicitações de melhoria, backlog, aprovações e releases.;IMPLEMENTADO E TESTADO;backlog, aprovação por outra pessoa, releases;desenvolvimento.test;
 FIN-001;Definir OMIE como fonte autoritativa para dados e eventos financeiros.;IMPLEMENTADO E TESTADO;"sem cálculo financeiro; status_financeiro só leitura";AT-006;
-FIN-002;Manter mapeamento de cliente/contrato ERP↔OMIE sem duplicação indevida.;PARCIAL;"contas.omie_codigo; divergências CSV";CSV OMIE;
+FIN-002;Manter mapeamento de cliente/contrato ERP↔OMIE sem duplicação indevida.;IMPLEMENTADO E TESTADO;"código OMIE único por organização (024); importação não troca nem repete, divergência";omie-mapa.test;
 FIN-003;Receber status financeiro necessário para ações operacionais autorizadas.;PARCIAL;"CSV situação financeira; omie-demo";"AT-006; CSV OMIE";layout não homologado
 FIN-004;Enviar eventos operacionais relevantes ao Financeiro por integração versionada.;PARCIAL;"outbox gravado; exportação CSV";—;sem confirmação de retorno
 FIN-005;Nunca emitir NFS-e, boleto ou baixa financeira no ERP Sinapse.;IMPLEMENTADO E TESTADO;nenhuma rota emite documento;AT-015 (revisão);garantido por ausência

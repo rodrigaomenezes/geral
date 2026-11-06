@@ -396,3 +396,12 @@ rótulo, botão/link com nome, imagem com alt, `lang="pt-BR"`, tela sem erro e s
 da máquina (não é dependência do projeto nem entra no CI dos testes). Autoteste (`TELAS_AUTOTESTE=1`) prova que os
 problemas são apontados. Resultado em 06/11: 25 telas, 351 elementos, nenhum problema.
 **Fora:** contraste de cores e ordem de foco (auditoria WCAG completa com ferramenta própria).
+
+# T-046 — Vínculo conta ↔ OMIE sem troca nem repetição silenciosa (F24, FIN-002)
+**Contexto (defeito):** a importação do CSV do OMIE trocava o código OMIE da conta quando o arquivo trazia outro para o
+mesmo CNPJ, sem avisar; e o mesmo código podia ficar em duas contas (não havia regra no banco). Dois testes antigos
+registravam a troca silenciosa como esperada.
+**Decisão:** a importação só vincula código a conta que ainda não tem; código diferente do atual vira divergência
+`omie_codigo_diferente` e código que já é de outra conta vira `omie_codigo_em_outra_conta` (a linha aparece como erro,
+nada é trocado). 024 cria o índice único (organização, código OMIE) nas contas ativas, só se não houver duplicata —
+nesse caso registra aviso e não altera dados. Os testes antigos passaram a usar o código real da conta.

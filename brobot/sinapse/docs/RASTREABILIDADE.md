@@ -322,3 +322,9 @@ dimensionamento e da infraestrutura definitiva.
 | --- | --- | --- |
 | Toda tela em 360 px, campos com rótulo, botões com nome, imagens com alt, pt-BR (RNF-012, celular primeiro) | ✔ conferido | `npm run telas` (25 telas, 0 problemas; autoteste aponta os 3 problemas injetados) |
 | Contraste e ordem de foco (WCAG completo) | ○ pendente | — |
+
+## Entrega de 06/11/2026 (F24 · Vínculo com o OMIE)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Mapeamento cliente ↔ OMIE sem duplicação nem troca indevida (FIN-002) | ✔ testado | `integracoes/csv/importadores.js`, 024 · `test/omie-mapa.test.js` |

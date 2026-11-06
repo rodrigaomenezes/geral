@@ -32,7 +32,7 @@ const cookieDe = async (nome) => {
 
 test('CSV com layout diferente: a prévia pede o mapa; aplicar salva a versão; o próximo arquivo usa o mapa salvo', async () => {
   const carla = await cookieDe('Carla Mendes');
-  const real = 'Código Cliente;CPF/CNPJ;Status;Razão\nOM-901;23.456.789/0001-01;adimplente;Rota\n';
+  const real = 'Código Cliente;CPF/CNPJ;Status;Razão\nOM-502;23.456.789/0001-01;adimplente;Rota\n';
   const p1 = await (await csvPost(carla, '/integracoes/csv/omie_clientes/previa', real)).json();
   assert.equal(p1.precisaMapear, true);
   assert.deepEqual(p1.faltam.sort(), ['cnpj', 'codigo_omie', 'situacao']);
@@ -47,7 +47,7 @@ test('CSV com layout diferente: a prévia pede o mapa; aplicar salva a versão; 
   const [m] = await t.sql("SELECT versao, ativo FROM mapas_csv WHERE tipo = 'omie_clientes' AND tenant_id = $1", [await t.tenant()]);
   assert.deepEqual([m.versao, m.ativo], [1, true]);
   // próximo arquivo do mesmo fluxo, mesmo layout: entra sem mapear de novo; uma linha ruim deixa a importação "parcial"
-  const prox = 'Código Cliente;CPF/CNPJ;Status;Razão\nOM-902;23.456.789/0001-01;inadimplente;Rota\nX;1;nada;Y\n';
+  const prox = 'Código Cliente;CPF/CNPJ;Status;Razão\nOM-502;23.456.789/0001-01;inadimplente;Rota\nX;1;nada;Y\n';
   const p3 = await (await csvPost(carla, '/integracoes/csv/omie_clientes/previa', prox)).json();
   assert.deepEqual([p3.precisaMapear, p3.mapa.origem, p3.mapa.versao], [undefined, 'salvo', 1]);
   const refazer = await (await csvPost(carla, '/integracoes/csv/omie_clientes/previa', prox, { mapa: {} })).json();
@@ -58,7 +58,7 @@ test('CSV com layout diferente: a prévia pede o mapa; aplicar salva a versão; 
   assert.equal(painel.importacoes.omie_clientes.mapaVersao, 1);
   assert.ok(painel.importacoes.omie_clientes.ultimoArquivoEm);
   // mudar o mapa cria a versão 2 e desativa a 1 (auditado)
-  const outro = 'cliente;documento;situacao\nOM-903;23.456.789/0001-01;em_dia\n';
+  const outro = 'cliente;documento;situacao\nOM-502;23.456.789/0001-01;em_dia\n';
   await csvPost(carla, '/integracoes/csv/omie_clientes/aplicar', outro, { mapa: { codigo_omie: 'cliente', cnpj: 'documento', situacao: 'situacao' } });
   const vs = await t.sql("SELECT versao, ativo FROM mapas_csv WHERE tipo = 'omie_clientes' AND tenant_id = $1 ORDER BY versao", [await t.tenant()]);
   assert.deepEqual(vs.map((v) => [v.versao, v.ativo]), [[1, false], [2, true]]);
