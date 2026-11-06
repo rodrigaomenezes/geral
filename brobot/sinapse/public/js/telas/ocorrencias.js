@@ -6,7 +6,7 @@ import { ligar } from '../telefone.js';
 const COR_ESTADO = { triagem: 'alerta', aberta: 'info', em_atendimento: 'ativo', aguardando_cliente: 'neutro', aguardando_terceiro: 'neutro',
   em_handoff: 'alerta', resolvida: 'ok', encerrada_sem_resolucao: 'neutro' };
 const COR_PRIO = { baixa: 'neutro', media: 'info', alta: 'alerta', critica: 'perigo' };
-const SLA = { vencido: ['Prazo vencido', 'perigo'], em_risco: ['Prazo em risco', 'alerta'], no_prazo: ['No prazo', 'ok'] };
+const SLA = { vencido: ['Prazo vencido', 'perigo'], em_risco: ['Prazo em risco', 'alerta'], no_prazo: ['No prazo', 'ok'], pausado: ['Prazo pausado (em espera)', 'neutro'] };
 
 export const seloEstado = (ctx, e) => selo(ctx.catalogos.estados[e] || e, COR_ESTADO[e]);
 export const seloSla = (s) => (s ? selo(...SLA[s]) : null);
@@ -170,7 +170,10 @@ export async function telaOcorrencia(el, ctx, id) {
         par('Ponto focal', o.ponto_focal_nome || '—'), par('Tipo', ctx.catalogos.tipos[o.tipo]), par('Origem', o.origem),
         par('Equipe (dona)', o.equipe_nome), par('Responsável', o.responsavel_nome || 'Na fila da equipe'),
         par('Próxima ação', o.proxima_acao ? `${o.proxima_acao} · ${dataHora(o.proxima_acao_em)} (${relativo(o.proxima_acao_em)})` : '—'),
-        par('Primeira resposta até', dataHora(o.sla_resposta_em)), par('Prazo de resolução', dataHora(o.prazo_em)),
+        par('Primeira resposta até', dataHora(o.sla_resposta_em)), par('Prazo de resolução', `${dataHora(o.prazo_em)}${o.sla === 'pausado' ? ' (pausado: anda o tempo da espera quando retomar)' : ''}`),
+        o.espera_cliente_seg || o.espera_terceiro_seg || o.espera_inicio_em ? par('Tempo em espera', [
+          o.espera_cliente_seg ? `cliente ${duracao(o.espera_cliente_seg)}` : null, o.espera_terceiro_seg ? `terceiro ${duracao(o.espera_terceiro_seg)}` : null,
+          o.espera_inicio_em ? `esperando desde ${dataHora(o.espera_inicio_em)}` : null].filter(Boolean).join(' · ')) : null,
         o.evidencia ? par('Evidência', o.evidencia) : null, o.motivo_encerramento ? par('Motivo do encerramento', o.motivo_encerramento) : null,
         o.codigo_desfecho ? par('Desfecho', ctx.catalogos.desfechosResolvida[o.codigo_desfecho] || ctx.catalogos.desfechosSemResolucao[o.codigo_desfecho]) : null,
         par('Aberta em', dataHora(o.criado_em)))),
@@ -191,6 +194,7 @@ export async function telaOcorrencia(el, ctx, id) {
 }
 
 const par = (rotulo, valor) => [h('dt', {}, rotulo), h('dd', {}, valor)];
+const duracao = (seg) => { const h2 = Math.floor(seg / 3600); const m = Math.round((seg % 3600) / 60); return h2 >= 24 ? `${Math.floor(h2 / 24)} d ${h2 % 24} h` : h2 ? `${h2} h ${m} min` : `${m} min`; };
 const VINCULO = { relacionada: 'Relacionada a', mesclada_em: 'Mesclada em', dividida_de: 'Dividida de', reaberta_por: 'Reaberta por' };
 
 /** INT-006: relacionar, mesclar (esta é a duplicada) ou dividir (itens escolhidos vão para uma nova). Nada é apagado. */

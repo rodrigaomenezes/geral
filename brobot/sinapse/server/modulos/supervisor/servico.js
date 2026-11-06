@@ -111,7 +111,7 @@ async function painel(c) {
        count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND equipe_id IS NULL)::int AS orfas,
        count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND proxima_acao_em IS NULL)::int AS sem_proxima_acao,
        count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND proxima_acao_em < $1)::int AS proxima_acao_vencida,
-       count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND prazo_em < $1)::int AS prazo_vencido,
+       count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao','aguardando_cliente','aguardando_terceiro') AND prazo_em < $1)::int AS prazo_vencido,
        count(*) FILTER (WHERE estado = 'triagem')::int AS em_triagem,
        count(*) FILTER (WHERE nivel_escalonamento > 0 AND estado NOT IN ('resolvida','encerrada_sem_resolucao'))::int AS escalonadas
      FROM ocorrencias`, [agora]));

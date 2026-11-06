@@ -51,6 +51,36 @@ function somarHorasUteis(inicio, horas, cal) {
   return new Date(local.getTime() - off);
 }
 
+/** Horas úteis entre `inicio` e `fim` (mesmo calendário de `somarHorasUteis`). */
+function horasUteisEntre(inicio, fim, cal) {
+  if (!(fim > inicio)) return 0;
+  const off = cal.fusoMinutos * 60e3;
+  let local = inicio.getTime() + off;
+  const ate = fim.getTime() + off;
+  let total = 0;
+  for (let guarda = 0; guarda < 3660 && local < ate; guarda++) {
+    const d = new Date(local);
+    const dia = d.toISOString().slice(0, 10);
+    const util = cal.expediente.dias.includes(d.getUTCDay()) && !cal.feriados.has(dia);
+    const abre = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), cal.expediente.inicio);
+    const fecha = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), cal.expediente.fim);
+    const proximoDia = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0);
+    if (util) total += Math.max(0, Math.min(fecha, ate) - Math.max(abre, local));
+    local = proximoDia;
+  }
+  return total / HORA;
+}
+
+/**
+ * WFL-006: tempo esperando cliente ou terceiro não conta no prazo de resolução. Ao sair da espera, o prazo anda
+ * o mesmo tanto (horas úteis; crítica em horas corridas).
+ */
+function prazoDepoisDaEspera(prazo, inicioEspera, fimEspera, { corrido = false, cal }) {
+  if (corrido) return new Date(prazo.getTime() + Math.max(0, fimEspera - inicioEspera));
+  const horas = horasUteisEntre(inicioEspera, fimEspera, cal);
+  return horas > 0 ? somarHorasUteis(prazo, horas, cal) : prazo;
+}
+
 /**
  * Prazos de resposta e resolução por prioridade; VIP tem prazo reduzido pelo fator configurado. SLA de contrato
  * (GOV-008, `contas.sla_contrato`) substitui as horas da prioridade e vale como acordado (sem o fator VIP).
@@ -80,4 +110,4 @@ function validarSlaContrato(v) {
   return Object.keys(saida).length ? saida : null;
 }
 
-module.exports = { calendario, somarHorasUteis, prazos, validarSlaContrato, PADRAO };
+module.exports = { calendario, somarHorasUteis, horasUteisEntre, prazoDepoisDaEspera, prazos, validarSlaContrato, PADRAO };

@@ -12,7 +12,7 @@ export function s(tag, attrs = {}, ...filhos) {
 }
 
 const SERIE = (i) => `var(--serie-${(i % 6) + 1})`;
-const STATUS = { ok: 'var(--ok)', alerta: '#e0a000', perigo: 'var(--perigo)' };
+const STATUS = { ok: 'var(--ok)', alerta: '#e0a000', perigo: 'var(--perigo)', neutro: '#98a2ad' };
 const fmt = (v, unidade) => (v === null || v === undefined ? '—' : unidade === 'R$' ? `R$ ${Math.round(v).toLocaleString('pt-BR')}`
   : `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}${unidade === '%' ? '%' : unidade === 'h' ? ' h' : ''}`);
 
