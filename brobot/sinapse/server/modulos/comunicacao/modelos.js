@@ -27,6 +27,11 @@ const MODELOS = {
     texto: 'Olá, {nome}. Tentamos falar com você por telefone sobre {qtd} pendência(s) da {conta} que impedem a consulta:\n{lista}\n'
       + 'Pode nos responder por aqui? Assim que corrigir, avise e nós revalidamos. Protocolo {protocolo}.',
   },
+  convite_treinamento: {
+    versao: 1, nome: 'Convite para treinamento coletivo', variaveis: ['nome', 'conta', 'titulo', 'data', 'link'],
+    texto: 'Olá, {nome}! A Brobot vai fazer o treinamento "{titulo}" em {data}, ao vivo, numa conta de demonstração (sem dados da {conta}). '
+      + 'Entre por este link: {link}\nTraga as dúvidas da sua equipe. Se não puder, responda esta mensagem que marcamos outra data.',
+  },
   formalizacao_combinado: {
     versao: 1, nome: 'Formalização: combinado por telefone', variaveis: ['nome', 'conta', 'qtd', 'lista', 'protocolo'],
     texto: 'Olá! Registrando o que combinamos por telefone com {nome} sobre {qtd} pendência(s) da {conta} que impedem a consulta:\n{lista}\n'

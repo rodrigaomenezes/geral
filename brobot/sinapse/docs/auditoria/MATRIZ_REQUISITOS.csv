@@ -97,12 +97,12 @@ COM-010;Publicar campanhas de adoção de produto com controle de frequência.;P
 CS-001;Gerir carteira VIP, responsáveis, contatos e plano de relacionamento.;IMPLEMENTADO SEM TESTE;carteira VIP;—;
 CS-002;Calcular saúde de conta com indicadores transparentes e configuráveis.;IMPLEMENTADO SEM TESTE;saúde da conta com motivos;dashboards;fórmula configurável ausente
 CS-003;Ler últimos acessos e uso por módulo via eventos autorizados da Platform.;PARCIAL;uso_contas via CSV;—;layout não homologado
-CS-004;Gerar tarefas para contas inativas ou com adoção insuficiente.;AUSENTE;—;—;
-CS-005;Gerir sessões coletivas, convites, inscrições e presença.;AUSENTE;—;—;treinamentos
-CS-006;Versionar roteiro de treinamento por tela e produto.;AUSENTE;—;—;
-CS-007;Utilizar conta de demonstração, sem expor dados reais de clientes.;AUSENTE;—;—;
-CS-008;Registrar dúvidas, avaliação e ações posteriores ao treinamento.;AUSENTE;—;—;
-CS-009;Acompanhar efetividade do treinamento por evolução de uso.;AUSENTE;—;—;
+CS-004;Gerar tarefas para contas inativas ou com adoção insuficiente.;IMPLEMENTADO E TESTADO;conta ativa sem acesso há 30 dias ou sem consulta → alerta para o CS;treinamentos.test;depende do CSV de uso da Platform
+CS-005;Gerir sessões coletivas, convites, inscrições e presença.;IMPLEMENTADO E TESTADO;sessões, participantes, convites ao ponto focal, presença;treinamentos.test;inscrição pelo cliente ainda não
+CS-006;Versionar roteiro de treinamento por tela e produto.;IMPLEMENTADO E TESTADO;roteiro versionado por tela e produto, imprimível;treinamentos.test;
+CS-007;Utilizar conta de demonstração, sem expor dados reais de clientes.;IMPLEMENTADO E TESTADO;"conta de demonstração obrigatória; CNPJ de cliente recusado";treinamentos.test;
+CS-008;Registrar dúvidas, avaliação e ações posteriores ao treinamento.;IMPLEMENTADO E TESTADO;"dúvidas, avaliação 1-5, próximo passo; ausente vira tarefa";treinamentos.test;
+CS-009;Acompanhar efetividade do treinamento por evolução de uso.;IMPLEMENTADO E TESTADO;uso fotografado no convite × uso atual, presentes × ausentes;treinamentos.test;depende do CSV de uso
 CS-010;Programar insights do Caça Condutores com frequência e opt-out.;PARCIAL;processo CaçaCondutores semanal desligado;—;sem teste
 CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;IMPLEMENTADO E TESTADO;encaminhar expansão/renovação ao Comercial pela Carteira;comercial-funis.test;
 CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;IMPLEMENTADO E TESTADO;iniciar offboarding pela Carteira com motivo do cancelamento;onboarding.test;

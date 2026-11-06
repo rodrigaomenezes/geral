@@ -17,6 +17,7 @@ const identidade = require('../identidade/servico');
 const lotesCsv = require('../integracoes/csv/lotes');
 const onboarding = require('../onboarding/servico');
 const monitoramento = require('../monitoramento/servico');
+const treinamentos = require('../treinamentos/servico');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -70,7 +71,9 @@ async function jobVarrer(c, ctx) {
   // CRE-004 e POS-009: credencial perto de vencer e reincidência viram ocorrência (uma por alerta).
   resumo.credenciaisVencendo = await monitoramento.verificarExpiracoes(c, ctx);
   resumo.reincidencias = await monitoramento.verificarReincidencia(c, ctx);
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias) {
+  // CS-004: conta sem uso vira alerta para o CS oferecer treinamento.
+  resumo.contasSemUso = await treinamentos.verificarInatividade(c, ctx);
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };

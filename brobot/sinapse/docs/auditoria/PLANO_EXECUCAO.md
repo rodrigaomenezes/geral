@@ -43,7 +43,7 @@ rodada), pedidos de faltantes com prazo, ativação administrativa × técnica �
 offboarding com revogação e retenção.
 
 ## F5 · Pré/pós-rodada, recorrentes e credenciais — ✔ FEITA em 06/11 (volumetria, erros invisíveis, robô parado, erro técnico, vencimento, reincidência); falta PRE-011 (DP-08)
-## F6 · CS: treinamentos coletivos (CS-004…009), insights (CS-010) e encaminhamento ao Comercial (CS-011)
+## F6 · CS: treinamentos coletivos (CS-004…009), insights (CS-010) e encaminhamento ao Comercial (CS-011) — ✔ treinamentos FEITOS em 06/11 (CS-011 na F3b; CS-010 segue desligado até o texto ser revisado)
 ## F7 · Desenvolvimento: incidentes, RCA, melhorias e releases (DEV-003/006/007/008)
 ## F8 · Infra e conformidade: papéis web/worker, monitor externo, backup/restauração testados, LGPD (SUP-008), MFA (R-05), métricas
 ## F9 · Governança: delegação temporária, RACI, unidades, plantões (GOV-001/003/008/009/010)
