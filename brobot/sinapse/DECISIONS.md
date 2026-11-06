@@ -380,3 +380,10 @@ quando o ponto focal muda). Com pendência de rodada aberta é risco: prazo de 2
 avaliada a cada varredura (a pendência pode surgir depois). Quando o ponto focal fica válido, as tarefas se fecham sozinhas
 com o nome cadastrado. O bloqueio de marcos críticos continua onde já estava (envio bloqueado e item obrigatório do
 onboarding).
+
+# T-044 — Aviso de transferência não aceita e testes da triagem (F22, DEV-004, INT-008)
+**Contexto:** a equipe de destino já era avisada da transferência pendente, mas a equipe que pediu não sabia quando o
+prazo de aceite vencia e a ocorrência ia para a contingência; a supervisão da triagem não tinha teste próprio.
+**Decisão:** a rotina de avisos (`agenda.jobAvisar`) passa a notificar a equipe de origem, uma vez, quando o handoff
+expira. Testes dedicados cobrem a triagem (prazo próprio vencido → nível 1 e tarefa da Supervisão, continua na coluna da
+triagem) e o ciclo de avisos da transferência.

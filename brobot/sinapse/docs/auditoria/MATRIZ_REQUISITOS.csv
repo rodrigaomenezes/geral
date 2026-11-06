@@ -16,7 +16,7 @@ INT-004;Classificar tipo, conta, criticidade, produto, origem e intenção.;PARC
 INT-005;Enviar classificação incerta a triagem com SLA e evidência.;IMPLEMENTADO E TESTADO;triagem com prazo;"AT-001; regras classificação";
 INT-006;Criar, vincular, dividir, mesclar e relacionar ocorrências sem apagar histórico.;IMPLEMENTADO E TESTADO;"ocorrencia_vinculos; ocorrencias/vinculos.js (relacionar, mesclar, dividir)";vinculos.test;
 INT-007;Permitir resposta no canal de origem, com registro de envio e entrega.;IMPLEMENTADO E TESTADO;ocorrencias.responder → mensageria;WhatsApp oficial/QR status;
-INT-008;Manter fila de entrada não classificada com supervisão automática.;PARCIAL;supervisor varre triagem;AT-001;supervisão automática da fila não testada isoladamente
+INT-008;Manter fila de entrada não classificada com supervisão automática.;IMPLEMENTADO E TESTADO;"triagem com SLA próprio; supervisor escalona e chama a Supervisão";"AT-001; triagem-handoff.test";
 INT-009;Validar anexos, tipos, tamanho, malware e política de retenção.;PARCIAL;anexos (020): tipo pelo conteúdo, 10 MB, SHA-256, download seguro, retenção configurável;anexos.test;sem antivírus no servidor
 INT-010;Preservar histórico completo e pesquisa por cliente, veículo, CNPJ e protocolo com autorização.;IMPLEMENTADO SEM TESTE;busca em /api/ocorrencias;—;busca por veículo não comprovada
 WFL-001;Executar máquina de estados por tipo de processo e versão.;IMPLEMENTADO E TESTADO;ocorrencias/maquina.js;regras máquina;
@@ -109,7 +109,7 @@ CS-012;Gerir solicitações de cancelamento e transição ao offboarding operaci
 DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;IMPLEMENTADO E TESTADO;ocorrência técnica + sanitização de segredos em incidente/melhoria/evidência;desenvolvimento.test;
 DEV-002;Rastrear prioridade, impacto, responsável e aceite do Desenvolvimento.;PARCIAL;prioridade/responsável/aceite;AT-010;
 DEV-003;Sincronizar estados e comentários de ferramentas técnicas autorizadas.;AUSENTE;—;—;sincronizar ferramenta técnica
-DEV-004;Notificar mudanças e falhas de handoff automaticamente.;PARCIAL;notificações de handoff;AT-010;
+DEV-004;Notificar mudanças e falhas de handoff automaticamente.;IMPLEMENTADO E TESTADO;aviso à equipe de destino (pendente) e à de origem (expirado);"AT-010; triagem-handoff.test";
 DEV-005;Exigir validação operacional após correção antes de resolução final.;IMPLEMENTADO E TESTADO;"Dev não resolve técnica; melhoria liberada é validada pela operação com evidência";"regras; desenvolvimento.test";
 DEV-006;Gerir incidentes críticos, comunicação, mitigação e post-mortem.;IMPLEMENTADO E TESTADO;incidentes com severidade, aviso aos afetados, linha do tempo e post-mortem obrigatório;desenvolvimento.test;status público ainda não
 DEV-007;Vincular problemas recorrentes a causa raiz e ações preventivas.;IMPLEMENTADO E TESTADO;"ocorrências ligadas à melhoria preventiva; reincidência (F5) recomenda RCA";"desenvolvimento.test; monitoramento.test";
