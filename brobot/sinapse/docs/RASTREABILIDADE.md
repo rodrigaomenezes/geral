@@ -249,3 +249,10 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | VIP por pedido e aprovação de outra pessoa, critério, validade, aviso, saída automática e histórico (GOV-002) | ✔ testado | `clientes/vip.js`, supervisor · `test/vip.test.js` |
+
+## Entrega de 06/11/2026 (F13 · Ciência do escalonamento)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Escalonamento por níveis com ciência e ação registradas (WFL-007) | ✔ testado | `ocorrencias/escalonamento.js`, supervisor · `test/escalonamento.test.js` |
+| Intervenção excepcional com justificativa e auditoria (WFL-014) | ✔ testado | `ocorrencias/servico.js reatribuir` · `escalonamento.test.js` |

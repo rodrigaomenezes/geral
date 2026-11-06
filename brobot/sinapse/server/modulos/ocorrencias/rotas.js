@@ -5,6 +5,7 @@ const { com } = require('../../http/servidor');
 const maquina = require('./maquina');
 const s = require('./servico');
 const vinculos = require('./vinculos');
+const escalonamento = require('./escalonamento');
 const tarefas = require('./tarefas');
 
 const TIPOS = { nao_classificada: 'Não classificada', duvida: 'Dúvida', erro_consulta: 'Erro de consulta', credencial: 'Credencial',
@@ -73,6 +74,13 @@ module.exports = [
     handler: async ({ db, ctx, corpo, params }) => {
       const d = validar(corpo, { equipeCodigo: { tipo: 'texto', max: 30 }, responsavelId: { tipo: 'uuid' }, motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 500 }, versao: { tipo: 'inteiro' } });
       return comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => s.reatribuir(c, ctx, params.id, d));
+    } },
+  // WFL-007: a gestão registra ciência do escalonamento com a ação e o novo prazo.
+  { metodo: 'POST', caminho: '/api/ocorrencias/:id/ciencia', permissao: 'ocorrencia.intervir', descricao: 'registrar ciência do escalonamento',
+    handler: async ({ db, ctx, corpo, params }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      const d = validar(corpo, { acao: { obrigatorio: true, tipo: 'texto', min: 5, max: 200 }, proximaAcaoEm: { tipo: 'data' }, versao: { tipo: 'inteiro' } });
+      return comAuditoriaDeAcesso(db, ctx, 'ocorrencia', params.id, (c) => escalonamento.registrarCiencia(c, ctx, params.id, d));
     } },
   // INT-006: relacionar, mesclar (duplicada → principal) e dividir, sem apagar nada.
   { metodo: 'POST', caminho: '/api/ocorrencias/:id/relacionar', permissao: 'ocorrencia.atender', descricao: 'relacionar ocorrências',

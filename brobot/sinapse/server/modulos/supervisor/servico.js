@@ -60,7 +60,7 @@ async function jobVarrer(c, ctx) {
   }
 
   for (const o of (await c.query(
-    `SELECT id, protocolo, nivel_escalonamento, proxima_acao FROM ocorrencias
+    `SELECT id, protocolo, nivel_escalonamento, escalonamento_ciente_nivel, proxima_acao FROM ocorrencias
      WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND proxima_acao_em < $1 LIMIT 100`, [agora])).rows) {
     const nivel = Math.min(o.nivel_escalonamento + 1, NIVEL_MAX);
     // COM-009: o alerta não se repete a cada minuto — a próxima verificação fica 1 hora (nível 1) a 4 horas depois.
@@ -68,7 +68,9 @@ async function jobVarrer(c, ctx) {
       proxima_acao_em: new Date(agora.getTime() + nivel * HORA) },
     'ocorrencia.escalonada', `Próxima ação vencida ("${o.proxima_acao}"): escalonamento nível ${nivel}`);
     await tarefas.criar(c, ctx, { tipo: 'escalonamento', equipeCodigo: 'supervisao', ocorrenciaId: o.id, chave: `esc:${o.id}:${nivel}`,
-      titulo: `${o.protocolo}: próxima ação vencida (nível ${nivel})`, prazoEm: new Date(agora.getTime() + HORA) });
+      // WFL-007: sem ciência da gestão no nível anterior, o título diz isso (a gestão precisa registrar a ação).
+      titulo: `${o.protocolo}: próxima ação vencida (nível ${nivel})${o.nivel_escalonamento > 0 && o.escalonamento_ciente_nivel < o.nivel_escalonamento ? ' · sem ciência da gestão' : ''}`,
+      prazoEm: new Date(agora.getTime() + HORA) });
     resumo.escalonadas++;
   }
   // Adendo CSV: arquivo exportado sem confirmação de aplicação no destino dentro do prazo.

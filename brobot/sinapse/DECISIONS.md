@@ -290,3 +290,13 @@ recusa quem pediu decidir). Um pedido pendente por conta. Aprovado, a conta muda
 antes/depois e evento. O supervisor avisa o CS 15 dias antes da validade (tarefa, uma vez) e, vencida sem renovação,
 retira o VIP sozinho (pedido "automático"). Só as ocorrências novas seguem o novo roteamento; as abertas ficam.
 **Fora:** critérios automáticos (por frota, faturamento), aprovação em dois níveis.
+
+# T-036 — Ciência do escalonamento (F13, WFL-007) e teste da intervenção (WFL-014)
+**Contexto:** o supervisor subia o nível e abria tarefa para a Supervisão, mas não havia registro de que a gestão viu
+nem do que decidiu.
+**Decisão:** `POST /api/ocorrencias/:id/ciencia` (`ocorrencia.intervir`) grava ciência do nível atual com a ação e o
+novo prazo (até 7 dias): a ação vira a próxima ação, as tarefas de escalonamento abertas são concluídas com ela e a
+linha do tempo registra. Uma ciência por nível (019: `escalonamento_ciente_*`, o banco recusa ciência acima do nível).
+Se o novo prazo vencer, o nível sobe; sem ciência no nível anterior, a tarefa diz "sem ciência da gestão".
+A intervenção excepcional (reatribuir) ganhou teste próprio: só gestão, justificativa, trava otimista, não em encerrada.
+**Fora:** notificação fora do sistema (e-mail/SMS) para nível 3.

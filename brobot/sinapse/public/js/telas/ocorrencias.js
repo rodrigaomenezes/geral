@@ -144,7 +144,9 @@ export async function telaOcorrencia(el, ctx, id) {
   }, a.rotulo)),
   o.conta_id && ctx.pode('telefonia.usar') ? h('button', { class: 'btn', onclick: () => ligar({ ocorrenciaId: o.id, aoEncerrar: recarregar }) }, '📞 Ligar') : null,
   ctx.pode('ocorrencia.intervir') && !['resolvida', 'encerrada_sem_resolucao'].includes(o.estado) ? h('button', { class: 'btn btn-fantasma', onclick: () => reatribuir(ctx, o, recarregar) }, 'Reatribuir (intervenção)') : null,
-  ctx.pode('ocorrencia.atender') ? h('button', { class: 'btn btn-fantasma', onclick: () => organizar(ctx, o, recarregar) }, 'Relacionar, mesclar ou dividir') : null);
+  ctx.pode('ocorrencia.atender') ? h('button', { class: 'btn btn-fantasma', onclick: () => organizar(ctx, o, recarregar) }, 'Relacionar, mesclar ou dividir') : null,
+  ctx.pode('ocorrencia.intervir') && o.nivel_escalonamento > (o.escalonamento_ciente_nivel || 0) && !['resolvida', 'encerrada_sem_resolucao'].includes(o.estado)
+    ? h('button', { class: 'btn btn-primario', onclick: () => ciencia(o, recarregar) }, `Registrar ciência (nível ${o.nivel_escalonamento})`) : null);
 
   const conversa = h('div', { class: 'conversa' }, o.interacoes.length ? o.interacoes.map((i) => h('div', { class: `msg msg-${i.direcao}` },
     h('div', { class: 'msg-meta' }, h('strong', {}, i.direcao === 'entrada' ? (i.remetente || 'Cliente') : i.direcao === 'nota' ? `Nota interna · ${i.autor_nome || ''}` : (i.autor_nome || 'Sinapse (automático)')),
@@ -162,7 +164,7 @@ export async function telaOcorrencia(el, ctx, id) {
     h('a', { class: 'voltar', href: o.estado === 'triagem' ? '#/triagem' : '#/ocorrencias' }, '← Voltar'),
     h('div', { class: 'titulo-tela' }, h('h1', {}, `${o.protocolo} · ${o.titulo}`)),
     h('div', { class: 'selos' }, seloEstado(ctx, o.estado), selo(ctx.catalogos.prioridades[o.prioridade], COR_PRIO[o.prioridade]), o.vip ? selo('VIP', 'vip') : null,
-      seloSla(o.sla), o.nivel_escalonamento ? selo(`Escalonada nível ${o.nivel_escalonamento}`, 'perigo') : null, o.reaberturas ? selo(`Reaberta ${o.reaberturas}x`, 'alerta') : null),
+      seloSla(o.sla), o.nivel_escalonamento ? selo(`Escalonada nível ${o.nivel_escalonamento}${o.escalonamento_ciente_nivel >= o.nivel_escalonamento ? ' · gestão ciente' : ''}`, o.escalonamento_ciente_nivel >= o.nivel_escalonamento ? 'alerta' : 'perigo') : null, o.reaberturas ? selo(`Reaberta ${o.reaberturas}x`, 'alerta') : null),
     acoes,
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Dados'), h('dl', { class: 'dados' },
@@ -195,6 +197,15 @@ export async function telaOcorrencia(el, ctx, id) {
 
 const par = (rotulo, valor) => [h('dt', {}, rotulo), h('dd', {}, valor)];
 const duracao = (seg) => { const h2 = Math.floor(seg / 3600); const m = Math.round((seg % 3600) / 60); return h2 >= 24 ? `${Math.floor(h2 / 24)} d ${h2 % 24} h` : h2 ? `${h2} h ${m} min` : `${m} min`; };
+/** WFL-007: ciência do escalonamento com a ação decidida e o novo prazo. */
+function ciencia(o, recarregar) {
+  const em4h = () => { const d = new Date(Date.now() + 4 * 3600e3); d.setSeconds(0, 0); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+  modal(`Ciência do escalonamento · nível ${o.nivel_escalonamento}`, (fechar) => formulario([
+    h('p', {}, `Próxima ação vencida: ${o.proxima_acao}.`),
+    campo('O que será feito', h('input', { name: 'acao', required: true, minlength: 5, maxlength: 200, placeholder: 'ex.: Rafael liga para o cliente hoje às 15h' }), 'Vira a próxima ação da ocorrência.'),
+    campo('Até quando', h('input', { name: 'proximaAcaoEm', type: 'datetime-local', required: true, value: em4h() }), 'Se vencer de novo, o nível sobe.'),
+  ], 'Registrar ciência', async (d) => { const r = await api.post(`/ocorrencias/${o.id}/ciencia`, { ...d, versao: o.version }); fechar(); aviso(`Ciência registrada; ${r.tarefasConcluidas} tarefa(s) de escalonamento concluída(s).`); recarregar(); }));
+}
 const VINCULO = { relacionada: 'Relacionada a', mesclada_em: 'Mesclada em', dividida_de: 'Dividida de', reaberta_por: 'Reaberta por' };
 
 /** INT-006: relacionar, mesclar (esta é a duplicada) ou dividir (itens escolhidos vão para uma nova). Nada é apagado. */
