@@ -277,3 +277,10 @@ dimensionamento e da infraestrutura definitiva.
 | --- | --- | --- |
 | Anexos com tipo pelo conteúdo, limite, sem repetição, download seguro, arquivar e retenção (INT-009) | ✔ testado | `ocorrencias/anexos.js` · `test/anexos.test.js` |
 | Verificação de malware | ○ pendente | sem antivírus no servidor (R-12) |
+
+## Entrega de 06/11/2026 (F17 · Métricas)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Métricas de requisições, fila, heartbeat, entrada e divergências para coletor externo (SUP-009, RNF-011, RNF-004) | ✔ testado | `nucleo/metricas.js`, `/api/metricas` · `test/metricas.test.js` |
+| Dashboards e alertas no coletor (Grafana/Prometheus) | ○ configuração | README: `SINAPSE_TOKEN_METRICAS` |
