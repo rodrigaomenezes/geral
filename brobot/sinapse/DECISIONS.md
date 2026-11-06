@@ -346,3 +346,14 @@ voltam ao cliente; quando ficam de fora de propósito, Operações registra o tr
 modelo padrão ganhou a verificação `placas_conferidas` (último lote sem rejeição pendente e exportação confirmada depois
 dele). Organizações que já têm modelo salvo ganham a verificação ao editar o modelo; o checklist já aberto não muda.
 **Fora:** conferir placa × CNPJ no Detran/SNE (é a Platform que consulta).
+
+# T-041 — Onboarding pede ao cliente o que depende dele (F19, ONB-003)
+**Contexto:** itens que dependem do cliente (contrato, credenciais, planilha de placas, adesão ao SNE) só andavam se
+alguém lembrasse de cobrar.
+**Decisão:** o item do modelo pode ter `pedidoCliente` (texto como o cliente entende, sem termo interno; 022 guarda no
+item). O supervisor, a partir de 1 dia de onboarding, manda ao ponto focal principal uma mensagem só
+(`onboarding_pendencias_cliente`) com o que falta e o prazo de cada item; repete a cada 3 dias, no máximo 3 vezes; depois do
+terceiro pedido, abre ligação para o CS (uma vez). Item feito sai do pedido. Consentimento e opt-out valem; sem ponto
+focal, nada é enviado (o item de ponto focal já vira tarefa). A mensagem avisa para nunca enviar senha. Organizações com
+modelo salvo ganham os pedidos ao editar o modelo; checklist já aberto não muda.
+**Fora:** canal de resposta estruturado (o cliente responde pela conversa, que vira ocorrência normal).

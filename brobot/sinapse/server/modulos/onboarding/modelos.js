@@ -10,15 +10,17 @@ const GRUPOS = { administrativa: 'Ativação administrativa', relacionamento: 'R
 const PADRAO = {
   onboarding: [
     { codigo: 'dados_cadastrais', titulo: 'Conferir dados cadastrais (razão social, CNPJ, endereço)', grupo: 'administrativa', equipe: 'cs', dias: 2 },
-    { codigo: 'contrato', titulo: 'Contrato assinado e arquivado', grupo: 'administrativa', equipe: 'cs', dias: 3 },
+    { codigo: 'contrato', titulo: 'Contrato assinado e arquivado', grupo: 'administrativa', equipe: 'cs', dias: 3, pedidoCliente: 'Enviar o contrato assinado' },
     { codigo: 'produtos', titulo: 'Produtos e módulos contratados conferidos', grupo: 'administrativa', equipe: 'cs', dias: 2, verificacao: 'conta_com_produtos' },
     { codigo: 'vip', titulo: 'Classificação VIP decidida (sim ou não, com critério)', grupo: 'administrativa', equipe: 'cs', dias: 2 },
     { codigo: 'ponto_focal', titulo: 'Ponto focal definido (1 nome + 1 contato)', grupo: 'relacionamento', equipe: 'cs', dias: 2, verificacao: 'ponto_focal' },
     { codigo: 'grupo_whatsapp', titulo: 'Grupo do WhatsApp do cliente cadastrado', grupo: 'relacionamento', equipe: 'suporte', dias: 3, verificacao: 'grupo_whatsapp', obrigatorio: false },
     { codigo: 'provisionamento', titulo: 'Conta e módulos provisionados na Platform (arquivo exportado e confirmado)', grupo: 'tecnica', equipe: 'operacoes', dias: 3, verificacao: 'provisionamento_confirmado' },
-    { codigo: 'credenciais', titulo: 'Credenciais e certificados com status OK na Platform (sem copiar segredo)', grupo: 'tecnica', equipe: 'suporte', dias: 5, verificacao: 'credenciais_ok' },
-    { codigo: 'placas', titulo: 'Placas e Renavam importados (lote conferido, rejeições tratadas)', grupo: 'tecnica', equipe: 'operacoes', dias: 5, verificacao: 'placas_conferidas' },
-    { codigo: 'sne', titulo: 'Vínculo SNE conferido', grupo: 'tecnica', equipe: 'suporte', dias: 5 },
+    { codigo: 'credenciais', titulo: 'Credenciais e certificados com status OK na Platform (sem copiar segredo)', grupo: 'tecnica', equipe: 'suporte', dias: 5, verificacao: 'credenciais_ok',
+      pedidoCliente: 'Cadastrar as credenciais e o certificado direto na Platform (nunca envie senha por mensagem)' },
+    { codigo: 'placas', titulo: 'Placas e Renavam importados (lote conferido, rejeições tratadas)', grupo: 'tecnica', equipe: 'operacoes', dias: 5, verificacao: 'placas_conferidas',
+      pedidoCliente: 'Enviar a planilha da frota com placa e Renavam' },
+    { codigo: 'sne', titulo: 'Vínculo SNE conferido', grupo: 'tecnica', equipe: 'suporte', dias: 5, pedidoCliente: 'Fazer a adesão ao SNE (Sistema de Notificação Eletrônica) com o CNPJ da empresa' },
     { codigo: 'robos', titulo: 'Robôs e agendamentos configurados na Platform', grupo: 'tecnica', equipe: 'operacoes', dias: 5 },
     { codigo: 'primeira_rodada', titulo: 'Primeira rodada executada com sucesso', grupo: 'tecnica', equipe: 'operacoes', dias: 10, verificacao: 'primeira_rodada' },
     { codigo: 'omie', titulo: 'Cliente cadastrado no OMIE (código vinculado no Sinapse)', grupo: 'financeira', equipe: 'financeiro', dias: 3, verificacao: 'omie_vinculado' },
@@ -48,6 +50,9 @@ function validarItens(itens, equipes) {
     if (!GRUPOS[i.grupo]) erros.push(`${aqui}: grupo desconhecido`);
     if (!equipes.includes(i.equipe)) erros.push(`${aqui}: equipe inexistente (${i.equipe})`);
     if (!(Number.isInteger(i.dias) && i.dias >= 0 && i.dias <= 90)) erros.push(`${aqui}: prazo de 0 a 90 dias`);
+    if (i.pedidoCliente !== undefined && i.pedidoCliente !== null && (typeof i.pedidoCliente !== 'string' || i.pedidoCliente.length < 5 || i.pedidoCliente.length > 200)) {
+      erros.push(`${aqui}: pedido ao cliente de 5 a 200 caracteres`);
+    }
   });
   return erros;
 }

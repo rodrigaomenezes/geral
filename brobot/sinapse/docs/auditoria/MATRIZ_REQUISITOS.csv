@@ -36,7 +36,7 @@ WFL-014;Permitir intervenção humana excepcional com justificativa e auditoria.
 WFL-015;Detectar loops, estados impossíveis e transições concorrentes.;IMPLEMENTADO E TESTADO;"version + FOR UPDATE; limite 5/24h";"AT-011; processos laço";
 ONB-001;Criar onboarding ao receber contratação validada do Comercial.;IMPLEMENTADO E TESTADO;venda ganha de cliente novo abre checklist de onboarding ligado à ocorrência e à venda;onboarding.test;
 ONB-002;Verificar dados cadastrais, módulos, contrato, VIP e ponto focal.;IMPLEMENTADO E TESTADO;itens de dados cadastrais, contrato, produtos, VIP e ponto focal;onboarding.test;
-ONB-003;Solicitar dados faltantes à área ou cliente responsável com prazo.;PARCIAL;"item com prazo e equipe; vencido vira tarefa";onboarding.test;pedido automático ao cliente ainda não
+ONB-003;Solicitar dados faltantes à área ou cliente responsável com prazo.;IMPLEMENTADO E TESTADO;"item vencido vira tarefa da área; pedido automático ao cliente (022, pedirAoCliente)";"onboarding.test; pedido-cliente.test";
 ONB-004;Provisionar conta e módulos na Platform por integração autorizada.;BLOQUEADO POR API/DECISÃO;exportação CSV de provisionamento;—;"Platform: só CSV nesta fase; capacidade de importação não homologada"
 ONB-005;Registrar checklist de certificados, placas, Renavam, SNE e permissões.;IMPLEMENTADO E TESTADO;itens de credenciais (verificação automática), placas, Renavam, SNE;onboarding.test;sem copiar segredo (só status)
 ONB-006;Importar lotes de placas com validação, resultado parcial e rejeições.;IMPLEMENTADO E TESTADO;"lotes_placas (021); onboarding/placas.js; exportação platform_placas_onboarding; verificação placas_conferidas";placas.test;
