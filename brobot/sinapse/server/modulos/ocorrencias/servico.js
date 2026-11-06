@@ -10,6 +10,7 @@ const { calendario, prazos, somarHorasUteis } = require('./sla');
 const maquina = require('./maquina');
 const clientes = require('../clientes/servico');
 const identidade = require('../identidade/servico');
+const vigencia = require('../governanca/vigencia');
 const comunicacao = require('../comunicacao/servico');
 
 const POR_PAGINA = 30;
@@ -52,9 +53,15 @@ async function criar(c, ctx, d) {
     colunas = { estado: 'triagem', equipe_id: await idEquipe(c, 'triagem'), tipo: 'nao_classificada', prioridade: d.prioridade || 'media',
       sla_resposta_em: prazo, prazo_em: prazo, proxima_acao: 'Classificar e identificar o cliente', proxima_acao_em: prazo };
   } else {
-    const p = prazos(d.prioridade || 'media', { agora, vip: conta.vip, cal });
-    const responsavel = await identidade.resolverResponsavel(c, d.responsavelId);
-    colunas = { estado: 'aberta', equipe_id: await idEquipe(c, d.equipeCodigo || clientes.equipeDaConta(conta)), tipo: d.tipo,
+    const p = prazos(d.prioridade || 'media', { agora, vip: conta.vip, cal, contrato: conta.sla_contrato });
+    const equipeId = await idEquipe(c, d.equipeCodigo || clientes.equipeDaConta(conta));
+    let responsavel = await identidade.resolverResponsavel(c, d.responsavelId);
+    // GOV-008: sem responsável indicado, quem está de plantão na equipe assume na hora.
+    if (!responsavel && !d.responsavelId) {
+      const pl = await vigencia.plantonista(c, equipeId, agora);
+      if (pl) responsavel = await identidade.resolverResponsavel(c, pl.usuario_id);
+    }
+    colunas = { estado: 'aberta', equipe_id: equipeId, tipo: d.tipo,
       prioridade: d.prioridade || 'media', sla_resposta_em: p.respostaEm, prazo_em: p.resolucaoEm, responsavel_id: responsavel,
       proxima_acao: d.proximaAcao || 'Assumir e responder o cliente', proxima_acao_em: d.proximaAcaoEm || p.respostaEm };
     if (responsavel) colunas.estado = 'em_atendimento';
@@ -96,7 +103,7 @@ async function transicionar(c, ctx, id, acao, dados = {}, versao) {
     const conta = await clientes.buscar(c, dados.contaId);
     if (!conta) throw erro.naoEncontrado('Conta');
     extra.equipeDestino = await idEquipe(c, clientes.equipeDaConta(conta));
-    extra.prazos = prazos(dados.prioridade || 'media', { agora, vip: conta.vip, cal });
+    extra.prazos = prazos(dados.prioridade || 'media', { agora, vip: conta.vip, cal, contrato: conta.sla_contrato });
   }
   if (acao === 'solicitar_handoff' && dados.paraEquipe) extra.equipeDestino = await idEquipe(c, dados.paraEquipe);
   if (acao === 'aceitar_handoff') {

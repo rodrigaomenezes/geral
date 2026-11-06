@@ -69,6 +69,21 @@ export async function telaConta(el, ctx, id) {
     campo('O que o cliente disse', h('textarea', { name: 'observacao', rows: 3, required: true, minlength: 5, maxlength: 500 })),
   ], 'Encaminhar', async (d) => { const o = await api.post('/comercial/encaminhar', { ...d, contaId: id }); fechar(); aviso(`${o.codigo} encaminhada ao Comercial.`); }));
 
+  // GOV-008: SLA acordado em contrato (horas por prioridade); vazio = padrão da organização.
+  const PRIOS = { critica: 'Crítica', alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+  const textoSla = (sla) => (sla ? Object.entries(sla).map(([p, r]) => `${PRIOS[p] || p}: resposta ${r.resposta} h, resolução ${r.resolucao} h`).join(' · ') : 'padrão da organização');
+  const sla = () => modal('SLA de contrato', (fechar) => formulario([
+    h('p', { class: 'suave' }, 'Preencha só as prioridades que o contrato define. Horas úteis (crítica em horas corridas). Vale no lugar do padrão e sem o desconto VIP.'),
+    ...Object.entries(PRIOS).map(([p, nome]) => h('div', { class: 'grade-2' },
+      campo(`${nome} · resposta (h)`, h('input', { name: `${p}_resposta`, type: 'number', min: 0.25, max: 720, step: 0.25, value: c.sla_contrato?.[p]?.resposta ?? '' })),
+      campo(`${nome} · resolução (h)`, h('input', { name: `${p}_resolucao`, type: 'number', min: 0.25, max: 720, step: 0.25, value: c.sla_contrato?.[p]?.resolucao ?? '' })))),
+    campo('Motivo (contrato, aditivo)', h('input', { name: 'motivo', required: true, minlength: 5, maxlength: 300 })),
+  ], 'Salvar', async (d) => {
+    const corpo = {};
+    for (const p of Object.keys(PRIOS)) if (d[`${p}_resposta`] || d[`${p}_resolucao`]) corpo[p] = { resposta: Number(d[`${p}_resposta`]), resolucao: Number(d[`${p}_resolucao`]) };
+    await api.post(`/contas/${id}/sla`, { sla: Object.keys(corpo).length ? corpo : null, motivo: d.motivo }); fechar(); aviso('SLA de contrato salvo.'); recarregar();
+  }));
+
   trocar(el,
     h('a', { class: 'voltar', href: '#/contas' }, '← Carteira'),
     h('div', { class: 'titulo-tela' }, h('h1', {}, c.nome)),
@@ -79,11 +94,12 @@ export async function telaConta(el, ctx, id) {
       ctx.pode('conta.editar') ? h('button', { class: 'btn btn-primario', onclick: novoPf }, 'Definir ponto focal') : null,
       ctx.pode('conta.editar') ? h('button', { class: 'btn', onclick: grupo }, c.grupo_whatsapp ? 'Alterar grupo do WhatsApp' : 'Cadastrar grupo do WhatsApp') : null,
       ctx.pode('conta.editar') && !ctx.pode('comercial.editar') ? h('button', { class: 'btn', onclick: encaminhar }, 'Encaminhar ao Comercial') : null,
+      ctx.pode('governanca.gerir') ? h('button', { class: 'btn', onclick: sla }, 'SLA de contrato') : null,
       ctx.pode('financeiro.bloqueio') ? h('button', { class: 'btn btn-fantasma', onclick: bloqueio }, 'Pedir bloqueio por inadimplência') : null),
     checklists,
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Cadastro'), h('dl', { class: 'dados' },
-        ...par('CNPJ', cnpj(c.cnpj)), ...par('Grupo do WhatsApp', c.grupo_whatsapp ? 'cadastrado' : 'não cadastrado (mensagens "no grupo" vão ao ponto focal)'), ...par('Segmento', c.segmento || '—'), ...par('ID Platform', c.id_platform || '—'), ...par('ID OMIE', c.id_omie || '—'),
+        ...par('CNPJ', cnpj(c.cnpj)), ...par('Grupo do WhatsApp', c.grupo_whatsapp ? 'cadastrado' : 'não cadastrado (mensagens "no grupo" vão ao ponto focal)'), ...par('Segmento', c.segmento || '—'), ...par('SLA', textoSla(c.sla_contrato)), ...par('ID Platform', c.id_platform || '—'), ...par('ID OMIE', c.id_omie || '—'),
         ...(c.vip ? [...par('Critério VIP', c.vip_criterio), ...par('Aprovado por', c.vip_aprovador), ...par('VIP válido até', data(c.vip_validade))] : []),
         ...(c.roteamento_excecao ? [...par('Exceção de roteamento', `${EQUIPE[c.roteamento_excecao]}: ${c.roteamento_justificativa}`)] : []),
         ...par('Situação financeira (OMIE)', `${c.financeiro.rotulo}${c.financeiro.sincronizadoEm ? ` · sincronizado ${dataHora(c.financeiro.sincronizadoEm)}` : ''}`))),

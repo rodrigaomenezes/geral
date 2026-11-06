@@ -12,6 +12,7 @@ const rodadas = require('../rodadas/servico');
 const entrada = require('../entrada/servico');
 const processos = require('../processos/servico');
 const padroes = require('../processos/padroes');
+const governanca = require('../governanca/servico');
 
 const EQUIPES = [
   ['triagem', 'Triagem', false], ['suporte', 'Suporte', false], ['cs', 'Customer Success', false], ['operacoes', 'Operações', false],
@@ -108,6 +109,7 @@ async function criarTenantBase(db, { slug, nome }, equipes) {
     await enfileirar(c, ctx, { tipo: 'telefonia.manutencao', chave: 'recorrente:telefonia', maxTentativas: 1000 });
     await c.query("INSERT INTO telefonia_config (tenant_id, provedor, celular) VALUES ($1, 'treino', true) ON CONFLICT DO NOTHING", [t.id]);
     await padroes.garantir(c, ctx, processos);
+    await governanca.aplicarSugestao(c, ctx);
   });
   return t.id;
 }

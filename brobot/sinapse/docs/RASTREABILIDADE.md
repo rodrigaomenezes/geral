@@ -212,3 +212,13 @@ dimensionamento e da infraestrutura definitiva.
 | Sessão expira por inatividade (R-19) | ✔ testado | `sessaoPorToken` · `mfa-lgpd.test.js` |
 | Pedido do titular: localizar, exportar e anonimizar, auditado sem o dado (SUP-008, RNF-006) | ✔ testado | `modulos/lgpd` · `mfa-lgpd.test.js` |
 | Backup/restauração, monitor externo, web × worker | ○ configuração | README, seção "Operação em produção" |
+
+## Entrega de 06/11/2026 (F9 · Governança)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Delegação temporária com expiração, revogação e auditoria; sem corrente; repasse das abertas (GOV-009) | ✔ testado | `modulos/governanca`, `identidade.resolverResponsavel`, supervisor · `test/governanca.test.js` |
+| Matriz RACI por processo, um aprovador, responsável vigente (delegado/substituto/plantão), sugestão inicial (GOV-010, GOV-003) | ✔ testado | `governanca/servico.js` · `governanca.test.js` |
+| Plantão por equipe: ocorrência nova vai ao plantonista (GOV-008) | ✔ testado | `ocorrencias/servico.js` · `governanca.test.js` |
+| SLA por contrato na conta, sem fator VIP (GOV-008) | ✔ testado | `ocorrencias/sla.js`, `contas.sla_contrato` · `governanca.test.js` |
+| Unidades e cadastro de equipes/usuários por tela (GOV-001) | ○ pendente | — |

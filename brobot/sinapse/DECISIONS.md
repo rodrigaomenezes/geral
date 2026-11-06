@@ -230,3 +230,18 @@ LGPD: `lgpd.gerir` localiza o titular por telefone/e-mail, exporta (acesso) e an
 e-mail viram marcadores, o papel de contato é encerrado, o destinatário das mensagens é trocado); confirmação digitada;
 auditoria só com o hash do identificador.
 **Fora:** retenção automática por prazo (política a definir com o jurídico), MFA por e-mail/SMS, chaves de acesso (passkeys).
+
+# T-031 — Governança: delegação temporária, matriz RACI, plantão e SLA por contrato (F9)
+**Contexto:** GOV-003/008/009/010 da especificação; ausência coberta só por `substituto_id` (um, fixo).
+**Decisão:** `delegacoes` (de → para, início/fim, até 90 dias, motivo; revogar encerra, nada se apaga). A própria pessoa
+delega o que é dela; a gestão (`governanca.gerir`) delega por quem faltou. Uma delegação por vez e sem corrente (quem
+recebe não pode estar delegando no período). `identidade.resolverResponsavel` passa a seguir: delegado disponível →
+pessoa → substituto → fila; o supervisor repassa as ocorrências abertas de quem tem delegação vigente e registra a
+expiração uma vez. A consulta de vigência fica em `governanca/vigencia.js` (sem importar outros módulos, para não criar
+ciclo com a identidade). RACI: `raci` por processo do catálogo (`governanca/servico.js` PROCESSOS), pessoa ou equipe,
+um aprovador por processo (índice único); a tela mostra quem responde **agora** (delegado, substituto ou plantonista),
+numa consulta só. Organização nova recebe uma sugestão por código de equipe, que só preenche processo vazio.
+`plantoes` por equipe (até 7 dias, sem choque): ocorrência nova da equipe sem responsável nasce com o plantonista.
+SLA de contrato: `contas.sla_contrato` (horas por prioridade, validado) substitui o padrão e não sofre o fator VIP.
+**Fora:** unidades (GOV-001) e cadastro de equipes/usuários por tela; reatribuir de volta quando a delegação termina
+(as ocorrências ficam com quem assumiu); escala recorrente de plantão.
