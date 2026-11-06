@@ -25,14 +25,14 @@ WFL-003;Gerar tarefas automaticamente a partir de eventos e regras.;IMPLEMENTADO
 WFL-004;Definir due_at e next_action_at obrigatórios para estados ativos.;IMPLEMENTADO E TESTADO;CHECK ativa_completa;regras banco RN-008;
 WFL-005;Calcular SLA por calendário, severidade e regras contratuais.;IMPLEMENTADO E TESTADO;sla.js;regras SLA;SLA por contrato ausente
 WFL-006;Separar SLA de resposta, tratamento, dependência externa e resolução.;IMPLEMENTADO E TESTADO;"sla_resposta_em; prazo_em; espera_cliente_seg/espera_terceiro_seg (017); prazo pausado na espera";"regras SLA; espera.test";
-WFL-007;Escalonar atrasos por níveis e registrar ciência/ação.;PARCIAL;supervisor escalonamento;AT-010;níveis múltiplos e registro de ciência parciais
+WFL-007;Escalonar atrasos por níveis e registrar ciência/ação.;IMPLEMENTADO E TESTADO;"supervisor (níveis 1–3); ciência por nível (019); ocorrencias/escalonamento.js";"AT-010; escalonamento.test";
 WFL-008;Executar handoff com aceite e fallback quando não recebido.;IMPLEMENTADO E TESTADO;handoffs + supervisor;AT-010;
 WFL-009;Executar retentativas controladas com backoff e limite.;IMPLEMENTADO E TESTADO;jobs/fila.js backoff + DLQ;AT-005/007;
 WFL-010;Suportar pausa justificada sem interromper supervisão da pendência.;IMPLEMENTADO E TESTADO;aguardar_cliente com revisão ≤3d;regras máquina;
 WFL-011;Distinguir tarefa concluída, ocorrência resolvida e encerrada sem correção.;IMPLEMENTADO E TESTADO;tarefa concluida × ocorrência resolvida/encerrada;"regras máquina; AT-009";
 WFL-012;Reabrir automaticamente em evento novo relacionado, conforme política.;IMPLEMENTADO E TESTADO;reabertura 7 dias;AT-012;
 WFL-013;Versionar templates de processo sem alterar instâncias antigas silenciosamente.;IMPLEMENTADO E TESTADO;processo_versoes imutáveis;processos execução;
-WFL-014;Permitir intervenção humana excepcional com justificativa e auditoria.;PARCIAL;"alterarComMotivo; reatribuir";—;sem teste dedicado
+WFL-014;Permitir intervenção humana excepcional com justificativa e auditoria.;IMPLEMENTADO E TESTADO;reatribuir/alterarComMotivo com justificativa e auditoria;escalonamento.test;
 WFL-015;Detectar loops, estados impossíveis e transições concorrentes.;IMPLEMENTADO E TESTADO;"version + FOR UPDATE; limite 5/24h";"AT-011; processos laço";
 ONB-001;Criar onboarding ao receber contratação validada do Comercial.;IMPLEMENTADO E TESTADO;venda ganha de cliente novo abre checklist de onboarding ligado à ocorrência e à venda;onboarding.test;
 ONB-002;Verificar dados cadastrais, módulos, contrato, VIP e ponto focal.;IMPLEMENTADO E TESTADO;itens de dados cadastrais, contrato, produtos, VIP e ponto focal;onboarding.test;

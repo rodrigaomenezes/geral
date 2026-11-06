@@ -16,7 +16,7 @@ const comunicacao = require('../comunicacao/servico');
 const POR_PAGINA = 30;
 const COLUNAS_GRAVAVEIS = new Set(['conta_id', 'tipo', 'prioridade', 'equipe_id', 'responsavel_id', 'prazo_em',
   'sla_resposta_em', 'proxima_acao', 'proxima_acao_em', 'evidencia', 'codigo_desfecho', 'motivo_encerramento',
-  'encerrada_em', 'reaberturas', 'nivel_escalonamento']);
+  'encerrada_em', 'reaberturas', 'nivel_escalonamento', 'escalonamento_ciente_em', 'escalonamento_ciente_por', 'escalonamento_ciente_nivel']);
 
 async function carregarCalendario(c) {
   const t = uma(await c.query('SELECT config FROM tenants'));
