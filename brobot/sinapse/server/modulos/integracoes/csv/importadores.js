@@ -156,8 +156,24 @@ const TIPOS = {
           erros.push({ linha: l.numero, erro: `CNPJ ${v.cnpj} sem conta no Sinapse (registrado em divergências)` });
           continue;
         }
-        const atual = uma(await c.query('SELECT id_omie FROM contas WHERE id = $1', [conta.id]));
-        if (atual.id_omie !== v.codigo_omie) { await c.query('UPDATE contas SET id_omie = $2, atualizado_em = now() WHERE id = $1', [conta.id, v.codigo_omie]); vinculados++; }
+        const atual = uma(await c.query('SELECT id_omie, nome FROM contas WHERE id = $1', [conta.id]));
+        // FIN-002: código OMIE nunca é trocado nem repetido em silêncio — divergência para o Financeiro decidir.
+        if (atual.id_omie && atual.id_omie !== v.codigo_omie) {
+          await divergir(c, ctx, 'omie_codigo_diferente', `Conta ${atual.nome} está ligada ao cliente OMIE ${atual.id_omie}, mas o arquivo traz ${v.codigo_omie} para o CNPJ ${v.cnpj}.`,
+            conta.id, `omie-codigo-diferente:${conta.id}:${v.codigo_omie}`);
+          erros.push({ linha: l.numero, erro: `A conta já tem o código OMIE ${atual.id_omie}; o arquivo traz ${v.codigo_omie} (registrado em divergências, nada foi trocado)` });
+          continue;
+        }
+        if (!atual.id_omie) {
+          const outra = uma(await c.query('SELECT id, nome FROM contas WHERE id_omie = $1 AND id <> $2 AND arquivada_em IS NULL', [v.codigo_omie, conta.id]));
+          if (outra) {
+            await divergir(c, ctx, 'omie_codigo_em_outra_conta', `O cliente OMIE ${v.codigo_omie} (CNPJ ${v.cnpj}) já está ligado à conta ${outra.nome}.`,
+              conta.id, `omie-codigo-outra:${v.codigo_omie}:${conta.id}`);
+            erros.push({ linha: l.numero, erro: `O código OMIE ${v.codigo_omie} já está na conta ${outra.nome} (registrado em divergências)` });
+            continue;
+          }
+          await c.query('UPDATE contas SET id_omie = $2, atualizado_em = now() WHERE id = $1', [conta.id, v.codigo_omie]); vinculados++;
+        }
         await c.query(`INSERT INTO status_financeiro (tenant_id, conta_id, situacao, fonte, sincronizado_em) VALUES ($1,$2,$3,'omie_csv',$4)
           ON CONFLICT (tenant_id, conta_id) DO UPDATE SET situacao = EXCLUDED.situacao, fonte = EXCLUDED.fonte, sincronizado_em = EXCLUDED.sincronizado_em`,
         [ctx.tenantId, conta.id, SITUACAO[chave(v.situacao)], relogio.agora()]);
@@ -226,5 +242,10 @@ const TIPOS = {
     },
   },
 };
+
+async function divergir(c, ctx, tipo, descricao, entidadeId, chave) {
+  await c.query('INSERT INTO divergencias (tenant_id, tipo, descricao, entidade_id, chave) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tenant_id, chave) DO NOTHING',
+    [ctx.tenantId, tipo, descricao.slice(0, 500), entidadeId, chave]);
+}
 
 module.exports = { TIPOS, DIA };
