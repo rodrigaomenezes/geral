@@ -26,6 +26,15 @@ const PADRAO = {
     { codigo: 'omie', titulo: 'Cliente cadastrado no OMIE (código vinculado no Sinapse)', grupo: 'financeira', equipe: 'financeiro', dias: 3, verificacao: 'omie_vinculado' },
     { codigo: 'treinamento', titulo: 'Treinamento inicial agendado com o cliente', grupo: 'relacionamento', equipe: 'cs', dias: 10, obrigatorio: false },
   ],
+  // ONB-011: alteração de cliente ativo (módulos, dados, carteira, ponto focal). O motivo diz o que muda.
+  alteracao: [
+    { codigo: 'combinado', titulo: 'Mudança combinada com o cliente por escrito (o que muda e a partir de quando)', grupo: 'relacionamento', equipe: 'cs', dias: 1 },
+    { codigo: 'platform', titulo: 'Platform atualizada (módulos, dados ou carteira) e arquivo confirmado', grupo: 'tecnica', equipe: 'operacoes', dias: 3, verificacao: 'carteira_confirmada' },
+    { codigo: 'financeiro', titulo: 'Financeiro avisado da mudança de valor ou de módulos (o OMIE é do Financeiro)', grupo: 'financeira', equipe: 'financeiro', dias: 2 },
+    { codigo: 'ponto_focal', titulo: 'Ponto focal conferido (troca registrada, histórico mantido)', grupo: 'relacionamento', equipe: 'cs', dias: 2, verificacao: 'ponto_focal' },
+    { codigo: 'vip', titulo: 'Classificação VIP revista (pedido de VIP, se mudou)', grupo: 'administrativa', equipe: 'cs', dias: 2, obrigatorio: false },
+    { codigo: 'aviso_cliente', titulo: 'Cliente avisado de que a mudança está valendo', grupo: 'relacionamento', equipe: 'cs', dias: 4 },
+  ],
   offboarding: [
     { codigo: 'comunicacao', titulo: 'Cliente informado do encerramento e da data', grupo: 'encerramento', equipe: 'cs', dias: 2 },
     { codigo: 'pendencias', titulo: 'Ocorrências e pendências em aberto tratadas', grupo: 'encerramento', equipe: 'suporte', dias: 3, verificacao: 'sem_pendencias' },

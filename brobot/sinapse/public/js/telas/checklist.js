@@ -10,7 +10,7 @@ const EQUIPE = { cs: 'CS', suporte: 'Suporte', operacoes: 'Operações', finance
 export async function secaoChecklists(ctx, conta, recarregar) {
   const caixa = h('section', { class: 'cartao checklists', 'aria-live': 'polite' });
   let dados;
-  try { dados = await api.get(`/contas/${conta.id}/checklists`); } catch (e) { return trocar(caixa, h('h2', {}, 'Onboarding e offboarding'), vazio(textoErro(e))); }
+  try { dados = await api.get(`/contas/${conta.id}/checklists`); } catch (e) { return trocar(caixa, h('h2', {}, 'Onboarding, alterações e offboarding'), vazio(textoErro(e))); }
   const abertos = dados.checklists.filter((k) => k.estado === 'aberto');
   const temAberto = (tipo) => abertos.some((k) => k.tipo === tipo);
   const podeAbrir = ctx.pode('conta.editar');
@@ -19,6 +19,10 @@ export async function secaoChecklists(ctx, conta, recarregar) {
     h('p', { class: 'suave' }, 'Abre o checklist de encerramento. A conta só é encerrada quando todos os itens obrigatórios estiverem feitos ou dispensados. Nada é apagado.'),
     campo('Motivo do encerramento', h('textarea', { name: 'motivo', rows: 3, required: true, minlength: 5, maxlength: 1000 }), 'Ex.: cancelamento pedido pelo cliente, troca de fornecedor.'),
   ], 'Iniciar offboarding', async (d) => { await api.post(`/contas/${conta.id}/checklists`, { tipo: 'offboarding', motivo: d.motivo }); fechar(); aviso('Offboarding iniciado.'); recarregar(); }));
+  const abrirAlt = () => modal('Registrar alteração do cliente', (fechar) => formulario([
+    h('p', { class: 'suave' }, 'Mudança de módulos, dados, carteira ou ponto focal de um cliente ativo, com dono, prazo e evidência em cada passo.'),
+    campo('O que muda', h('textarea', { name: 'motivo', rows: 3, required: true, minlength: 5, maxlength: 1000 }), 'Ex.: inclusão do módulo CaçaCondutores a partir de 01/12; novo ponto focal.'),
+  ], 'Abrir checklist', async (d) => { await api.post(`/contas/${conta.id}/checklists`, { tipo: 'alteracao', motivo: d.motivo }); fechar(); aviso('Alteração registrada.'); recarregar(); }));
   const abrirOn = async () => { try { await api.post(`/contas/${conta.id}/checklists`, { tipo: 'onboarding' }); aviso('Onboarding iniciado.'); recarregar(); } catch (e) { aviso(textoErro(e), 'erro'); } };
 
   const agir = (i, acao, titulo, rotulo, nomeCampo, ajuda) => () => {
@@ -64,13 +68,14 @@ export async function secaoChecklists(ctx, conta, recarregar) {
           e.currentTarget.disabled = true;
           try { const r = await api.post(`/checklists/${k.id}/concluir`); aviso(k.tipo === 'onboarding' ? `Onboarding concluído: conta ${r.contaStatus}.` : 'Offboarding concluído: conta encerrada.'); recarregar(); }
           catch (err) { aviso(textoErro(err), 'erro'); e.currentTarget.disabled = false; }
-        } }, k.tipo === 'onboarding' ? 'Concluir onboarding' : 'Concluir offboarding e encerrar a conta')) : null);
+        } }, { onboarding: 'Concluir onboarding', alteracao: 'Concluir alteração' }[k.tipo] || 'Concluir offboarding e encerrar a conta')) : null);
   };
 
   return trocar(caixa,
-    h('div', { class: 'titulo-tela' }, h('h2', {}, 'Onboarding e offboarding'),
+    h('div', { class: 'titulo-tela' }, h('h2', {}, 'Onboarding, alterações e offboarding'),
       podeAbrir ? h('span', { class: 'acoes' },
         !temAberto('onboarding') && conta.status !== 'encerrada' ? h('button', { class: 'btn btn-pequeno', type: 'button', onclick: abrirOn }, 'Iniciar onboarding') : null,
+        !temAberto('alteracao') && conta.status === 'ativa' ? h('button', { class: 'btn btn-pequeno', type: 'button', onclick: abrirAlt }, 'Registrar alteração') : null,
         !temAberto('offboarding') && conta.status !== 'encerrada' ? h('button', { class: 'btn btn-pequeno btn-fantasma', type: 'button', onclick: abrirOff }, 'Iniciar offboarding') : null) : null),
     dados.checklists.length ? dados.checklists.map(blocoChecklist) : vazio('Nenhum checklist. A venda de cliente novo abre o onboarding sozinha.'));
 }

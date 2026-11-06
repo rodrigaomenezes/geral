@@ -296,3 +296,9 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Solicitar ao cliente os dados faltantes com prazo, repetição limitada e escalonamento ao CS (ONB-003) | ✔ testado | `onboarding/servico.js pedirAoCliente` · `test/pedido-cliente.test.js` |
+
+## Entrega de 06/11/2026 (F20 · Alteração de cliente ativo)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Orquestrar alteração de módulos, dados, carteira e ponto focal (ONB-011) | ✔ testado | `onboarding` tipo `alteracao` (023) · `test/alteracao.test.js` |
