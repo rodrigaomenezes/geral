@@ -243,3 +243,9 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Tempo de dependência externa (cliente/terceiro) separado e fora do prazo de resolução (WFL-006) | ✔ testado | `ocorrencias/sla.js`, `aplicar` · `test/espera.test.js` |
+
+## Entrega de 06/11/2026 (F12 · VIP com aprovação)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| VIP por pedido e aprovação de outra pessoa, critério, validade, aviso, saída automática e histórico (GOV-002) | ✔ testado | `clientes/vip.js`, supervisor · `test/vip.test.js` |

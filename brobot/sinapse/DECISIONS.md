@@ -281,3 +281,12 @@ o tempo. Em espera, a situação do prazo é "pausado" e não conta como vencida
 supervisor); a revisão da espera (até 3 dias) continua sendo o prazo da dependência externa. O SLA de primeira
 resposta não pausa. Migração 017 (aditiva; ocorrências já em espera ganham início = última atualização).
 **Fora:** pausa parcial (por exemplo, só para a primeira resposta) e relatório de tempo por fase.
+
+# T-035 — VIP por pedido, aprovação, validade e histórico (F12, GOV-002)
+**Contexto:** VIP muda o roteamento (VIP → CS) mas era só um campo do cadastro, sem aprovação nem efeito da validade.
+**Decisão:** `vip_pedidos` (018): quem cuida da conta (`conta.editar`) pede conceder, renovar ou retirar, com critério,
+validade (até 2 anos) e motivo; outra pessoa da gestão (`governanca.gerir`) aprova ou recusa (recusa com motivo; o banco
+recusa quem pediu decidir). Um pedido pendente por conta. Aprovado, a conta muda na mesma transação, com auditoria
+antes/depois e evento. O supervisor avisa o CS 15 dias antes da validade (tarefa, uma vez) e, vencida sem renovação,
+retira o VIP sozinho (pedido "automático"). Só as ocorrências novas seguem o novo roteamento; as abertas ficam.
+**Fora:** critérios automáticos (por frota, faturamento), aprovação em dois níveis.

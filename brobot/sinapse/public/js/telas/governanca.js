@@ -1,6 +1,6 @@
 // Governança: matriz RACI com quem responde agora em cada processo, delegações temporárias e escala de plantão.
 // Qualquer pessoa delega o que é dela (férias, curso, consulta); a gestão monta a matriz e a escala.
-import { h, trocar, dataHora, selo, campo, opcoes, aviso, modal, vazio } from '../dom.js';
+import { h, trocar, data, dataHora, selo, campo, opcoes, aviso, modal, vazio } from '../dom.js';
 import { api } from '../api.js';
 import { formulario } from './ocorrencias.js';
 
@@ -9,6 +9,12 @@ const local = (ms) => { const d = new Date(Date.now() + ms); d.setSeconds(0, 0);
 
 export async function telaGovernanca(el, ctx) {
   const [g, eq] = await Promise.all([api.get('/governanca'), api.get('/equipes')]);
+  const vipPend = g.podeGerir ? (await api.get('/vip/pedidos')).pedidos : [];
+  const TIPO_VIP = { conceder: 'Conceder VIP', renovar: 'Renovar VIP', retirar: 'Retirar VIP' };
+  const decidirVip = (p, decisao) => modal(decisao === 'aprovar' ? 'Aprovar o pedido de VIP' : 'Recusar o pedido de VIP', (fechar) => formulario([
+    h('p', {}, `${TIPO_VIP[p.tipo]} · ${p.conta_nome}${p.validade ? ` até ${data(p.validade)}` : ''}${p.criterio ? ` · ${p.criterio}` : ''}`),
+    campo(decisao === 'aprovar' ? 'Observação (opcional)' : 'Motivo da recusa', h('textarea', { name: 'motivo', rows: 2, maxlength: 500, ...(decisao === 'recusar' ? { required: true, minlength: 5 } : {}) })),
+  ], decisao === 'aprovar' ? 'Aprovar' : 'Recusar', async (d) => { await api.post(`/vip/pedidos/${p.id}/${decisao}`, d); fechar(); aviso('Decisão registrada.'); recarregar(); }));
   const recarregar = () => telaGovernanca(el, ctx);
   const pessoas = Object.fromEntries(eq.usuarios.map((u) => [u.id, `${u.nome} · ${u.equipe_nome}`]));
   const equipes = Object.fromEntries(eq.equipes.map((e) => [e.id, e.nome]));
@@ -62,6 +68,12 @@ export async function telaGovernanca(el, ctx) {
           const r = await api.post('/raci/sugestao', {}); aviso(`${r.incluidas} linha(s) sugerida(s) incluída(s). Ajuste o que for diferente na Brobot.`); recarregar();
         } }, 'Preencher com a sugestão') : null)),
     h('p', { class: 'suave' }, 'Quem responde por cada processo e quem está respondendo agora (com férias, delegação, substituto e plantão já considerados).'),
+    vipPend.length ? h('section', { class: 'cartao' }, h('h2', {}, `Pedidos de VIP (${vipPend.length})`), h('ul', { class: 'itens' }, vipPend.map((p) => h('li', {},
+      h('strong', {}, `${TIPO_VIP[p.tipo]} · `), h('a', { href: `#/contas/${p.conta_id}` }, p.conta_nome),
+      h('div', { class: 'suave' }, `${p.pedido_por_nome}: ${p.motivo}${p.validade ? ` · até ${data(p.validade)}` : ''}`),
+      p.pedido_por === ctx.usuario.id ? h('div', { class: 'suave' }, 'Você pediu: outra pessoa da gestão decide.') : h('div', { class: 'acoes' },
+        h('button', { class: 'btn btn-pequeno btn-primario', type: 'button', onclick: () => decidirVip(p, 'aprovar') }, 'Aprovar'),
+        h('button', { class: 'btn btn-pequeno btn-fantasma', type: 'button', onclick: () => decidirVip(p, 'recusar') }, 'Recusar')))))) : null,
     h('section', { class: 'cartao' }, h('h2', {}, 'Delegações'),
       g.delegacoes.length ? h('ul', { class: 'itens' }, g.delegacoes.map((x) => h('li', {},
         h('strong', {}, `${x.de_nome} → ${x.para_nome}`), ' ',

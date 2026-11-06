@@ -39,7 +39,27 @@ export async function telaContas(el, ctx) {
 export async function telaConta(el, ctx, id) {
   const c = await api.get(`/contas/${id}`);
   const recarregar = () => telaConta(el, ctx, id);
-  const checklists = await secaoChecklists(ctx, { id, status: c.status }, recarregar);
+  const [checklists, vipHist] = await Promise.all([secaoChecklists(ctx, { id, status: c.status }, recarregar), api.get(`/contas/${id}/vip`)]);
+  // GOV-002: VIP por pedido; outra pessoa da gestão aprova (Governança).
+  const pendenteVip = vipHist.pedidos.find((p) => p.estado === 'pendente');
+  const umAno = () => { const d = new Date(Date.now() + 365 * 864e5); return d.toISOString().slice(0, 10); };
+  const pedirVip = (tipo) => modal({ conceder: 'Pedir VIP', renovar: 'Renovar o VIP', retirar: 'Retirar o VIP' }[tipo], (fechar) => formulario([
+    tipo !== 'retirar' ? campo('Critério', h('input', { name: 'criterio', required: true, minlength: 5, maxlength: 300, value: c.vip_criterio || '', placeholder: 'ex.: frota acima de 400 veículos' })) : null,
+    tipo !== 'retirar' ? campo('Válido até', h('input', { name: 'validade', type: 'date', required: true, value: umAno() }), 'Até 2 anos. 15 dias antes, o CS recebe a tarefa de renovar.') : null,
+    campo('Motivo', h('textarea', { name: 'motivo', rows: 2, required: true, minlength: 5, maxlength: 500 })),
+    h('p', { class: 'suave' }, 'Outra pessoa da gestão aprova. Aprovado, as ocorrências novas passam a ir para o ' + (tipo === 'retirar' ? 'Suporte.' : 'CS.')),
+  ], 'Enviar pedido', async (d) => { await api.post(`/contas/${id}/vip`, { ...d, tipo }); fechar(); aviso('Pedido enviado para aprovação.'); recarregar(); }));
+  const ESTADO_VIP = { pendente: ['esperando aprovação', 'alerta'], aprovado: ['aprovado', 'ok'], recusado: ['recusado', 'neutro'], automatico: ['automático', 'neutro'] };
+  const TIPO_VIP = { conceder: 'Conceder VIP', renovar: 'Renovar VIP', retirar: 'Retirar VIP' };
+  const secaoVip = vipHist.pedidos.length || ctx.pode('conta.editar') ? h('section', { class: 'cartao' }, h('h2', {}, 'VIP'),
+    h('p', {}, c.vip ? `VIP até ${data(c.vip_validade)} · ${c.vip_criterio} · aprovado por ${c.vip_aprovador || '—'}` : 'Esta conta não é VIP.'),
+    ctx.pode('conta.editar') && !pendenteVip ? h('div', { class: 'acoes' },
+      !c.vip ? h('button', { class: 'btn', type: 'button', onclick: () => pedirVip('conceder') }, 'Pedir VIP') : null,
+      c.vip ? h('button', { class: 'btn', type: 'button', onclick: () => pedirVip('renovar') }, 'Renovar') : null,
+      c.vip ? h('button', { class: 'btn btn-fantasma', type: 'button', onclick: () => pedirVip('retirar') }, 'Retirar VIP') : null) : null,
+    vipHist.pedidos.length ? h('ul', { class: 'itens' }, vipHist.pedidos.map((p) => h('li', {}, h('strong', {}, TIPO_VIP[p.tipo]), ' ', selo(...ESTADO_VIP[p.estado]),
+      h('div', { class: 'suave' }, `${dataHora(p.criado_em)} · ${p.pedido_por_nome || 'Sinapse'}: ${p.motivo}${p.validade ? ` · até ${data(p.validade)}` : ''}`),
+      p.decidido_por_nome ? h('div', { class: 'suave' }, `Decidido por ${p.decidido_por_nome} em ${dataHora(p.decidido_em)}${p.decisao_motivo ? `: ${p.decisao_motivo}` : ''}`) : null))) : null) : null;
   const vigentes = c.pontosFocais.filter((p) => p.vigente);
   const historico = c.pontosFocais.filter((p) => !p.vigente);
 
@@ -97,6 +117,7 @@ export async function telaConta(el, ctx, id) {
       ctx.pode('governanca.gerir') ? h('button', { class: 'btn', onclick: sla }, 'SLA de contrato') : null,
       ctx.pode('financeiro.bloqueio') ? h('button', { class: 'btn btn-fantasma', onclick: bloqueio }, 'Pedir bloqueio por inadimplência') : null),
     checklists,
+    secaoVip,
     h('div', { class: 'grade-2' },
       h('section', { class: 'cartao' }, h('h2', {}, 'Cadastro'), h('dl', { class: 'dados' },
         ...par('CNPJ', cnpj(c.cnpj)), ...par('Grupo do WhatsApp', c.grupo_whatsapp ? 'cadastrado' : 'não cadastrado (mensagens "no grupo" vão ao ponto focal)'), ...par('Segmento', c.segmento || '—'), ...par('SLA', textoSla(c.sla_contrato)), ...par('ID Platform', c.id_platform || '—'), ...par('ID OMIE', c.id_omie || '—'),
