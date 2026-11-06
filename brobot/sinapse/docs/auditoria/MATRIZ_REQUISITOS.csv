@@ -5,7 +5,7 @@ GOV-003;Manter matriz de responsáveis por processo, carteira, horário e substi
 GOV-004;Impedir tarefas ativas sem dono ou fila de contingência.;IMPLEMENTADO E TESTADO;"CHECK tarefas.equipe_id; supervisor; quadro mostra fila sem responsável";"AT-010; quadro.test";
 GOV-005;Aplicar regras VIP→CS e demais→Suporte, com exceções justificadas.;IMPLEMENTADO E TESTADO;"clientes.equipeDaConta; CHECK justificativa";regras roteamento RN-001;
 GOV-006;Cadastrar ponto focal principal e suplente com canais válidos e histórico.;IMPLEMENTADO E TESTADO;pontos_focais (vigente, histórico);regras ponto focal histórico;
-GOV-007;Alertar e bloquear marcos críticos quando faltar ponto focal obrigatório.;PARCIAL;"alertas sem_ponto_focal; tarefa antes do D-3";processos força-tarefa;"alerta sim; bloqueio de marco crítico não comprovado por teste"
+GOV-007;Alertar e bloquear marcos críticos quando faltar ponto focal obrigatório.;PARCIAL;"alerta sem ponto focal; item obrigatório do onboarding bloqueia a ativação";onboarding.test;
 GOV-008;Gerir calendário de feriados, expediente, plantões e SLA por contrato.;PARCIAL;"ocorrencias/sla.js; feriados";regras SLA;plantões e SLA por contrato ausentes
 GOV-009;Permitir delegação temporária com auditoria e expiração.;AUSENTE;—;—;delegação temporária
 GOV-010;Exibir matriz RACI e responsáveis vigentes por processo.;AUSENTE;—;—;tela RACI
@@ -34,18 +34,18 @@ WFL-012;Reabrir automaticamente em evento novo relacionado, conforme política.;
 WFL-013;Versionar templates de processo sem alterar instâncias antigas silenciosamente.;IMPLEMENTADO E TESTADO;processo_versoes imutáveis;processos execução;
 WFL-014;Permitir intervenção humana excepcional com justificativa e auditoria.;PARCIAL;"alterarComMotivo; reatribuir";—;sem teste dedicado
 WFL-015;Detectar loops, estados impossíveis e transições concorrentes.;IMPLEMENTADO E TESTADO;"version + FOR UPDATE; limite 5/24h";"AT-011; processos laço";
-ONB-001;Criar onboarding ao receber contratação validada do Comercial.;IMPLEMENTADO E TESTADO;comercial ganha → conta em onboarding;comercial proposta→ganha;
-ONB-002;Verificar dados cadastrais, módulos, contrato, VIP e ponto focal.;PARCIAL;checagens no processo de onboarding;—;sem checklist estruturado
-ONB-003;Solicitar dados faltantes à área ou cliente responsável com prazo.;AUSENTE;—;—;
+ONB-001;Criar onboarding ao receber contratação validada do Comercial.;IMPLEMENTADO E TESTADO;venda ganha de cliente novo abre checklist de onboarding ligado à ocorrência e à venda;onboarding.test;
+ONB-002;Verificar dados cadastrais, módulos, contrato, VIP e ponto focal.;IMPLEMENTADO E TESTADO;itens de dados cadastrais, contrato, produtos, VIP e ponto focal;onboarding.test;
+ONB-003;Solicitar dados faltantes à área ou cliente responsável com prazo.;PARCIAL;"item com prazo e equipe; vencido vira tarefa";onboarding.test;pedido automático ao cliente ainda não
 ONB-004;Provisionar conta e módulos na Platform por integração autorizada.;BLOQUEADO POR API/DECISÃO;exportação CSV de provisionamento;—;"Platform: só CSV nesta fase; capacidade de importação não homologada"
-ONB-005;Registrar checklist de certificados, placas, Renavam, SNE e permissões.;AUSENTE;—;—;checklist
-ONB-006;Importar lotes de placas com validação, resultado parcial e rejeições.;PARCIAL;importação CSV de veículos de rodada;CSV Platform;lote de placas do onboarding ausente
-ONB-007;Acompanhar configurações e agendamentos de robôs na Platform.;AUSENTE;—;—;
-ONB-008;Validar rodada inicial e critério de sucesso por produto.;BLOQUEADO POR API/DECISÃO;—;—;critério de sucesso por produto depende de homologação (RN-010)
-ONB-009;Separar ativação administrativa, operacional e sinalização financeira ao OMIE.;AUSENTE;—;—;
-ONB-010;Impedir conclusão sem critérios e permitir exceção formal aprovada.;AUSENTE;—;—;
-ONB-011;Orquestrar alteração de módulos, dados, carteira e ponto focal.;AUSENTE;—;—;
-ONB-012;Executar offboarding com checklist de acessos, pendências, evidências e retenção.;AUSENTE;—;—;offboarding
+ONB-005;Registrar checklist de certificados, placas, Renavam, SNE e permissões.;IMPLEMENTADO E TESTADO;itens de credenciais (verificação automática), placas, Renavam, SNE;onboarding.test;sem copiar segredo (só status)
+ONB-006;Importar lotes de placas com validação, resultado parcial e rejeições.;PARCIAL;"item de placas no checklist; importação de veículos por CSV de rodada";CSV Platform;lote de placas do onboarding com rejeições ainda não
+ONB-007;Acompanhar configurações e agendamentos de robôs na Platform.;PARCIAL;item de robôs e agendamentos (manual com evidência);onboarding.test;leitura da Platform depende de CSV
+ONB-008;Validar rodada inicial e critério de sucesso por produto.;PARCIAL;item primeira rodada com sucesso verificado pelo sistema;onboarding.test;critério por produto: DP-09
+ONB-009;Separar ativação administrativa, operacional e sinalização financeira ao OMIE.;IMPLEMENTADO E TESTADO;grupos ativação administrativa, técnica e sinalização financeira separados com progresso;onboarding.test;
+ONB-010;Impedir conclusão sem critérios e permitir exceção formal aprovada.;IMPLEMENTADO E TESTADO;conclusão exige obrigatórios feitos ou dispensa aprovada por outra pessoa (CHECK no banco);onboarding.test;
+ONB-011;Orquestrar alteração de módulos, dados, carteira e ponto focal.;PARCIAL;"modelo versionado; expansão de conta pela venda";onboarding.test;checklist de mudança de módulos/carteira ainda não
+ONB-012;Executar offboarding com checklist de acessos, pendências, evidências e retenção.;IMPLEMENTADO E TESTADO;"offboarding com motivo, itens de acesso, pendências, financeiro e dados (LGPD); conta encerrada";onboarding.test;
 PRE-001;Detectar calendário de rodadas por conta/produto na Platform.;MOCK/DEMO;"platform-demo.js; CSV rodadas";CSV Platform;calendário real depende de CSV homologado
 PRE-002;Iniciar pré-rodada D-4 e registrar execução e resultado.;IMPLEMENTADO E TESTADO;rodadas/servico.js jobPreRodada;AT-005;execução real é da Platform (CSV/demo)
 PRE-003;Normalizar erros de vínculo SNE, certificado, credencial e demais falhas.;IMPLEMENTADO E TESTADO;rodadas/erros.js normalizarErro;regras erros normalizados;
@@ -105,7 +105,7 @@ CS-008;Registrar dúvidas, avaliação e ações posteriores ao treinamento.;AUS
 CS-009;Acompanhar efetividade do treinamento por evolução de uso.;AUSENTE;—;—;
 CS-010;Programar insights do Caça Condutores com frequência e opt-out.;PARCIAL;processo CaçaCondutores semanal desligado;—;sem teste
 CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;IMPLEMENTADO E TESTADO;encaminhar expansão/renovação ao Comercial pela Carteira;comercial-funis.test;
-CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;AUSENTE;—;—;
+CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;IMPLEMENTADO E TESTADO;iniciar offboarding pela Carteira com motivo do cancelamento;onboarding.test;
 DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;PARCIAL;ocorrência tipo técnica;regras DEV-005;evidência sanitizada não verificada
 DEV-002;Rastrear prioridade, impacto, responsável e aceite do Desenvolvimento.;PARCIAL;prioridade/responsável/aceite;AT-010;
 DEV-003;Sincronizar estados e comentários de ferramentas técnicas autorizadas.;AUSENTE;—;—;sincronizar ferramenta técnica

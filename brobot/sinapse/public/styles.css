@@ -370,3 +370,13 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .previsao-ponderado { display: block; height: 100%; background: var(--marca); border-radius: 4px; }
 .previsao-valor { grid-column: 2; font-size: .82rem; color: var(--suave); }
 @media (max-width: 480px) { .previsao li { grid-template-columns: 1fr; } .previsao-valor { grid-column: 1; } }
+
+/* Onboarding/offboarding: progresso por grupo e itens atrasados. */
+.checklist + .checklist { border-top: 1px solid var(--borda); margin-top: 1rem; padding-top: 1rem; }
+.checklist-progresso { display: grid; grid-template-columns: 1fr; gap: .3rem; margin: .6rem 0; }
+@media (min-width: 700px) { .checklist-progresso { grid-template-columns: 1fr 1fr; gap: .3rem 1.5rem; } }
+.checklist-grupo { display: grid; grid-template-columns: minmax(8rem, 1fr) 6rem 2.5rem; gap: .5rem; align-items: center; font-size: .85rem; }
+.checklist-barra { display: block; height: .5rem; background: var(--neutro-f); border-radius: 4px; overflow: hidden; }
+.checklist-barra > span { display: block; height: 100%; background: var(--ok); }
+.checklist-item.atrasado { border-left: 3px solid var(--perigo); padding-left: .5rem; }
+.texto-perigo { color: var(--perigo); }

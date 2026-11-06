@@ -157,3 +157,15 @@ dimensionamento e da infraestrutura definitiva.
 | CS encaminha expansão/renovação ao Comercial pela Carteira (CS-011) | ✔ testado | rota `/api/comercial/encaminhar`, tela Carteira · `comercial-funis.test.js` |
 | Pessoas da negociação sem duplicar por telefone/e-mail (CRM-001) | ✔ testado | `comercial/contatos.js` · `comercial-funis.test.js` |
 | Previsão de fechamento ponderada por etapa e mês, com fórmula (CRM-015) | ✔ testado | `funil.previsao` · `comercial-funis.test.js` |
+
+## Entrega de 05/11/2026 (F4 · onboarding e offboarding por checklist)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Venda de cliente novo abre o onboarding com checklist (ONB-001) | ✔ testado | `onboarding/servico.js`, `comercial/servico.js` · `test/onboarding.test.js` |
+| Checklist por grupo: administrativa, técnica, financeira, relacionamento (ONB-002, 005, 007, 009) | ✔ testado | `onboarding/modelos.js` · `onboarding.test.js` |
+| Verificação automática quando há dado (ponto focal, credenciais, provisionamento, 1ª rodada, OMIE) (ONB-008 parcial) | ✔ testado | `VERIFICACOES` · `onboarding.test.js` |
+| Concluir só com tudo feito ou exceção aprovada por outra pessoa (ONB-010) | ✔ testado | migração 010 (CHECK) · `onboarding.test.js` |
+| Item vencido vira tarefa da equipe (ONB-003 parcial) | ✔ testado | supervisor · `onboarding.test.js` |
+| Modelo versionado, aberto não muda (ONB-011 parcial) | ✔ testado | `checklist_modelos` · `onboarding.test.js` |
+| Offboarding com motivo, pendências conferidas, conta encerrada sem apagar (ONB-012, CS-012) | ✔ testado | `onboarding.test.js` |

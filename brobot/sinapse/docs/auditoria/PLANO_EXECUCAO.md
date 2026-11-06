@@ -37,7 +37,7 @@ Pessoas × organizações com dedup; catálogo de produtos; múltiplos pipelines
 suspenso/reaberto; handoff formal com aceite; renovação/expansão; importação do Pipedrive com prévia e conciliação.
 DE-PARA em `DE_PARA_PIPEDRIVE_SINAPSE.csv` (a validar com a exportação real).
 
-## F4 · Onboarding com checklist e offboarding (ONB-001…012, CS-012)
+## F4 · Onboarding com checklist e offboarding (ONB-001…012, CS-012) — ✔ FEITA em 05/11 (falta: tela do modelo, pedido automático ao cliente)
 Checklist configurável por produto (dados, contrato, ponto focal, certificados por status, placas, SNE, primeira
 rodada), pedidos de faltantes com prazo, ativação administrativa × técnica × sinalização ao OMIE, exceção aprovada,
 offboarding com revogação e retenção.

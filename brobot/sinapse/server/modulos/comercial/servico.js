@@ -15,6 +15,7 @@ const catalogo = require('./catalogo');
 const propostas = require('./propostas');
 const atividades = require('./atividades');
 const contatos = require('./contatos');
+const onboarding = require('../onboarding/servico');
 
 const ACAO_PADRAO = { qualificacao: 'Agendar a demonstração', demonstracao: 'Enviar a proposta', proposta: 'Combinar o teste (período e critério de sucesso)',
   negociacao: 'Fechar a venda' };
@@ -205,6 +206,8 @@ async function criarContaDaVenda(c, ctx, o) {
       + `Teste: ${o.teste_dispensado ? 'dispensado (produtos sem teste no catálogo)' : `${o.teste_criterio || '-'} (${o.teste_parecer || 'aprovado'})`}. O CS define o ponto focal (1 nome + 1 contato) e repassa ao Suporte.`,
     proximaAcao: 'Definir o ponto focal e o plano de onboarding',
   });
+  // ONB-001: venda de cliente novo abre o checklist de onboarding (expansão usa o da conta, se ainda estiver aberto).
+  if (!expansao) await onboarding.abrir(c, ctx, { contaId: conta.id, tipo: 'onboarding', ocorrenciaId: oc.id, oportunidadeId: o.id });
   await auditar(c, ctx, { acao: expansao ? 'conta.expansao_vendida' : 'conta.criada_pela_venda', entidade: 'conta', entidadeId: conta.id,
     depois: { oportunidade: o.codigo, produtos: o.produtos, valorMensal: o.valor_mensal } });
   return { contaId: conta.id, ocorrenciaId: oc.id, expansao };
