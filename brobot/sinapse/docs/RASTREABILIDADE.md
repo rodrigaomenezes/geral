@@ -290,3 +290,9 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Lote de placas com validação, resultado parcial e rejeições; envio à Platform com confirmação; item do checklist automático (ONB-006) | ✔ testado | `onboarding/placas.js` · `test/placas.test.js` |
+
+## Entrega de 06/11/2026 (F19 · Pedido ao cliente no onboarding)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Solicitar ao cliente os dados faltantes com prazo, repetição limitada e escalonamento ao CS (ONB-003) | ✔ testado | `onboarding/servico.js pedirAoCliente` · `test/pedido-cliente.test.js` |

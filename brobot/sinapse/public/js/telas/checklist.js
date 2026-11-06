@@ -45,7 +45,8 @@ export async function secaoChecklists(ctx, conta, recarregar) {
     const porGrupo = Object.keys(dados.grupos).filter((g) => k.itens.some((i) => i.grupo === g));
     return h('div', { class: 'checklist' },
       h('div', { class: 'linha-topo' }, h('strong', {}, k.rotulo), selo(aberto ? 'em andamento' : 'concluído', aberto ? 'info' : 'ok'),
-        h('span', { class: 'suave' }, `aberto ${dataHora(k.aberto_em)}${k.aberto_por_nome ? ` por ${k.aberto_por_nome}` : ''} · modelo v${k.modelo_versao}`)),
+        h('span', { class: 'suave' }, `aberto ${dataHora(k.aberto_em)}${k.aberto_por_nome ? ` por ${k.aberto_por_nome}` : ''} · modelo v${k.modelo_versao}`
+          + (k.pedidos_cliente ? ` · cliente lembrado ${k.pedidos_cliente}x (último ${dataHora(k.ultimo_pedido_cliente_em)})` : ''))),
       k.motivo ? h('p', { class: 'suave' }, `Motivo: ${k.motivo}`) : null,
       h('div', { class: 'checklist-progresso' }, k.progresso.grupos.map((g) => h('div', { class: 'checklist-grupo' },
         h('span', {}, g.nome), h('span', { class: 'checklist-barra', role: 'img', 'aria-label': `${g.prontos} de ${g.total}` }, h('span', { style: { width: `${g.total ? (g.prontos / g.total) * 100 : 0}%` } })),

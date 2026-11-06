@@ -79,6 +79,8 @@ async function jobVarrer(c, ctx) {
   resumo.lotesSemConfirmacao = await lotesCsv.verificarLotesAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // ONB-003/010: item obrigatório de onboarding/offboarding vencido vira tarefa para a equipe dele.
   resumo.checklistAtrasados = await onboarding.verificarAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
+  // ONB-003: o que depende do cliente é pedido a ele (até 3 vezes; depois, ligação do CS).
+  resumo.pedidosAoCliente = await onboarding.pedirAoCliente(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // CRE-004 e POS-009: credencial perto de vencer e reincidência viram ocorrência (uma por alerta).
   resumo.credenciaisVencendo = await monitoramento.verificarExpiracoes(c, ctx);
   resumo.reincidencias = await monitoramento.verificarReincidencia(c, ctx);
@@ -93,7 +95,7 @@ async function jobVarrer(c, ctx) {
   resumo.anexosExpurgados = await anexos.aplicarRetencao(c, ctx);
   // SUP-002: canal em silêncio, entrada parada e rotina parada.
   Object.assign(resumo, await saudeCanais.verificarCanais(c, ctx, { carregarCalendario: ocorrencias.carregarCalendario, criarTarefa: (t) => tarefas.criar(c, ctx, t) }));
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados) {
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados || resumo.pedidosAoCliente) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };

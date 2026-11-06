@@ -16,6 +16,7 @@ const ROTULO = { onboarding: 'Onboarding', offboarding: 'Offboarding' };
 
 // Verificações automáticas: devolvem a evidência (texto) quando o dado do sistema comprova o item; senão null.
 const placas = require('./placas');
+const comunicacao = require('../comunicacao/servico');
 
 const VERIFICACOES = {
   async conta_com_produtos(c, ck) {
@@ -101,9 +102,9 @@ async function abrir(c, ctx, { contaId, tipo, motivo, ocorrenciaId, oportunidade
   [ctx.tenantId, contaId, tipo, m.versao, motivo || null, ocorrenciaId || null, oportunidadeId || null, ctx.usuario?.id || null, agora]));
   let n = 0;
   for (const i of m.itens) {
-    await c.query(`INSERT INTO checklist_itens (tenant_id, checklist_id, ordem, codigo, titulo, grupo, equipe_codigo, obrigatorio, verificacao, prazo_em)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [ctx.tenantId, ck.id, n++, i.codigo, i.titulo, i.grupo, i.equipe, i.obrigatorio !== false, i.verificacao || null, new Date(agora.getTime() + (i.dias || 0) * DIA)]);
+    await c.query(`INSERT INTO checklist_itens (tenant_id, checklist_id, ordem, codigo, titulo, grupo, equipe_codigo, obrigatorio, verificacao, prazo_em, pedido_cliente)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [ctx.tenantId, ck.id, n++, i.codigo, i.titulo, i.grupo, i.equipe, i.obrigatorio !== false, i.verificacao || null, new Date(agora.getTime() + (i.dias || 0) * DIA), i.pedidoCliente || null]);
   }
   await auditar(c, ctx, { acao: `checklist.${tipo}_aberto`, entidade: 'conta', entidadeId: contaId, depois: { checklist: ck.id, modeloVersao: m.versao, itens: n }, motivo: motivo || null });
   await publicar(c, ctx, { tipo: `conta.${tipo}_aberto`, agregado: 'conta', agregadoId: contaId, chave: `checklist:${ck.id}:aberto`, payload: { checklistId: ck.id } });
@@ -210,6 +211,40 @@ async function daConta(c, ctx, contaId) {
 }
 
 /** Supervisor: item obrigatório vencido vira tarefa para a equipe dele (uma vez por item). Também confere automáticos. */
+/**
+ * ONB-003: o que depende do cliente é pedido a ele sozinho. A partir de 1 dia de onboarding, uma mensagem ao ponto
+ * focal principal com tudo o que falta e o prazo; repete a cada 3 dias, no máximo 3 vezes; depois do terceiro pedido sem
+ * resposta, tarefa para o CS ligar. Consentimento e opt-out valem (o envio bloqueado fica registrado).
+ */
+const PEDIDOS_MAX = 3;
+async function pedirAoCliente(c, ctx, { criarTarefa }) {
+  const agora = relogio.agora();
+  let enviados = 0;
+  const lista = (await c.query(`SELECT k.*, ct.nome AS conta FROM checklists k JOIN contas ct ON ct.id = k.conta_id
+    WHERE k.estado = 'aberto' AND k.tipo = 'onboarding' AND k.aberto_em <= $1
+      AND (k.ultimo_pedido_cliente_em IS NULL OR k.ultimo_pedido_cliente_em <= $2) LIMIT 100`,
+  [new Date(agora.getTime() - DIA), new Date(agora.getTime() - 3 * DIA)])).rows;
+  for (const k of lista) {
+    const itens = (await c.query(`SELECT pedido_cliente, prazo_em FROM checklist_itens WHERE checklist_id = $1 AND pedido_cliente IS NOT NULL
+      AND estado IN ('pendente', 'dispensa_pedida') ORDER BY prazo_em, ordem`, [k.id])).rows;
+    if (!itens.length) continue;
+    if (k.pedidos_cliente >= PEDIDOS_MAX) {
+      await criarTarefa({ tipo: 'ligacao', equipeCodigo: 'cs', chave: `onboarding-cliente:${k.id}`, prazoEm: new Date(agora.getTime() + 4 * HORA),
+        titulo: `${k.conta}: cliente não respondeu a ${PEDIDOS_MAX} pedidos do onboarding — ligar` });
+      continue;
+    }
+    const pf = uma(await c.query("SELECT * FROM pontos_focais WHERE conta_id = $1 AND vigente ORDER BY (papel = 'principal') DESC LIMIT 1", [k.conta_id]));
+    if (!pf) continue; // sem ponto focal, o item "ponto focal" já vira tarefa do CS
+    const data = (d) => new Date(d).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
+    await comunicacao.programarEnvio(c, ctx, { contaId: k.conta_id, ocorrenciaId: k.ocorrencia_id, pontoFocal: pf, modelo: 'onboarding_pendencias_cliente',
+      variaveis: { nome: pf.nome.split(' ')[0], conta: k.conta, lista: itens.map((i) => `• ${i.pedido_cliente} (até ${data(i.prazo_em)})`).join('\n') } });
+    await c.query('UPDATE checklists SET pedidos_cliente = pedidos_cliente + 1, ultimo_pedido_cliente_em = $2 WHERE id = $1', [k.id, agora]);
+    await auditar(c, ctx, { acao: 'checklist.pedido_cliente', entidade: 'conta', entidadeId: k.conta_id, depois: { checklist: k.id, itens: itens.length, pedido: k.pedidos_cliente + 1 } });
+    enviados++;
+  }
+  return enviados;
+}
+
 async function verificarAtrasados(c, ctx, { criarTarefa }) {
   for (const ck of (await c.query("SELECT * FROM checklists WHERE estado = 'aberto' LIMIT 200")).rows) await conferirAutomaticos(c, ctx, ck);
   const agora = relogio.agora();
@@ -224,4 +259,4 @@ async function verificarAtrasados(c, ctx, { criarTarefa }) {
   return atrasados.length;
 }
 
-module.exports = { abrir, agirItem, concluir, daConta, modeloAtivo, salvarModelo, verificarAtrasados, conferirAutomaticos, VERIFICACOES };
+module.exports = { abrir, agirItem, concluir, daConta, modeloAtivo, salvarModelo, verificarAtrasados, pedirAoCliente, conferirAutomaticos, VERIFICACOES };

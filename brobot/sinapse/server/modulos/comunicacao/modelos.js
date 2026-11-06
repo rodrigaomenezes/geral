@@ -47,6 +47,11 @@ const MODELOS = {
       + 'Consultados com sucesso: {lista_sucesso}\nNão consultados (pendência do cadastro):\n{lista}\n'
       + 'Quando corrigir, por favor nos avise por aqui para revalidarmos. Protocolo {protocolo}.',
   },
+  onboarding_pendencias_cliente: {
+    versao: 1, nome: 'Onboarding · o que falta do cliente', variaveis: ['nome', 'conta', 'lista'],
+    texto: 'Olá, {nome}! Para concluir a ativação da {conta} na Brobot, precisamos de:\n{lista}\nSe já fez algum, é só avisar por aqui. '
+      + 'Por segurança, nunca envie senhas por mensagem: cadastre direto na Platform.',
+  },
   lembrete_cliente: {
     versao: 1, nome: 'Lembrete: aguardamos seu retorno', variaveis: ['nome', 'conta', 'protocolo'],
     texto: 'Olá, {nome}. Ainda aguardamos o seu retorno sobre o atendimento {protocolo} da {conta}. Se já resolveu, é só nos avisar por aqui.',
