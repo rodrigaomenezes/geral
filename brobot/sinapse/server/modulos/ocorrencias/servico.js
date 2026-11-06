@@ -6,7 +6,7 @@ const { uma } = require('../../db');
 const { erro } = require('../../nucleo/erros');
 const { publicar, auditar } = require('../../nucleo/registro');
 const { relogio } = require('../../nucleo/relogio');
-const { calendario, prazos, somarHorasUteis } = require('./sla');
+const { calendario, prazos, somarHorasUteis, prazoDepoisDaEspera } = require('./sla');
 const maquina = require('./maquina');
 const clientes = require('../clientes/servico');
 const identidade = require('../identidade/servico');
@@ -128,11 +128,39 @@ async function transicionar(c, ctx, id, acao, dados = {}, versao) {
   return atual;
 }
 
+const ESPERA = ['aguardando_cliente', 'aguardando_terceiro'];
+
+/**
+ * WFL-006: relógio da espera. Entrar em espera marca o início; sair soma o tempo (cliente ou terceiro) e, se a
+ * ocorrência segue ativa, empurra o prazo de resolução pelo tempo esperado (horas úteis; crítica em horas corridas).
+ */
+async function colunasDaEspera(c, oc, para, colunas) {
+  const extra = {};
+  const agora = relogio.agora();
+  if (ESPERA.includes(oc.estado) && para !== oc.estado && oc.espera_inicio_em) {
+    const inicio = new Date(oc.espera_inicio_em);
+    const campo = oc.estado === 'aguardando_cliente' ? 'espera_cliente_seg' : 'espera_terceiro_seg';
+    extra[campo] = (oc[campo] || 0) + Math.max(0, Math.round((agora - inicio) / 1000));
+    extra.espera_inicio_em = null;
+    if (!maquina.FINAIS.includes(para) && !('prazo_em' in colunas) && oc.prazo_em) {
+      const cal = await carregarCalendario(c);
+      const regra = cal.sla[oc.prioridade] || cal.sla.media;
+      extra.prazo_em = prazoDepoisDaEspera(new Date(oc.prazo_em), inicio, agora, { corrido: !!regra.corrido, cal });
+    }
+  }
+  if (ESPERA.includes(para) && para !== oc.estado) extra.espera_inicio_em = agora;
+  return extra;
+}
+
 async function aplicar(c, oc, para, colunas) {
   const sets = ['estado = $3', 'version = version + 1', 'atualizado_em = now()'];
   const vals = [oc.id, oc.version, para];
   for (const [k, v] of Object.entries(colunas)) {
     if (!COLUNAS_GRAVAVEIS.has(k)) throw new Error(`Coluna não gravável: ${k}`);
+    vals.push(v);
+    sets.push(`${k} = $${vals.length}`);
+  }
+  for (const [k, v] of Object.entries(await colunasDaEspera(c, oc, para, colunas))) {
     vals.push(v);
     sets.push(`${k} = $${vals.length}`);
   }
@@ -207,6 +235,7 @@ async function anotar(c, ctx, id, texto) {
 
 function situacaoSla(o, agora) {
   if (maquina.FINAIS.includes(o.estado)) return null;
+  if (ESPERA.includes(o.estado)) return 'pausado'; // o prazo de resolução anda ao sair da espera (WFL-006)
   const prazo = new Date(o.prazo_em);
   if (prazo < agora) return 'vencido';
   if (prazo - agora < 2 * 3600e3) return 'em_risco';
@@ -260,7 +289,7 @@ async function quadro(c, usuario, f = {}) {
   else if (f.responsavel === 'ninguem') onde.push('o.responsavel_id IS NULL');
   else if (f.responsavel) add('o.responsavel_id = ?', f.responsavel);
   if (f.vip) onde.push('c.vip');
-  if (f.vencidas) onde.push("o.estado NOT IN ('resolvida','encerrada_sem_resolucao') AND o.prazo_em < $1::timestamptz");
+  if (f.vencidas) onde.push("o.estado NOT IN ('resolvida','encerrada_sem_resolucao','aguardando_cliente','aguardando_terceiro') AND o.prazo_em < $1::timestamptz");
   if (f.q) {
     params.push(`%${f.q}%`);
     const n = `$${params.length}`;

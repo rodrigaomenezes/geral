@@ -64,9 +64,10 @@ async function operacao(c, f) {
   const serie = [...porDia.values()];
   const agora = relogio.agora();
   const porEquipe = (await c.query(`SELECT e.codigo, e.nome,
-      count(o.id) FILTER (WHERE o.prazo_em >= $1::timestamptz + interval '2 hours')::int AS no_prazo,
-      count(o.id) FILTER (WHERE o.prazo_em >= $1 AND o.prazo_em < $1::timestamptz + interval '2 hours')::int AS em_risco,
-      count(o.id) FILTER (WHERE o.prazo_em < $1)::int AS vencido
+      count(o.id) FILTER (WHERE o.estado NOT IN ('aguardando_cliente','aguardando_terceiro') AND o.prazo_em >= $1::timestamptz + interval '2 hours')::int AS no_prazo,
+      count(o.id) FILTER (WHERE o.estado NOT IN ('aguardando_cliente','aguardando_terceiro') AND o.prazo_em >= $1 AND o.prazo_em < $1::timestamptz + interval '2 hours')::int AS em_risco,
+      count(o.id) FILTER (WHERE o.estado NOT IN ('aguardando_cliente','aguardando_terceiro') AND o.prazo_em < $1)::int AS vencido,
+      count(o.id) FILTER (WHERE NOT (o.estado NOT IN ('aguardando_cliente','aguardando_terceiro')))::int AS em_espera
     FROM equipes e JOIN ocorrencias o ON o.equipe_id = e.id AND o.estado NOT IN ('resolvida','encerrada_sem_resolucao')
     LEFT JOIN contas c ON c.id = o.conta_id WHERE true${ondeOcorrencias({ ...f, equipe: null }, [agora])}
     GROUP BY e.codigo, e.nome ORDER BY count(o.id) DESC`, [agora])).rows;
@@ -84,8 +85,9 @@ async function operacao(c, f) {
       colunas: [{ campo: 'dia', rotulo: 'Dia' }, { campo: 'abertas', rotulo: 'Abertas' }, { campo: 'resolvidas', rotulo: 'Resolvidas' }],
       linhas: serieDiaria(f, serie, ['abertas', 'resolvidas']) },
     { id: 'fila_equipe', titulo: 'Fila ativa por equipe e prazo', tipo: 'empilhado', status: true,
-      series: [{ campo: 'no_prazo', rotulo: 'No prazo', status: 'ok' }, { campo: 'em_risco', rotulo: 'Em risco (< 2 h)', status: 'alerta' }, { campo: 'vencido', rotulo: 'Vencido', status: 'perigo' }],
-      colunas: [{ campo: 'nome', rotulo: 'Equipe' }, { campo: 'no_prazo', rotulo: 'No prazo' }, { campo: 'em_risco', rotulo: 'Em risco' }, { campo: 'vencido', rotulo: 'Vencido' }],
+      series: [{ campo: 'no_prazo', rotulo: 'No prazo', status: 'ok' }, { campo: 'em_risco', rotulo: 'Em risco (< 2 h)', status: 'alerta' }, { campo: 'vencido', rotulo: 'Vencido', status: 'perigo' },
+        { campo: 'em_espera', rotulo: 'Em espera (prazo pausado)', status: 'neutro' }],
+      colunas: [{ campo: 'nome', rotulo: 'Equipe' }, { campo: 'no_prazo', rotulo: 'No prazo' }, { campo: 'em_risco', rotulo: 'Em risco' }, { campo: 'vencido', rotulo: 'Vencido' }, { campo: 'em_espera', rotulo: 'Em espera' }],
       linhas: porEquipe.map((x) => ({ ...x, rotulo: x.nome, link: `#/ocorrencias?equipe=${x.codigo}` })) },
     { id: 'envelhecimento', titulo: 'Há quanto tempo as ativas estão abertas', tipo: 'barras', unidade: 'ocorrências',
       colunas: [{ campo: 'rotulo', rotulo: 'Idade' }, { campo: 'valor', rotulo: 'Ocorrências' }], linhas: idade.map((x) => ({ rotulo: x.faixa.slice(3), valor: x.n })) },

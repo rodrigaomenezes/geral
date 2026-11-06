@@ -24,7 +24,7 @@ WFL-002;Validar pré-condições, guardas, evidências e permissões nas transi�
 WFL-003;Gerar tarefas automaticamente a partir de eventos e regras.;IMPLEMENTADO E TESTADO;processos/motor.js;processos execução;
 WFL-004;Definir due_at e next_action_at obrigatórios para estados ativos.;IMPLEMENTADO E TESTADO;CHECK ativa_completa;regras banco RN-008;
 WFL-005;Calcular SLA por calendário, severidade e regras contratuais.;IMPLEMENTADO E TESTADO;sla.js;regras SLA;SLA por contrato ausente
-WFL-006;Separar SLA de resposta, tratamento, dependência externa e resolução.;PARCIAL;resposta_em/prazo_em;regras SLA;dependência externa sem relógio próprio
+WFL-006;Separar SLA de resposta, tratamento, dependência externa e resolução.;IMPLEMENTADO E TESTADO;"sla_resposta_em; prazo_em; espera_cliente_seg/espera_terceiro_seg (017); prazo pausado na espera";"regras SLA; espera.test";
 WFL-007;Escalonar atrasos por níveis e registrar ciência/ação.;PARCIAL;supervisor escalonamento;AT-010;níveis múltiplos e registro de ciência parciais
 WFL-008;Executar handoff com aceite e fallback quando não recebido.;IMPLEMENTADO E TESTADO;handoffs + supervisor;AT-010;
 WFL-009;Executar retentativas controladas com backoff e limite.;IMPLEMENTADO E TESTADO;jobs/fila.js backoff + DLQ;AT-005/007;

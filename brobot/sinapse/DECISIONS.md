@@ -269,3 +269,15 @@ próximas mensagens caírem nela. Dividir cria uma ocorrência da mesma conta (c
 placas escolhidas; a original nunca fica vazia por divisão. Referência pelo protocolo ou pelo id; o protocolo é por
 organização, a RLS isola. Tudo com motivo na linha do tempo das duas.
 **Fora:** mesclar entre contas diferentes (use relacionar); desfazer uma mescla (reabrir a duplicada continua possível).
+
+# T-034 — Relógio da espera: dependência externa fora do prazo de resolução (F11, WFL-006)
+**Contexto:** em "aguardando cliente/terceiro" o prazo de resolução continuava correndo; ocorrências esperando o
+cliente apareciam como vencidas.
+**Decisão:** o único ponto que muda o estado (`aplicar` em `ocorrencias/servico.js`) marca `espera_inicio_em` ao
+entrar em espera e, ao sair, soma o tempo em `espera_cliente_seg` ou `espera_terceiro_seg`; se a ocorrência segue
+ativa, o prazo de resolução anda as mesmas horas úteis esperadas (crítica: horas corridas). Vale para toda saída:
+retomar, resposta do cliente pela entrada, transferência, rotina do supervisor; encerrar durante a espera só registra
+o tempo. Em espera, a situação do prazo é "pausado" e não conta como vencida (quadro, painel, dashboard, saúde do
+supervisor); a revisão da espera (até 3 dias) continua sendo o prazo da dependência externa. O SLA de primeira
+resposta não pausa. Migração 017 (aditiva; ocorrências já em espera ganham início = última atualização).
+**Fora:** pausa parcial (por exemplo, só para a primeira resposta) e relatório de tempo por fase.

@@ -237,3 +237,9 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Relacionar, mesclar (duplicada → principal) e dividir ocorrências sem apagar (INT-006) | ✔ testado | `ocorrencias/vinculos.js` · `test/vinculos.test.js` |
+
+## Entrega de 06/11/2026 (F11 · Relógio da espera)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Tempo de dependência externa (cliente/terceiro) separado e fora do prazo de resolução (WFL-006) | ✔ testado | `ocorrencias/sla.js`, `aplicar` · `test/espera.test.js` |

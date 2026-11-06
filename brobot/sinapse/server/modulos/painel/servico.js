@@ -14,14 +14,14 @@ async function indicadores(c) {
        count(*) FILTER (WHERE estado = 'triagem')::int AS triagem,
        count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND equipe_id IS NULL)::int AS orfas,
        count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND proxima_acao_em IS NULL)::int AS sem_proxima_acao,
-       count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao') AND prazo_em < $1)::int AS vencidas,
+       count(*) FILTER (WHERE estado NOT IN ('resolvida','encerrada_sem_resolucao','aguardando_cliente','aguardando_terceiro') AND prazo_em < $1)::int AS vencidas,
        count(*) FILTER (WHERE primeira_resposta_em IS NOT NULL)::int AS respondidas,
        count(*) FILTER (WHERE primeira_resposta_em IS NOT NULL AND primeira_resposta_em <= sla_resposta_em)::int AS respondidas_no_prazo,
        count(*) FILTER (WHERE estado = 'resolvida')::int AS resolvidas,
        count(*) FILTER (WHERE estado = 'encerrada_sem_resolucao')::int AS encerradas_sem_resolucao
      FROM ocorrencias`, [agora]));
   const porEquipe = (await c.query(
-    `SELECT e.nome, count(o.id)::int AS ativas, count(o.id) FILTER (WHERE o.prazo_em < $1)::int AS vencidas
+    `SELECT e.nome, count(o.id)::int AS ativas, count(o.id) FILTER (WHERE o.prazo_em < $1 AND o.estado NOT IN ('aguardando_cliente','aguardando_terceiro'))::int AS vencidas
      FROM equipes e LEFT JOIN ocorrencias o ON o.equipe_id = e.id AND o.estado NOT IN ('resolvida','encerrada_sem_resolucao')
      GROUP BY e.nome ORDER BY ativas DESC, e.nome`, [agora])).rows;
   const rod = uma(await c.query(
