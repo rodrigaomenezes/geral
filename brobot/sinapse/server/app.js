@@ -29,6 +29,7 @@ const ROTAS = [
   ...require('./modulos/onboarding/rotas'),
   ...require('./modulos/monitoramento/rotas'),
   ...require('./modulos/treinamentos/rotas'),
+  ...require('./modulos/desenvolvimento/rotas'),
   ...require('./modulos/rodadas/rotas'),
   ...require('./modulos/entrada/rotas'),
   ...require('./modulos/supervisor/rotas'),

@@ -205,3 +205,15 @@ Presença e avaliação só depois do início; concluir exige toda presença mar
 reagendar. Conta ativa sem acesso há 30 dias ou sem consulta no mês vira alerta para o CS (uma vez, `alerta_chave`),
 salvo se já estiver numa sessão agendada (CS-004). Permissão nova `treinamento.gerir` (CS e gestão).
 **Fora:** inscrição pelo próprio cliente (link de inscrição), lista de presença automática pela ferramenta de chamada.
+
+# T-029 — Desenvolvimento: incidentes, melhorias e releases (F7)
+**Contexto:** DEV-001, DEV-005…008; a diretriz manda substituir o Redmine no que é decisão e acompanhamento.
+**Decisão:** módulo `desenvolvimento`. Incidente com severidade, clientes afetados, linha do tempo só de inserção e
+aviso opcional a cada atualização (modelo editável `aviso_incidente`, ao ponto focal, pelo canal permitido); SEV1 vira
+tarefa da Supervisão com prazo de 1 hora; encerrar exige post-mortem (causa raiz e lições, CHECK no banco) e as ações
+preventivas viram melhorias propostas ligadas ao incidente. Melhoria: proposta por quem atende; aprovada ou recusada
+(com motivo) por outra pessoa com `ocorrencia.intervir` (CHECK no banco); entra numa release; publicar a release
+libera e cria a tarefa de validação para a operação; validar é de quem cuida de contas e não é do Desenvolvimento,
+com evidência (DEV-005), e avisa as ocorrências ligadas (DEV-007). Todo texto passa por `nucleo/sanitizar.js`
+(DEV-001: tira senha, token e chave; preserva placa, protocolo e UUID). Permissão nova `dev.gerir`.
+**Fora:** sincronizar com a ferramenta técnica (DEV-003, sem API autorizada), status público para os clientes.

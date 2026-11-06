@@ -27,6 +27,10 @@ const MODELOS = {
     texto: 'Olá, {nome}. Tentamos falar com você por telefone sobre {qtd} pendência(s) da {conta} que impedem a consulta:\n{lista}\n'
       + 'Pode nos responder por aqui? Assim que corrigir, avise e nós revalidamos. Protocolo {protocolo}.',
   },
+  aviso_incidente: {
+    versao: 1, nome: 'Aviso de incidente aos clientes afetados', variaveis: ['nome', 'conta', 'titulo', 'texto', 'codigo'],
+    texto: 'Olá, {nome}. Aviso da Brobot sobre {titulo}: {texto}\nSeguimos acompanhando e avisamos a próxima atualização por aqui. Referência {codigo}.',
+  },
   convite_treinamento: {
     versao: 1, nome: 'Convite para treinamento coletivo', variaveis: ['nome', 'conta', 'titulo', 'data', 'link'],
     texto: 'Olá, {nome}! A Brobot vai fazer o treinamento "{titulo}" em {data}, ao vivo, numa conta de demonstração (sem dados da {conta}). '

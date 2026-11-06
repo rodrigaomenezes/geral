@@ -191,3 +191,14 @@ dimensionamento e da infraestrutura definitiva.
 | Conta de demonstração, nunca de cliente (CS-007) | ✔ testado | `criarSessao` · `treinamentos.test.js` |
 | Dúvidas, avaliação e próximo passo; ausente vira tarefa de reagendar (CS-008) | ✔ testado | `treinamentos.test.js` |
 | Efetividade pelo uso antes × depois, presentes × ausentes (CS-009) | ✔ testado | `detalhe.efetividade` · `treinamentos.test.js` |
+
+## Entrega de 06/11/2026 (F7 · Desenvolvimento)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Evidência sem segredo (senha, token, chave) (DEV-001) | ✔ testado | `nucleo/sanitizar.js` · `test/desenvolvimento.test.js` |
+| Validação operacional depois da release, por quem não desenvolveu (DEV-005) | ✔ testado | `desenvolvimento/servico.js` · `desenvolvimento.test.js` |
+| Incidentes: severidade, clientes afetados, aviso, linha do tempo, post-mortem obrigatório (DEV-006) | ✔ testado | migração 013 · `desenvolvimento.test.js` |
+| Problema recorrente ligado à ação preventiva; ocorrências avisadas (DEV-007) | ✔ testado | `melhoria_ocorrencias` · `desenvolvimento.test.js` |
+| Backlog com aprovação por outra pessoa e releases (DEV-008) | ✔ testado | `melhorias`, `releases` · `desenvolvimento.test.js` |
+| Sincronizar com ferramenta técnica (DEV-003) | ○ bloqueado | sem API autorizada |

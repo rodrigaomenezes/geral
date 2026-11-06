@@ -106,14 +106,14 @@ CS-009;Acompanhar efetividade do treinamento por evolução de uso.;IMPLEMENTADO
 CS-010;Programar insights do Caça Condutores com frequência e opt-out.;PARCIAL;processo CaçaCondutores semanal desligado;—;sem teste
 CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;IMPLEMENTADO E TESTADO;encaminhar expansão/renovação ao Comercial pela Carteira;comercial-funis.test;
 CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;IMPLEMENTADO E TESTADO;iniciar offboarding pela Carteira com motivo do cancelamento;onboarding.test;
-DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;PARCIAL;ocorrência tipo técnica;regras DEV-005;evidência sanitizada não verificada
+DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;IMPLEMENTADO E TESTADO;ocorrência técnica + sanitização de segredos em incidente/melhoria/evidência;desenvolvimento.test;
 DEV-002;Rastrear prioridade, impacto, responsável e aceite do Desenvolvimento.;PARCIAL;prioridade/responsável/aceite;AT-010;
 DEV-003;Sincronizar estados e comentários de ferramentas técnicas autorizadas.;AUSENTE;—;—;sincronizar ferramenta técnica
 DEV-004;Notificar mudanças e falhas de handoff automaticamente.;PARCIAL;notificações de handoff;AT-010;
-DEV-005;Exigir validação operacional após correção antes de resolução final.;IMPLEMENTADO E TESTADO;dev não resolve técnica;regras máquina;
-DEV-006;Gerir incidentes críticos, comunicação, mitigação e post-mortem.;AUSENTE;—;—;incidentes/post-mortem
-DEV-007;Vincular problemas recorrentes a causa raiz e ações preventivas.;AUSENTE;—;—;
-DEV-008;Gerir solicitações de melhoria, backlog, aprovações e releases.;AUSENTE;—;—;
+DEV-005;Exigir validação operacional após correção antes de resolução final.;IMPLEMENTADO E TESTADO;"Dev não resolve técnica; melhoria liberada é validada pela operação com evidência";"regras; desenvolvimento.test";
+DEV-006;Gerir incidentes críticos, comunicação, mitigação e post-mortem.;IMPLEMENTADO E TESTADO;incidentes com severidade, aviso aos afetados, linha do tempo e post-mortem obrigatório;desenvolvimento.test;status público ainda não
+DEV-007;Vincular problemas recorrentes a causa raiz e ações preventivas.;IMPLEMENTADO E TESTADO;"ocorrências ligadas à melhoria preventiva; reincidência (F5) recomenda RCA";"desenvolvimento.test; monitoramento.test";
+DEV-008;Gerir solicitações de melhoria, backlog, aprovações e releases.;IMPLEMENTADO E TESTADO;backlog, aprovação por outra pessoa, releases;desenvolvimento.test;
 FIN-001;Definir OMIE como fonte autoritativa para dados e eventos financeiros.;IMPLEMENTADO E TESTADO;"sem cálculo financeiro; status_financeiro só leitura";AT-006;
 FIN-002;Manter mapeamento de cliente/contrato ERP↔OMIE sem duplicação indevida.;PARCIAL;"contas.omie_codigo; divergências CSV";CSV OMIE;
 FIN-003;Receber status financeiro necessário para ações operacionais autorizadas.;PARCIAL;"CSV situação financeira; omie-demo";"AT-006; CSV OMIE";layout não homologado
@@ -166,7 +166,7 @@ RNF-012;Acessibilidade Interfaces responsivas e boas práticas WCAG, nível-alvo
 AT-001;Mensagem sem cliente identificado Permanece em triagem com SLA, sem perda.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-001;
 AT-002;"Mesmo webhook três vezes Uma ocorrência/efeito; eventos duplicados auditados.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-002;
 AT-003;Usuário responsável indisponível Tarefa é atribuída ao substituto/fila.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-003;
-AT-004;Redmine antigo indisponível Novo ERP continua sem dependência operacional.;IMPLEMENTADO E TESTADO;nenhuma dependência do Redmine;AT-004 por desenho;"não há teste automatizado; garantido por ausência"
+AT-004;Redmine antigo indisponível Novo ERP continua sem dependência operacional.;IMPLEMENTADO E TESTADO;"nenhuma dependência do Redmine; incidentes e backlog no Sinapse";desenvolvimento.test;
 AT-005;"Platform indisponível Ocorrência e checkpoint preservados; retentativa e alerta.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-005;
 AT-006;"OMIE indisponível Fila financeira de integração aguarda e reconcilia; ERP não inventa status.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-006;
 AT-007;WhatsApp falha Erro registrado, retentativa e fallback autorizado.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-007;
