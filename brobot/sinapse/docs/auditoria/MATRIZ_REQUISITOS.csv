@@ -5,7 +5,7 @@ GOV-003;Manter matriz de responsáveis por processo, carteira, horário e substi
 GOV-004;Impedir tarefas ativas sem dono ou fila de contingência.;IMPLEMENTADO E TESTADO;"CHECK tarefas.equipe_id; supervisor; quadro mostra fila sem responsável";"AT-010; quadro.test";
 GOV-005;Aplicar regras VIP→CS e demais→Suporte, com exceções justificadas.;IMPLEMENTADO E TESTADO;"clientes.equipeDaConta; CHECK justificativa";regras roteamento RN-001;
 GOV-006;Cadastrar ponto focal principal e suplente com canais válidos e histórico.;IMPLEMENTADO E TESTADO;pontos_focais (vigente, histórico);regras ponto focal histórico;
-GOV-007;Alertar e bloquear marcos críticos quando faltar ponto focal obrigatório.;PARCIAL;"alerta sem ponto focal; item obrigatório do onboarding bloqueia a ativação";onboarding.test;
+GOV-007;Alertar e bloquear marcos críticos quando faltar ponto focal obrigatório.;IMPLEMENTADO E TESTADO;"envio bloqueado sem ponto focal; item obrigatório do onboarding; tarefa de risco com pendência de rodada";"onboarding.test; ponto-focal.test";
 GOV-008;Gerir calendário de feriados, expediente, plantões e SLA por contrato.;IMPLEMENTADO E TESTADO;"ocorrencias/sla.js; feriados; plantoes; contas.sla_contrato";"regras SLA; governanca.test";
 GOV-009;Permitir delegação temporária com auditoria e expiração.;IMPLEMENTADO E TESTADO;"delegacoes (015); resolverResponsavel; supervisor registra expiração";governanca.test;
 GOV-010;Exibir matriz RACI e responsáveis vigentes por processo.;IMPLEMENTADO E TESTADO;"raci (015); tela Governança com responsável vigente";governanca.test;
@@ -137,7 +137,7 @@ SUP-010;Permitir parametrização de regras com aprovação, simulação e rollb
 SUP-011;Controlar indisponibilidades e contingência de canais.;PARCIAL;integracoes.disponivel;AT-005/007;
 SUP-012;Exibir cobertura de automação, exceções e trabalho manual residual.;IMPLEMENTADO SEM TESTE;dashboard automação;dashboards;
 RN-001;"VIP é atendido pelo CS; demais pelo Suporte, salvo exceção aprovada.";IMPLEMENTADO E TESTADO;equipeDaConta;regras;
-RN-002;Toda conta operacional precisa de ponto focal válido e canal de contato.;PARCIAL;alertas/tarefa;processos força-tarefa;
+RN-002;Toda conta operacional precisa de ponto focal válido e canal de contato.;IMPLEMENTADO E TESTADO;"ponto focal válido = vigente + canal autorizado; supervisor abre tarefa e fecha ao corrigir";ponto-focal.test;
 RN-003;"Pré-rodada é iniciada D-4; contatos D-3, intermediário e D-1 conforme calendário aprovado.";IMPLEMENTADO E TESTADO;MARCOS;AT-008;
 RN-004;Pós-rodada gera contato inicial e follow-up após três dias, sem apagar pendência técnica.;IMPLEMENTADO E TESTADO;pós-rodada;AT-009;
 RN-005;Erro corrigido tecnicamente encerra pendência e cancela contatos futuros relacionados.;IMPLEMENTADO E TESTADO;marcarCorrigida;AT-008;

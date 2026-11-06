@@ -369,3 +369,14 @@ VIP revisto (opcional) e cliente avisado. Concluir não muda a situação da con
 Volta da migração cancela as abertas e mantém o histórico.
 **Fora:** abrir a alteração sozinho a partir de um evento (ex.: venda de expansão ganha) — fica para a configuração de
 processos.
+
+# T-043 — Conta sem ponto focal válido vira tarefa (F21, RN-002, GOV-007)
+**Contexto:** a conta sem ponto focal só mostrava um alerta na tela; os contatos de rodada ficavam bloqueados sem
+ninguém ser cobrado.
+**Decisão:** `clientes/ponto-focal-saude.js` na varredura do supervisor, sem migração. Ponto focal válido = principal
+vigente, sem opt-out e com canal autorizado (a mesma regra do envio, `escolherCanal`). Conta ativa ou em onboarding sem
+isso gera tarefa para a equipe da conta (VIP → CS, demais → Suporte, exceção vale), uma vez por situação (a chave muda
+quando o ponto focal muda). Com pendência de rodada aberta é risco: prazo de 2 h e tarefa também para a Supervisão,
+avaliada a cada varredura (a pendência pode surgir depois). Quando o ponto focal fica válido, as tarefas se fecham sozinhas
+com o nome cadastrado. O bloqueio de marcos críticos continua onde já estava (envio bloqueado e item obrigatório do
+onboarding).

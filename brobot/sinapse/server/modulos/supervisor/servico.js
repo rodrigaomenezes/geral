@@ -21,6 +21,7 @@ const treinamentos = require('../treinamentos/servico');
 const governanca = require('../governanca/servico');
 const vip = require('../clientes/vip');
 const saudeCanais = require('./saude-canais');
+const pontoFocalSaude = require('../clientes/ponto-focal-saude');
 const anexos = require('../ocorrencias/anexos');
 
 const INTERVALO_MS = 60e3;
@@ -79,6 +80,8 @@ async function jobVarrer(c, ctx) {
   resumo.lotesSemConfirmacao = await lotesCsv.verificarLotesAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // ONB-003/010: item obrigatório de onboarding/offboarding vencido vira tarefa para a equipe dele.
   resumo.checklistAtrasados = await onboarding.verificarAtrasados(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
+  // RN-002 / GOV-007: conta operacional sem ponto focal válido vira tarefa (risco se houver pendência de rodada).
+  resumo.pontosFocaisInvalidos = await pontoFocalSaude.verificarPontosFocais(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t), concluirTarefa: (id, r) => tarefas.concluir(c, ctx, id, r) });
   // ONB-003: o que depende do cliente é pedido a ele (até 3 vezes; depois, ligação do CS).
   resumo.pedidosAoCliente = await onboarding.pedirAoCliente(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // CRE-004 e POS-009: credencial perto de vencer e reincidência viram ocorrência (uma por alerta).
@@ -95,7 +98,7 @@ async function jobVarrer(c, ctx) {
   resumo.anexosExpurgados = await anexos.aplicarRetencao(c, ctx);
   // SUP-002: canal em silêncio, entrada parada e rotina parada.
   Object.assign(resumo, await saudeCanais.verificarCanais(c, ctx, { carregarCalendario: ocorrencias.carregarCalendario, criarTarefa: (t) => tarefas.criar(c, ctx, t) }));
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados || resumo.pedidosAoCliente) {
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados || resumo.pedidosAoCliente || resumo.pontosFocaisInvalidos) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };
