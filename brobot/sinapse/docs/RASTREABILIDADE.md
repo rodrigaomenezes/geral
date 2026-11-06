@@ -315,3 +315,10 @@ dimensionamento e da infraestrutura definitiva.
 | --- | --- | --- |
 | Fila de entrada não classificada com supervisão automática (INT-008) | ✔ testado | supervisor · `test/triagem-handoff.test.js` |
 | Notificar mudanças e falhas de handoff (DEV-004) | ✔ testado | `agenda.jobAvisar` · `triagem-handoff.test.js` |
+
+## Entrega de 06/11/2026 (F23 · Telas em 360 px)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Toda tela em 360 px, campos com rótulo, botões com nome, imagens com alt, pt-BR (RNF-012, celular primeiro) | ✔ conferido | `npm run telas` (25 telas, 0 problemas; autoteste aponta os 3 problemas injetados) |
+| Contraste e ordem de foco (WCAG completo) | ○ pendente | — |

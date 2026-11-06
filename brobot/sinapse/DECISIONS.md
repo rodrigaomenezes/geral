@@ -387,3 +387,12 @@ prazo de aceite vencia e a ocorrência ia para a contingência; a supervisão da
 **Decisão:** a rotina de avisos (`agenda.jobAvisar`) passa a notificar a equipe de origem, uma vez, quando o handoff
 expira. Testes dedicados cobrem a triagem (prazo próprio vencido → nível 1 e tarefa da Supervisão, continua na coluna da
 triagem) e o ciclo de avisos da transferência.
+
+# T-045 — Conferência automática das telas em 360 px (F23, RNF-012)
+**Contexto:** cada fatia conferia as próprias telas à mão no Playwright; não havia uma passada em todas as telas.
+**Decisão:** `npm run telas` (scripts/telas.js) sobe o Sinapse em memória com a demonstração, entra com oito personas,
+abre cada item do menu e as telas de detalhe (conta, ocorrência) e confere: sem rolagem lateral em 360 px, campo com
+rótulo, botão/link com nome, imagem com alt, `lang="pt-BR"`, tela sem erro e sem erro de JavaScript. Usa o Playwright
+da máquina (não é dependência do projeto nem entra no CI dos testes). Autoteste (`TELAS_AUTOTESTE=1`) prova que os
+problemas são apontados. Resultado em 06/11: 25 telas, 351 elementos, nenhum problema.
+**Fora:** contraste de cores e ordem de foco (auditoria WCAG completa com ferramenta própria).

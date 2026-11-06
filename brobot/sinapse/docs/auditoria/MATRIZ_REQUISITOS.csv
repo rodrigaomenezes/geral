@@ -162,7 +162,7 @@ RNF-008;"Recuperação RPO/RTO a homologar por criticidade; exercícios de resta
 RNF-009;Escalabilidade Workers horizontais e limites de concorrência por integração/tenant.;PARCIAL;SKIP LOCKED;AT-011;PGlite é processo único
 RNF-010;Manutenibilidade Módulos coesos, contratos versionados, testes e documentação obrigatória.;PARCIAL;"módulos coesos; CI";CI pglite+pg;sem lint
 RNF-011;Observabilidade Métricas, traces, logs estruturados, dashboards e alertas com dono.;PARCIAL;"logs estruturados; métricas Prometheus; saúde do supervisor";metricas.test;dashboards/alertas no coletor a configurar
-RNF-012;Acessibilidade Interfaces responsivas e boas práticas WCAG, nível-alvo a definir.;PARCIAL;360 px;—;sem auditoria WCAG
+RNF-012;Acessibilidade Interfaces responsivas e boas práticas WCAG, nível-alvo a definir.;PARCIAL;npm run telas: 360 px, rótulos, nomes, alt, pt-BR em todas as telas;scripts/telas.js;contraste e ordem de foco
 AT-001;Mensagem sem cliente identificado Permanece em triagem com SLA, sem perda.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-001;
 AT-002;"Mesmo webhook três vezes Uma ocorrência/efeito; eventos duplicados auditados.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-002;
 AT-003;Usuário responsável indisponível Tarefa é atribuída ao substituto/fila.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-003;
