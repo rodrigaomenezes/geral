@@ -21,6 +21,7 @@ const { garantirUsuariosTeste } = require('./modulos/identidade/usuarios-teste')
 const { aplicarStatus } = require('./modulos/integracoes/whatsapp-status');
 const { normalizarTelefone } = require('./nucleo/telefone');
 const seed = require('./modulos/demo/seed');
+const implantacao = require('./modulos/organizacao/implantacao');
 
 const ROTAS = [
   ...require('./modulos/identidade/rotas'),
@@ -92,6 +93,7 @@ async function criarApp(cfg, { log = console.log } = {}) {
   await migrar(db, log);
   await relogio.carregar(db);
   if (cfg.demo) await seed.semearSeVazio(db, cfg, log);
+  else await implantacao.implantarSeVazio(db, cfg, log);
   await garantirUsuariosTeste(db, cfg, log);
   const worker = criarWorker(db, handlersDeJobs(db), { log });
   ligarWhatsappQr(db, cfg, log);

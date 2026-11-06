@@ -21,7 +21,8 @@ import { telaTreinamentos } from './telas/treinamentos.js';
 import { telaDesenvolvimento } from './telas/desenvolvimento.js';
 import { telaLgpd } from './telas/lgpd.js';
 import { telaGovernanca } from './telas/governanca.js';
-import { abrirSeguranca } from './telas/seguranca.js';
+import { abrirSeguranca, abrirMinhaConta, telaTrocarSenha } from './telas/seguranca.js';
+import { telaPessoas } from './telas/pessoas.js';
 import { telaDashboards } from './telas/dashboards.js';
 import { telaMensagens } from './telas/mensagens.js';
 
@@ -44,6 +45,7 @@ const MENU = [
   { rota: 'integracoes', rotulo: 'Integrações', perm: 'integracao.usar' },
   { rota: 'canais', rotulo: 'Canais', perm: 'canais.gerir' },
   { rota: 'governanca', rotulo: 'Governança', perm: 'ocorrencia.ver' },
+  { rota: 'pessoas', rotulo: 'Pessoas e equipes', perm: 'usuario.gerir' },
   { rota: 'supervisor', rotulo: 'Supervisor', perm: 'supervisor.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', perm: 'auditoria.ver' },
   { rota: 'lgpd', rotulo: 'Privacidade (LGPD)', perm: 'lgpd.gerir' },
@@ -61,6 +63,7 @@ const ROTAS = {
   desenvolvimento: telaDesenvolvimento,
   lgpd: telaLgpd,
   governanca: telaGovernanca,
+  pessoas: telaPessoas,
   dashboards: telaDashboards,
   mensagens: telaMensagens,
   painel: telaPainel,
@@ -107,8 +110,8 @@ function montarCasca() {
     h('a', { class: 'marca', href: '#/', 'aria-label': 'Início' }, ctx.usuario.marca?.logo ? h('img', { src: logo, alt: '', height: 28 }) : h('span', { class: 'wordmark' }, h('b', {}, 'b'), 'robot'),
       h('small', {}, `Sinapse · ${ctx.usuario.marca?.nome || ctx.usuario.organizacao}`)),
     h('div', { class: 'quem' },
-      h('button', { class: 'quem-botao', type: 'button', title: 'Segurança da conta', onclick: () => abrirSeguranca(ctx) },
-        h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}${ctx.usuario.mfaAtivo ? ' · 2 etapas' : ''}`)),
+      h('button', { class: 'quem-botao', type: 'button', title: 'Minha conta', onclick: () => abrirMinhaConta(ctx, () => { montarCasca(); rotear(); }) },
+        h('span', { class: 'quem-nome' }, ctx.usuario.nome), h('small', {}, `${ctx.usuario.papelNome} · ${ctx.usuario.organizacao}${ctx.usuario.mfaAtivo ? ' · 2 etapas' : ''}${ctx.usuario.disponivel ? '' : ' · ausente'}`)),
     ),
     ctx.pode('agenda.usar') ? sinoNotificacoes() : null,
     h('button', { class: 'btn btn-fantasma', type: 'button', onclick: sair }, 'Sair'));
@@ -149,6 +152,7 @@ async function iniciar() {
     const s = await api.get('/sessao');
     ctx.usuario = s.usuario;
     if (!ctx.usuario) { telaLogin(raiz, { demo: s.demo, aoEntrar: (u) => { ctx.usuario = u; iniciar(); } }); return; }
+    if (ctx.usuario.senhaTrocar) { telaTrocarSenha(raiz, iniciar, sair); return; }
     [ctx.catalogos, ctx.equipes] = await Promise.all([api.get('/catalogos'), api.get('/equipes')]);
     montarCasca();
     rotear();

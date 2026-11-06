@@ -5,20 +5,13 @@
 
 const { relogio, DIA, HORA } = require('../../nucleo/relogio');
 const { ctxSistema } = require('../../nucleo/registro');
-const { enfileirar } = require('../../jobs/fila');
 const { hashSenha } = require('../identidade/servico');
 const ocorrencias = require('../ocorrencias/servico');
 const rodadas = require('../rodadas/servico');
 const entrada = require('../entrada/servico');
-const processos = require('../processos/servico');
-const padroes = require('../processos/padroes');
-const governanca = require('../governanca/servico');
+const implantacao = require('../organizacao/implantacao');
 
-const EQUIPES = [
-  ['triagem', 'Triagem', false], ['suporte', 'Suporte', false], ['cs', 'Customer Success', false], ['operacoes', 'Operações', false],
-  ['dev', 'Desenvolvimento', false], ['supervisao', 'Supervisão', false], ['contingencia', 'Contingência', true], ['financeiro', 'Financeiro', false],
-  ['comercial', 'Comercial', false],
-];
+const EQUIPES = implantacao.EQUIPES_PADRAO;
 
 const PESSOAS = [
   ['admin', 'Administração Sinapse', 'admin@sinapse.demo', 'admin', 'supervisao'],
@@ -92,26 +85,7 @@ async function semearSeVazio(db, cfg, log = () => {}) {
 }
 
 async function criarTenantBase(db, { slug, nome }, equipes) {
-  const t = (await db.query("INSERT INTO tenants (slug, nome, demonstracao, config) VALUES ($1, $2, true, '{}') RETURNING id", [slug, nome])).rows[0];
-  await db.comoTenant(t.id, async (c) => {
-    for (const [codigo, nomeEq, cont] of equipes) {
-      await c.query('INSERT INTO equipes (tenant_id, codigo, nome, contingencia) VALUES ($1,$2,$3,$4)', [t.id, codigo, nomeEq, cont]);
-    }
-    for (const nomeI of ['platform', 'omie', 'whatsapp', 'email']) {
-      await c.query('INSERT INTO integracoes (tenant_id, nome) VALUES ($1, $2)', [t.id, nomeI]);
-    }
-    const ctx = ctxSistema(t.id, 'implantação');
-    await enfileirar(c, ctx, { tipo: 'supervisor.varrer', chave: 'recorrente:supervisor', maxTentativas: 1000 });
-    await enfileirar(c, ctx, { tipo: 'omie.sincronizar', chave: 'recorrente:omie', maxTentativas: 1000 });
-    await enfileirar(c, ctx, { tipo: 'processos.despachar', chave: 'recorrente:processos', maxTentativas: 1000 });
-    await enfileirar(c, ctx, { tipo: 'processos.agenda', chave: 'recorrente:agenda', maxTentativas: 1000 });
-    await enfileirar(c, ctx, { tipo: 'lembretes.avisar', chave: 'recorrente:lembretes', maxTentativas: 1000 });
-    await enfileirar(c, ctx, { tipo: 'telefonia.manutencao', chave: 'recorrente:telefonia', maxTentativas: 1000 });
-    await c.query("INSERT INTO telefonia_config (tenant_id, provedor, celular) VALUES ($1, 'treino', true) ON CONFLICT DO NOTHING", [t.id]);
-    await padroes.garantir(c, ctx, processos);
-    await governanca.aplicarSugestao(c, ctx);
-  });
-  return t.id;
+  return implantacao.criarOrganizacao(db, { slug, nome, demonstracao: true }, equipes);
 }
 
 async function semearTenant(db, cfg, base) {

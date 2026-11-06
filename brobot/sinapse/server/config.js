@@ -22,6 +22,9 @@ function carregarConfig(env = process.env) {
     tokenEntrada: env.SINAPSE_TOKEN_ENTRADA || null,
     // Senha inicial do administrador (só usada ao semear). Sem ela, só o login de demonstração funciona.
     senhaAdmin: env.SINAPSE_SENHA_ADMIN || null,
+    // Implantação real (sem demonstração): e-mail da primeira pessoa da Administração e nome da organização.
+    adminEmail: env.SINAPSE_ADMIN_EMAIL ? env.SINAPSE_ADMIN_EMAIL.trim() : null,
+    organizacao: env.SINAPSE_ORGANIZACAO ? env.SINAPSE_ORGANIZACAO.trim().slice(0, 80) : null,
     // Senha dos usuários de teste (gestor@brobot.com.br, suporte1@…); sem ela, eles não são criados.
     senhaTeste: env.SINAPSE_SENHA_TESTE || null,
     // MFA obrigatório para Administração e Supervisão: com SINAPSE_MFA_OBRIGATORIO=1, e sempre em produção real.
@@ -37,6 +40,7 @@ function carregarConfig(env = process.env) {
   if (cfg.senhaAdmin && cfg.senhaAdmin.length < 12) {
     throw new Error('SINAPSE_SENHA_ADMIN precisa ter pelo menos 12 caracteres.');
   }
+  if (cfg.adminEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cfg.adminEmail)) throw new Error('SINAPSE_ADMIN_EMAIL não parece um e-mail.');
   if (env.SINAPSE_DEMO && !['0', '1'].includes(env.SINAPSE_DEMO)) throw new Error('SINAPSE_DEMO deve ser 0 ou 1.');
   if (cfg.ambiente === 'producao') {
     if (cfg.demo) throw new Error('SINAPSE_AMBIENTE=producao não aceita SINAPSE_DEMO=1: o login sem senha e os dados fictícios ficam proibidos.');

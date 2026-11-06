@@ -245,3 +245,17 @@ numa consulta só. Organização nova recebe uma sugestão por código de equipe
 SLA de contrato: `contas.sla_contrato` (horas por prioridade, validado) substitui o padrão e não sofre o fator VIP.
 **Fora:** unidades (GOV-001) e cadastro de equipes/usuários por tela; reatribuir de volta quando a delegação termina
 (as ocorrências ficam com quem assumiu); escala recorrente de plantão.
+
+# T-032 — Implantação real e cadastro de pessoas e equipes (F9b)
+**Contexto:** sem demonstração, o banco vazio não tinha como ganhar a primeira organização nem a primeira pessoa
+(só o seed de demonstração criava); pessoas e equipes só por seed (GOV-001).
+**Decisão:** `organizacao/implantacao.js` é o único lugar que monta uma organização (equipes, rotinas, processos
+padrão, matriz sugerida); a demonstração usa o mesmo código. Com `SINAPSE_DEMO` desligado e banco vazio, cria a
+organização (`SINAPSE_ORGANIZACAO`, padrão "Brobot"), os feriados nacionais e a primeira Administração com
+`SINAPSE_ADMIN_EMAIL` + `SINAPSE_SENHA_ADMIN`; sem elas, o log diz o que criar. Nunca mexe em organização existente.
+Cadastro (`usuario.gerir`, só Administração): senha temporária de 16 caracteres gerada no servidor e mostrada uma vez;
+com ela, só a troca de senha responde (403 `senha_temporaria`). Perfil trocado, desativação e senha redefinida
+derrubam as sessões. Desativar não apaga, marca indisponível (o supervisor devolve as ocorrências) e tira a pessoa de
+substituta; a organização nunca fica sem Administração ativa. A pessoa troca a própria senha (12+, sem o e-mail) e
+marca ausência em "Minha conta".
+**Fora:** convite por e-mail (não há envio de e-mail real ainda), unidades (GOV-001), SSO.

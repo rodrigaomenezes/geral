@@ -395,3 +395,6 @@ a.g-linha:hover { background: var(--destaque-claro); }
 /* Nome no topo abre a segurança da conta. */
 .quem-botao { background: none; border: 0; color: inherit; text-align: right; cursor: pointer; padding: 0; display: flex; flex-direction: column; align-items: flex-end; min-width: 0; max-width: 100%; font: inherit; }
 .quem-botao:hover .quem-nome, .quem-botao:focus .quem-nome { text-decoration: underline; }
+.senha-temporaria code { display: inline-block; font-size: 1.25rem; letter-spacing: .08em; padding: .5rem .75rem; background: var(--neutro-f); border-radius: var(--raio); user-select: all; word-break: break-all; }
+.marca { flex-shrink: 0; }
+.quem-botao > .quem-nome, .quem-botao > small { display: block; max-width: 100%; }

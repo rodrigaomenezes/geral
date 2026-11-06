@@ -37,3 +37,36 @@ export function abrirSeguranca(ctx, aoMudar = () => {}) {
     return area;
   });
 }
+
+const camposSenha = () => [
+  campo('Senha atual', h('input', { name: 'atual', type: 'password', autocomplete: 'current-password', required: true })),
+  campo('Nova senha', h('input', { name: 'nova', type: 'password', autocomplete: 'new-password', required: true, minlength: 12, maxlength: 200 }),
+    'Pelo menos 12 caracteres. Uma frase com 3 ou 4 palavras é fácil de lembrar e difícil de adivinhar.'),
+];
+
+/** Primeiro acesso (ou senha redefinida): tela inteira até trocar a temporária. */
+export function telaTrocarSenha(raiz, aoTrocar, aoSair) {
+  trocar(raiz, h('div', { class: 'login' }, h('div', { class: 'cartao login-cartao' },
+    h('h2', {}, 'Crie a sua senha'),
+    h('p', {}, 'Você entrou com uma senha temporária. Para continuar, digite-a e escolha a sua senha.'),
+    formulario(camposSenha(), 'Salvar e continuar', async (d) => { await api.post('/senha', d); aviso('Senha trocada.'); aoTrocar(); }),
+    h('button', { class: 'btn btn-fantasma', type: 'button', onclick: aoSair }, 'Sair'))));
+}
+
+/** Minha conta: senha, disponibilidade e verificação em duas etapas. */
+export function abrirMinhaConta(ctx, aoMudar = () => {}) {
+  const u = ctx.usuario;
+  modal('Minha conta', (fechar) => h('div', { class: 'lista' },
+    h('button', { class: 'btn', type: 'button', onclick: () => { fechar(); modal('Trocar senha', (f2) => formulario(camposSenha(), 'Trocar senha', async (d) => {
+      await api.post('/senha', d); f2(); aviso('Senha trocada. Os outros aparelhos vão pedir para entrar de novo.');
+    })); } }, 'Trocar senha'),
+    ctx.pode('agenda.usar') ? h('button', { class: 'btn', type: 'button', onclick: async () => {
+      try {
+        const r = await api.post('/eu/disponivel', { disponivel: !u.disponivel }); u.disponivel = r.disponivel; fechar();
+        aviso(r.disponivel ? 'Você está disponível de novo.' : 'Marcado como ausente: o que chegar vai para o seu substituto ou para a fila.'); aoMudar();
+      } catch (e) { aviso(textoErro(e), 'erro'); }
+    } }, u.disponivel ? 'Estou ausente agora' : 'Voltei: estou disponível') : null,
+    h('button', { class: 'btn', type: 'button', onclick: () => { fechar(); abrirSeguranca(ctx, aoMudar); } },
+      u.mfaAtivo ? 'Verificação em duas etapas (ativa)' : 'Ativar a verificação em duas etapas'),
+    h('p', { class: 'suave' }, 'Vai ficar fora por dias? Use "Delegar", na Governança.')));
+}

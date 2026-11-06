@@ -127,6 +127,10 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
       const usuario = token ? await identidade.sessaoPorToken(db, token) : null;
       if (!rota.publica) {
         if (!usuario) throw erro.naoAutenticado();
+        // Antes do MFA: senha temporária (cadastro ou redefinição pela Administração): só a troca e o sair respondem até trocar.
+        if (usuario.senha_trocar && !['/api/senha', '/api/sessao/sair'].includes(url.pathname)) {
+          throw new ErroNegocio(403, 'senha_temporaria', 'Troque a senha temporária para continuar.');
+        }
         // R-05: com MFA obrigatório, Administração e Supervisão só usam o sistema depois de ativar (a ativação fica liberada).
         if (cfg.mfaObrigatorio && ['admin', 'supervisor'].includes(usuario.papel) && !usuario.mfa_ativo && !url.pathname.startsWith('/api/mfa/')) {
           throw new ErroNegocio(403, 'mfa_obrigatorio', 'Ative a verificação em duas etapas para continuar: clique no seu nome, no topo, e siga os passos.');
