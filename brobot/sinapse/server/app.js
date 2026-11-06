@@ -21,6 +21,7 @@ const { garantirUsuariosTeste } = require('./modulos/identidade/usuarios-teste')
 const { aplicarStatus } = require('./modulos/integracoes/whatsapp-status');
 const { normalizarTelefone } = require('./nucleo/telefone');
 const seed = require('./modulos/demo/seed');
+const { criarMetricas } = require('./nucleo/metricas');
 const implantacao = require('./modulos/organizacao/implantacao');
 
 const ROTAS = [
@@ -97,8 +98,9 @@ async function criarApp(cfg, { log = console.log } = {}) {
   await garantirUsuariosTeste(db, cfg, log);
   const worker = criarWorker(db, handlersDeJobs(db), { log });
   ligarWhatsappQr(db, cfg, log);
-  const deps = { worker, log };
-  const servidor = criarServidor({ db, cfg, rotas: ROTAS, deps, log });
+  const metricas = criarMetricas();
+  const deps = { worker, log, metricas };
+  const servidor = criarServidor({ db, cfg, rotas: ROTAS, deps, log, metricas });
   return {
     db, worker, servidor,
     async iniciar(porta) {

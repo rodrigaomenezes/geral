@@ -324,3 +324,13 @@ Corrigido junto: upload acima do limite derrubava a conexão (o navegador via "s
 mensagem.
 **Fora:** antivírus no servidor (R-12 segue parcial: a lista fechada de tipos e o download como anexo reduzem o risco);
 anexos em mensagens de WhatsApp/e-mail recebidas.
+
+# T-039 — Métricas para coletor externo (F17, SUP-009, RNF-011)
+**Contexto:** só havia log estruturado por requisição; sem números para painel ou alerta fora do sistema.
+**Decisão:** `nucleo/metricas.js` em memória (sem dependência): contador e histograma de tempo das requisições por
+modelo de rota e classe de status, mais medidas do banco (fila de jobs por estado, idade do heartbeat, entradas
+aguardando e a mais antiga — RNF-004, meta 60 s —, divergências por tipo, ocorrências ativas/triagem/escalonadas),
+totais de todas as organizações e sem nome de cliente, pessoa ou organização. `GET /api/metricas` no formato do
+Prometheus, só com `SINAPSE_TOKEN_METRICAS` (24+) e `Authorization: Bearer`; sem a variável, a rota responde 404. Os
+contadores zeram ao reiniciar (padrão do Prometheus).
+**Fora:** traces distribuídos; com vários processos (web e worker), cada um expõe os seus contadores.

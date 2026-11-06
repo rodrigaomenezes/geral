@@ -106,7 +106,7 @@ function servirEstatico(req, res, urlPath) {
   });
 }
 
-function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
+function criarServidor({ db, cfg, rotas, deps = {}, log = console.log, metricas = null }) {
   const tabela = compilar(rotas);
   // HSTS só em produção (HTTPS garantido pelo Railway); em desenvolvimento quebraria o http://localhost.
   if (cfg.producao) CABECALHOS['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
@@ -115,7 +115,12 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
     const inicio = Date.now();
     const correlacao = /^[0-9a-f-]{36}$/i.test(req.headers['x-correlation-id'] || '') ? req.headers['x-correlation-id'] : crypto.randomUUID();
     const url = new URL(req.url, 'http://local');
-    const registrar = (status) => log(JSON.stringify({ t: new Date().toISOString(), metodo: req.method, rota: url.pathname, status, ms: Date.now() - inicio, correlacao }));
+    let modelo = null; // modelo da rota para as métricas (sem ids no rótulo)
+    const registrar = (status) => {
+      const ms = Date.now() - inicio;
+      log(JSON.stringify({ t: new Date().toISOString(), metodo: req.method, rota: url.pathname, status, ms, correlacao }));
+      if (metricas) metricas.registrar({ metodo: req.method, rota: modelo || 'desconhecida', status, ms });
+    };
 
     if (!url.pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, CABECALHOS); res.end(); return; }
@@ -123,6 +128,7 @@ function criarServidor({ db, cfg, rotas, deps = {}, log = console.log }) {
       return;
     }
     const rota = tabela.find((r) => r.metodo === req.method && r.re.test(url.pathname));
+    modelo = rota ? rota.caminho : null;
     try {
       if (!rota) throw new ErroNegocio(404, 'rota_inexistente', 'Endereço da API não encontrado.');
       if (req.method !== 'GET') {

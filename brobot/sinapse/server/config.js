@@ -20,6 +20,8 @@ function carregarConfig(env = process.env) {
     dbTls: { ca: env.SINAPSE_DB_CA ? env.SINAPSE_DB_CA.replace(/\\n/g, '\n') : null, inseguro: env.SINAPSE_DB_TLS_INSEGURO === '1' },
     // Token exigido nos webhooks de entrada (cabeçalho x-sinapse-token). Sem ele, a rota fica desligada.
     tokenEntrada: env.SINAPSE_TOKEN_ENTRADA || null,
+    // SUP-009: token do coletor de métricas (Prometheus/Grafana). Sem ele, /api/metricas fica desligada.
+    tokenMetricas: env.SINAPSE_TOKEN_METRICAS || null,
     // Senha inicial do administrador (só usada ao semear). Sem ela, só o login de demonstração funciona.
     senhaAdmin: env.SINAPSE_SENHA_ADMIN || null,
     // Implantação real (sem demonstração): e-mail da primeira pessoa da Administração e nome da organização.
@@ -33,6 +35,7 @@ function carregarConfig(env = process.env) {
     cicloWorkerMs: Number(env.SINAPSE_CICLO_MS || 2000),
     worker: env.SINAPSE_WORKER !== '0',
   };
+  if (cfg.tokenMetricas && cfg.tokenMetricas.length < 24) throw new Error('SINAPSE_TOKEN_METRICAS precisa ter pelo menos 24 caracteres.');
   if (cfg.tokenEntrada && cfg.tokenEntrada.length < 24) {
     throw new Error('SINAPSE_TOKEN_ENTRADA precisa ter pelo menos 24 caracteres.');
   }

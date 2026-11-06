@@ -49,6 +49,7 @@ apagado): `TESTE_DATABASE_URL=postgres://... npm test`.
 | `SINAPSE_SESSAO_INATIVIDADE_MIN` | não | Minutos sem uso até a sessão expirar (padrão 120) |
 | `SINAPSE_ADMIN_EMAIL` | na implantação real | E-mail da primeira pessoa da Administração. Com `SINAPSE_SENHA_ADMIN` e o banco vazio (sem demonstração), o Sinapse cria a organização e essa pessoa. Depois, cadastre as outras em **Pessoas e equipes** |
 | `SINAPSE_ORGANIZACAO` | não | Nome da organização na implantação real (padrão "Brobot") |
+| `SINAPSE_TOKEN_METRICAS` | não | Liga `GET /api/metricas` (formato Prometheus) para Grafana/Prometheus/Railway; o coletor manda `Authorization: Bearer <token>`. 24+ caracteres |
 | `SINAPSE_SENHA_TESTE` | para testar com e-mail e senha | Senha (12+) dos usuários de teste abaixo; trocar a variável troca a senha de todos no próximo deploy. Recusada com `SINAPSE_AMBIENTE=producao` |
 | `SINAPSE_SENHA_ADMIN` | na implantação real | Senha inicial (12+) da primeira Administração (`SINAPSE_ADMIN_EMAIL`); na demonstração, a do `admin@sinapse.demo`. Usada só quando o banco está vazio: troque-a depois em "Minha conta" |
 | `SINAPSE_CHAVE` | para guardar segredos | Chave (32+ caracteres) que cifra a senha dos ramais SIP e o token do WhatsApp |
