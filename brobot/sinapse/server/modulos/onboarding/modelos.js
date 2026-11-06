@@ -17,7 +17,7 @@ const PADRAO = {
     { codigo: 'grupo_whatsapp', titulo: 'Grupo do WhatsApp do cliente cadastrado', grupo: 'relacionamento', equipe: 'suporte', dias: 3, verificacao: 'grupo_whatsapp', obrigatorio: false },
     { codigo: 'provisionamento', titulo: 'Conta e módulos provisionados na Platform (arquivo exportado e confirmado)', grupo: 'tecnica', equipe: 'operacoes', dias: 3, verificacao: 'provisionamento_confirmado' },
     { codigo: 'credenciais', titulo: 'Credenciais e certificados com status OK na Platform (sem copiar segredo)', grupo: 'tecnica', equipe: 'suporte', dias: 5, verificacao: 'credenciais_ok' },
-    { codigo: 'placas', titulo: 'Placas e Renavam importados (lote conferido, rejeições tratadas)', grupo: 'tecnica', equipe: 'operacoes', dias: 5 },
+    { codigo: 'placas', titulo: 'Placas e Renavam importados (lote conferido, rejeições tratadas)', grupo: 'tecnica', equipe: 'operacoes', dias: 5, verificacao: 'placas_conferidas' },
     { codigo: 'sne', titulo: 'Vínculo SNE conferido', grupo: 'tecnica', equipe: 'suporte', dias: 5 },
     { codigo: 'robos', titulo: 'Robôs e agendamentos configurados na Platform', grupo: 'tecnica', equipe: 'operacoes', dias: 5 },
     { codigo: 'primeira_rodada', titulo: 'Primeira rodada executada com sucesso', grupo: 'tecnica', equipe: 'operacoes', dias: 10, verificacao: 'primeira_rodada' },

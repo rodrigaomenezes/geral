@@ -9,6 +9,8 @@ const s = require('./servico');
 const uuid = (v, o) => { if (!/^[0-9a-f-]{36}$/i.test(v)) throw new ErroNegocio(400, 'entrada_invalida', `${o} inválido.`); };
 const TIPOS = ['onboarding', 'offboarding'];
 
+const placas = require('./placas');
+
 module.exports = [
   { metodo: 'GET', caminho: '/api/contas/:id/checklists', permissao: 'conta.ver',
     handler: ({ db, ctx, params }) => comAuditoriaDeAcesso(db, ctx, 'conta', params.id, (c) => s.daConta(c, ctx, params.id)) },
@@ -16,6 +18,22 @@ module.exports = [
     handler: ({ db, ctx, corpo, params }) => {
       const d = validar(corpo, { tipo: { obrigatorio: true, tipo: 'texto', em: TIPOS }, motivo: { tipo: 'texto', max: 1000 } });
       return comAuditoriaDeAcesso(db, ctx, 'conta', params.id, async (c) => com(201, await s.abrir(c, ctx, { contaId: params.id, tipo: d.tipo, motivo: d.motivo })));
+    } },
+  // ONB-006: lote de placas do cliente (CSV com placa e renavam) conferido antes de ir para a Platform.
+  { metodo: 'GET', caminho: '/api/contas/:id/placas', permissao: 'conta.ver',
+    handler: ({ db, ctx, params }) => { validar(params, { id: { obrigatorio: true, tipo: 'uuid' } }); return db.comoTenant(ctx.tenantId, (c) => placas.listar(c, params.id)); } },
+  { metodo: 'POST', caminho: '/api/contas/:id/placas', permissao: 'rodada.operar', descricao: 'importar o lote de placas', texto: true,
+    handler: ({ db, ctx, params, corpo, req }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      let arquivo = 'placas.csv';
+      try { arquivo = decodeURIComponent(String(req.headers['x-nome-arquivo'] || arquivo)); } catch { /* usa o padrão */ }
+      return db.comoTenant(ctx.tenantId, async (c) => com(201, await placas.importar(c, ctx, params.id, { texto: corpo, arquivo })));
+    } },
+  { metodo: 'POST', caminho: '/api/lotes-placas/:id/tratar', permissao: 'rodada.operar', descricao: 'tratar rejeições do lote de placas',
+    handler: ({ db, ctx, params, corpo }) => {
+      validar(params, { id: { obrigatorio: true, tipo: 'uuid' } });
+      const d = validar(corpo, { motivo: { obrigatorio: true, tipo: 'texto', min: 5, max: 300 } });
+      return db.comoTenant(ctx.tenantId, (c) => placas.tratarRejeicoes(c, ctx, params.id, d.motivo));
     } },
   { metodo: 'GET', caminho: '/api/checklists/modelos/:tipo', permissao: 'conta.ver',
     handler: ({ db, ctx, params }) => {
