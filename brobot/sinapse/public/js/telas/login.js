@@ -24,7 +24,7 @@ export async function telaLogin(raiz, { demo, aoEntrar }) {
       h('h1', {}, 'Operação, Suporte, CS e Comercial sob controle'),
       h('p', {}, 'Cada pendência com dono, prazo e próxima ação. Processos que o sistema segue sozinho, do D-4 ao pós-rodada, e tudo auditável.')),
     h('div', { class: 'cartao login-cartao' },
-      demo ? [h('h2', {}, 'Demonstração: entre como'), h('p', { class: 'suave' }, 'Escolha uma pessoa fictícia para ver o sistema pelo perfil dela.'), personas,
+      demo ? [h('h2', {}, 'Demonstração: entre como'), h('p', { class: 'suave' }, 'Escolha uma pessoa fictícia para ver o sistema pelo perfil dela, ou ', h('a', { href: '/demo' }, 'veja os perfis com roteiro de apresentação'), '.'), personas,
         h('details', {}, h('summary', {}, 'Entrar com e-mail e senha'), form)] : [h('h2', {}, 'Entrar'), form])));
 
   if (!demo) return;

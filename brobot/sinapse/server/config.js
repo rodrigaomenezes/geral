@@ -14,6 +14,8 @@ function carregarConfig(env = process.env) {
     // Modo demonstração: login por persona SEM SENHA, simulador, relógio ajustável e dados fictícios.
     // Fora de produção vem ligado; em produção (NODE_ENV=production) só liga com SINAPSE_DEMO=1 explícito (R-01).
     demo: producao ? env.SINAPSE_DEMO === '1' : env.SINAPSE_DEMO !== '0',
+    // Vitrine (/demo): completa a demonstração com exemplo em todas as áreas. SINAPSE_DEMO_VITRINE=0 deixa só o cenário mínimo.
+    vitrine: env.SINAPSE_DEMO_VITRINE !== '0',
     // SINAPSE_AMBIENTE=producao marca o ambiente com dados reais: recusa demonstração e exige banco gerenciado.
     ambiente: env.SINAPSE_AMBIENTE || (producao ? 'nao_informado' : 'desenvolvimento'),
     // TLS do PostgreSQL gerenciado (R-03): certificado verificado. SINAPSE_DB_CA = certificado da autoridade (PEM).

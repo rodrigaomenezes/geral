@@ -11,6 +11,8 @@ fechamento. A Platform Brobot continua dona das consultas e o OMIE, do financeir
 **CSV** (Integrações), com prévia antes de gravar.
 
 **Fase 1 · demonstração.** Os dados são fictícios e o simulador reproduz os cenários de aceite da especificação.
+**Apresentação:** abra `/demo` (ex.: `http://localhost:3000/demo`) para ver os modelos de acesso por perfil, cada um com
+um roteiro do que mostrar, e entrar com um clique. Os dados fictícios cobrem todas as áreas.
 
 ## Rodar no computador
 
@@ -41,6 +43,7 @@ apagado): `TESTE_DATABASE_URL=postgres://... npm test`.
 | `DATABASE_URL` | uma das duas | PostgreSQL gerenciado |
 | `SINAPSE_DATA` | uma das duas | Pasta do banco embutido (o Dockerfile já define `/data/pg`) |
 | `SINAPSE_DEMO` | **sim, para apresentar** | `1` liga a demonstração (login por persona **sem senha**, simulador, dados fictícios, faixa amarela no topo). No Railway (`NODE_ENV=production`), **sem esta variável a demonstração fica desligada** |
+| `SINAPSE_DEMO_VITRINE` | não | `0` deixa a demonstração só com o cenário mínimo (sem os exemplos extras da vitrine `/demo`) |
 | `SINAPSE_AMBIENTE` | para dados reais | `producao` trava o ambiente: recusa `SINAPSE_DEMO=1`, exige `DATABASE_URL` e TLS verificado |
 | `SINAPSE_DB_CA` | se o banco usar certificado próprio | Certificado da autoridade (PEM) do PostgreSQL; com `sslmode` na URL o certificado é sempre verificado |
 | `SINAPSE_DB_TLS_INSEGURO` | não | `1` aceita certificado sem verificação (só fora de produção; fica registrado no log) |

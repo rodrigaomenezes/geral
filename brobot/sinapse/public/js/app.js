@@ -2,6 +2,7 @@
 import { h, trocar, aviso, carregando } from './dom.js';
 import { api, textoErro } from './api.js';
 import { telaLogin } from './telas/login.js';
+import { telaVitrine } from './telas/vitrine.js';
 import { telaPainel } from './telas/painel.js';
 import { telaOcorrencias, telaOcorrencia } from './telas/ocorrencias.js';
 import { telaTarefas } from './telas/tarefas.js';
@@ -148,6 +149,8 @@ async function rotear() {
 }
 
 async function iniciar() {
+  // /demo: vitrine com os modelos de acesso da demonstração (entrar leva para /#/<primeira tela do roteiro>).
+  if (/^\/demo\/?$/.test(location.pathname)) { telaVitrine(raiz, { aoEntrar: (u) => { ctx.usuario = u; iniciar(); } }); return; }
   try {
     const s = await api.get('/sessao');
     ctx.usuario = s.usuario;

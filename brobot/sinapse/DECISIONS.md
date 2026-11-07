@@ -405,3 +405,16 @@ registravam a troca silenciosa como esperada.
 `omie_codigo_diferente` e código que já é de outra conta vira `omie_codigo_em_outra_conta` (a linha aparece como erro,
 nada é trocado). 024 cria o índice único (organização, código OMIE) nas contas ativas, só se não houver duplicata —
 nesse caso registra aviso e não altera dados. Os testes antigos passaram a usar o código real da conta.
+
+# T-047 — Vitrine da demonstração em /demo
+**Contexto:** a demonstração abria com dados só em parte das áreas (treinamentos, VIP, incidentes, consultas, ligações,
+plantão, onboarding e lote de placas apareciam vazios) e o login listava pessoas sem dizer o que mostrar com cada uma.
+**Decisão:** `/demo` mostra os modelos de acesso (um cartão por pessoa fictícia, com o que o perfil faz e um roteiro de
+telas); "Entrar" abre o sistema já na tela do roteiro. `modulos/demo/vitrine.js` completa o seed pelos **serviços
+reais** (cliente ganho → conta e onboarding, lote de placas com rejeições, treinamento, pedido de VIP, incidente,
+melhoria e release, volume de consultas com alerta, ligações no modo de treino, plantão e delegação). Ligada por padrão
+na demonstração; `SINAPSE_DEMO_VITRINE=0` deixa só o cenário mínimo, que é a base dos testes (a vitrine tem teste
+próprio). Sem demonstração ligada, `/demo` só avisa que o ambiente guarda dados reais: nada de login sem senha.
+**Consequência:** o ambiente com dados reais não tem `/demo`; para apresentar junto da produção, publique um segundo
+serviço com `SINAPSE_DEMO=1` (banco próprio).
+

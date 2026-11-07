@@ -398,3 +398,26 @@ a.g-linha:hover { background: var(--destaque-claro); }
 .senha-temporaria code { display: inline-block; font-size: 1.25rem; letter-spacing: .08em; padding: .5rem .75rem; background: var(--neutro-f); border-radius: var(--raio); user-select: all; word-break: break-all; }
 .marca { flex-shrink: 0; }
 .quem-botao > .quem-nome, .quem-botao > small { display: block; max-width: 100%; }
+
+/* Vitrine da demonstração (/demo): modelos de acesso com roteiro */
+.vitrine { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 2rem; display: flex; flex-direction: column; gap: 1rem; }
+body:has(.vitrine) { background: var(--fundo); }
+.vitrine-cabeca { background: linear-gradient(160deg, var(--marca-clara), var(--marca) 55%, var(--marca-escura)); border-radius: var(--raio); padding: 1rem; display: flex; flex-direction: column; gap: .75rem; }
+.vitrine-topo { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; color: #fff; }
+.vitrine-topo .wordmark { color: #fff; font-size: 1.6rem; }
+.vitrine-intro { color: #fff; }
+.vitrine-intro h1 { color: #fff; font-size: 1.9rem; line-height: 1.15; margin: .25rem 0 .5rem; }
+.vitrine-intro p { max-width: 46rem; margin: .4rem 0; color: rgba(255,255,255,.92); }
+.vitrine-intro .suave { color: rgba(255,255,255,.8); }
+.vitrine-org { font-size: 1rem; margin: 1rem 0 .25rem; color: var(--texto); }
+.vitrine-cartoes { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+.vitrine-cartao { display: flex; flex-direction: column; gap: .5rem; margin: 0; min-width: 0; }
+.vitrine-cartao .btn { margin-top: auto; align-self: flex-start; }
+.vitrine-perfil { display: flex; flex-direction: column; gap: .1rem; }
+.vitrine-papel { align-self: flex-start; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--marca-escura);
+  background: var(--destaque-claro); border-radius: 999px; padding: .15rem .6rem; }
+.vitrine-roteiro { margin: 0; padding-left: 1.2rem; font-size: .9rem; display: flex; flex-direction: column; gap: .3rem; }
+.vitrine-roteiro a { overflow-wrap: anywhere; }
+.vitrine-rodape { text-align: center; margin-top: 1rem; }
+@media (min-width: 720px) { .vitrine-cartoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vitrine-intro h1 { font-size: 2.4rem; } }
+@media (min-width: 1020px) { .vitrine-cartoes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

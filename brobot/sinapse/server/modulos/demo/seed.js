@@ -10,6 +10,7 @@ const ocorrencias = require('../ocorrencias/servico');
 const rodadas = require('../rodadas/servico');
 const entrada = require('../entrada/servico');
 const implantacao = require('../organizacao/implantacao');
+const { semearVitrine } = require('./vitrine');
 
 const EQUIPES = implantacao.EQUIPES_PADRAO;
 
@@ -134,6 +135,7 @@ async function semearTenant(db, cfg, base) {
   });
   await semearOcorrencias(db, tenantId, ids);
   await semearComercial(db, tenantId, ids);
+  if (cfg.vitrine !== false) await db.comoTenant(tenantId, (c) => semearVitrine(c, tenantId, ids));
   return tenantId;
 }
 

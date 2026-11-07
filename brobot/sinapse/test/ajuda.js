@@ -19,7 +19,7 @@ async function limparBancoExterno(url) {
   await c.end();
 }
 
-async function subir() {
+async function subir({ vitrine = false } = {}) {
   const url = process.env.TESTE_DATABASE_URL;
   if (url) await limparBancoExterno(url);
   const cfg = carregarConfig({ SINAPSE_DATA: ':memoria:', SINAPSE_DEMO: '0', SINAPSE_WORKER: '0', SINAPSE_TOKEN_ENTRADA: TOKEN,
@@ -27,6 +27,7 @@ async function subir() {
   const app = await criarApp(cfg, { log: process.env.TESTE_LOG ? console.error : () => {} });
   await relogio.salvar(app.db, INICIO.getTime() - Date.now());
   cfg.demo = true;
+  cfg.vitrine = vitrine; // os testes partem do cenário mínimo; a vitrine tem teste próprio
   await seed.semearSeVazio(app.db, cfg);
   const porta = await app.iniciar(0);
   const base = `http://127.0.0.1:${porta}`;
