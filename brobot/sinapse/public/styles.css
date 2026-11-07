@@ -5,7 +5,7 @@
 @font-face { font-family: Montserrat; font-style: normal; font-weight: 800; font-display: swap; src: url(/fonts/montserrat-latin-800-normal.woff2) format('woff2'); }
 :root {
   --fundo: #f3f7fb; --cartao: #ffffff; --texto: #0d2236; --suave: #55697d; --borda: #d8e3ee;
-  --marca: #1478c8; --marca-clara: #1f95de; --marca-escura: #0e5a9c; --destaque: #1683d2; --destaque-claro: #e4f1fb;
+  --marca: #1478c8; --marca-clara: #1f95de; --marca-escura: #0e5a9c; --destaque: #1372bd; --destaque-claro: #e4f1fb;
   --info: #1366b3; --info-f: #e6f1fb; --ok: #1b7a43; --ok-f: #e5f5ec; --alerta: #8a5a00; --alerta-f: #fff3d6;
   --perigo: #b42318; --perigo-f: #fde8e6; --vip: #6b3fa0; --vip-f: #f1e9fb; --neutro: #4b5965; --neutro-f: #eef1f4;
   --raio: 10px; --sombra: 0 1px 2px rgba(16, 34, 46, .06), 0 1px 8px rgba(16, 34, 46, .04);

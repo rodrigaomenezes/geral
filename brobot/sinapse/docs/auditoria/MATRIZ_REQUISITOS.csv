@@ -153,7 +153,7 @@ RN-014;Eventos duplicados não podem produzir efeitos duplicados.;IMPLEMENTADO E
 RN-015;Falhas externas não podem causar perda silenciosa nem encerramento indevido.;IMPLEMENTADO E TESTADO;DLQ + falha registrada;AT-005/007;
 RNF-001;Disponibilidade Meta inicial sugerida 99,9% mensal do ERP, com janelas e exclusões formalizadas.;AUSENTE;—;—;sem SLO nem monitor
 RNF-002;"Durabilidade Nenhum evento confirmado ao emissor deve ser descartado; backups e recuperação testados.";PARCIAL;entrada antes de 202;AT-002;backup/restauração não testados
-RNF-003;Performance P95 de páginas operacionais até 2 s em carga nominal, a validar em dimensionamento.;AUSENTE;—;—;sem teste de carga
+RNF-003;Performance P95 de páginas operacionais até 2 s em carga nominal, a validar em dimensionamento.;PARCIAL;"npm run carga (scripts/carga.js): 20 usuários simultâneos P95 ≈ 0,2 s; 50 usuários P95 ≤ 0,73 s, banco embutido, máquina de 4 núcleos";scripts/carga.js;repetir no ambiente de produção dimensionado
 RNF-004;Processamento Eventos críticos reconhecidos em até 60 s em condições normais, salvo dependência externa.;PARCIAL;métrica da entrada mais antiga não processada (meta 60 s);metricas.test;alerta no coletor a configurar
 RNF-005;Segurança TLS, criptografia em repouso, MFA administrativo, segregação por tenant, secrets manager.;PARCIAL;"RLS; AES-GCM; scrypt; TLS verificado; limite de login; MFA TOTP obrigatório para gestão";"mfa-lgpd.test; seguranca.test";secrets manager do provedor
 RNF-006;Privacidade LGPD, minimização, base legal, retenção, consentimento quando aplicável, logs protegidos.;PARCIAL;"exportação e anonimização do titular; logs sem dado pessoal";mfa-lgpd.test;retenção automática por prazo a definir
@@ -162,7 +162,7 @@ RNF-008;"Recuperação RPO/RTO a homologar por criticidade; exercícios de resta
 RNF-009;Escalabilidade Workers horizontais e limites de concorrência por integração/tenant.;PARCIAL;SKIP LOCKED;AT-011;PGlite é processo único
 RNF-010;Manutenibilidade Módulos coesos, contratos versionados, testes e documentação obrigatória.;PARCIAL;"módulos coesos; CI";CI pglite+pg;sem lint
 RNF-011;Observabilidade Métricas, traces, logs estruturados, dashboards e alertas com dono.;PARCIAL;"logs estruturados; métricas Prometheus; saúde do supervisor";metricas.test;dashboards/alertas no coletor a configurar
-RNF-012;Acessibilidade Interfaces responsivas e boas práticas WCAG, nível-alvo a definir.;PARCIAL;npm run telas: 360 px, rótulos, nomes, alt, pt-BR em todas as telas;scripts/telas.js;contraste e ordem de foco
+RNF-012;Acessibilidade Interfaces responsivas e boas práticas WCAG, nível-alvo a definir.;IMPLEMENTADO E TESTADO;"npm run telas: 360 px, rótulos, nomes, alt, pt-BR, contraste AA (4,5:1 / 3:1) e foco visível sem tabindex positivo em todas as telas; cor da marca só com contraste AA (nucleo/cores.js)";"scripts/telas.js (autoteste com 5 problemas injetados); acessibilidade.test";"nível-alvo adotado: WCAG AA; leitor de tela não conferido manualmente"
 AT-001;Mensagem sem cliente identificado Permanece em triagem com SLA, sem perda.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-001;
 AT-002;"Mesmo webhook três vezes Uma ocorrência/efeito; eventos duplicados auditados.";IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-002;
 AT-003;Usuário responsável indisponível Tarefa é atribuída ao substituto/fila.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-003;

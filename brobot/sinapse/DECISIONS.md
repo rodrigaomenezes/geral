@@ -449,3 +449,14 @@ Desenvolvimento lista, numa consulta só e paginada, o que aguarda aceite, o que
 aguardando a validação da operação, por prioridade e prazo.
 **Consequência:** o teto é fixo no código (10/h); se a Brobot quiser outro número, vira configuração da organização.
 
+# T-051 — Contraste AA, foco visível e teste de carga (F28, RNF-012, RNF-003)
+**Contexto:** a conferência de telas não olhava contraste nem foco; não havia medida de desempenho.
+**Decisão:** nível-alvo de acessibilidade WCAG AA. `npm run telas` passou a medir o contraste de todo texto visível
+(4,5:1; 3:1 no texto grande), recusar tabindex positivo e percorrer com Tab conferindo foco visível; o autoteste injeta
+5 problemas e precisa apontar os 5. Achado: o botão principal tinha 4,03:1; `--destaque` foi de #1683d2 para #1372bd
+(5,04:1). A cor de marca da organização (white-label) só é aplicada se aguentar texto branco com 4,5:1; senão fica a
+padrão. `npm run carga` sobe a demonstração completa e mede P50/P95 das chamadas das telas do dia a dia com usuários
+simultâneos; sai com erro se o P95 passar de 2 s.
+**Resultado medido (07/11, banco embutido, 4 núcleos):** 20 usuários P95 ≈ 0,2 s; 50 usuários P95 ≤ 0,73 s; cerca de
+130 pedidos/s (limite do processo único). Repetir no ambiente de produção quando ele for dimensionado (R-06/R-07).
+

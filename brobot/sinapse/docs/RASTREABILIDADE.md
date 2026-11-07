@@ -321,7 +321,7 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Toda tela em 360 px, campos com rótulo, botões com nome, imagens com alt, pt-BR (RNF-012, celular primeiro) | ✔ conferido | `npm run telas` (25 telas, 0 problemas; autoteste aponta os 3 problemas injetados) |
-| Contraste e ordem de foco (WCAG completo) | ○ pendente | — |
+| Contraste e ordem de foco (WCAG completo) | ✔ conferido em 07/11 (F28) | ver abaixo |
 
 ## Entrega de 06/11/2026 (F24 · Vínculo com o OMIE)
 
@@ -354,4 +354,13 @@ dimensionamento e da infraestrutura definitiva.
 | --- | --- | --- |
 | Teto de avisos não críticos por hora com resumo; adiados, não perdidos; urgente primeiro e sem espera; gravidade escrita (COM-009) | ✔ testado | `agenda/servico.js`, `telas/meu-dia.js` · `test/avisos.test.js` |
 | Fila técnica do Desenvolvimento do pedido à validação da operação (DEV-002, REC-005) | ✔ testado | `desenvolvimento/servico.js`, `telas/desenvolvimento.js` · `test/fila-tecnica.test.js` |
+
+## Entrega de 07/11/2026 (F28 · Contraste, foco e carga)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Contraste AA e foco visível em todas as telas; sem tabindex positivo (RNF-012) | ✔ conferido | `scripts/telas.js` (25 telas, 0 problemas; autoteste aponta os 5 injetados) |
+| Botão principal passou de 4,03:1 para 5,04:1 (`--destaque` #1372bd) | ✔ corrigido | `public/styles.css` · `test/acessibilidade.test.js` |
+| Cor da marca da organização só vale com contraste AA sobre texto branco | ✔ testado | `nucleo/cores.js` · idem |
+| P95 das telas operacionais em carga (RNF-003) | ◐ medido localmente | `npm run carga`: 20 usuários P95 ≈ 0,2 s; 50 usuários P95 ≤ 0,73 s; repetir em produção |
 
