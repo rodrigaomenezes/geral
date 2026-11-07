@@ -341,3 +341,10 @@ dimensionamento e da infraestrutura definitiva.
 | Carteira VIP e credenciais por conta só com status (CS-001, BL-02, CRE-008) | ✔ testado | `clientes/servico.js` · idem |
 | Instruções seguras ao ponto focal no aviso D-3 (CRE-005) | ✔ testado | `rodadas/erros.js` · idem |
 
+## Entrega de 07/11/2026 (F26 · Leads de fora e probabilidade por etapa)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Lead do site/formulário/parceiro por webhook, idempotente, sem duplicar contato, com dono distribuído (CRM-002) | ✔ testado | `comercial/captura.js`, 025 · `test/comercial-leads.test.js` |
+| Probabilidade por etapa da organização na previsão e na fórmula da tela (CRM-004, CRM-015) | ✔ testado | `comercial/funil.js` · idem |
+

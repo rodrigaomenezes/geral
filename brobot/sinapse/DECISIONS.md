@@ -427,3 +427,15 @@ entra na implantação.
 **Consequência:** a mesma régua vale para todos da organização; editar pela tela, com aprovação e histórico, fica como
 melhoria se a Brobot pedir.
 
+# T-049 — Leads de fora do sistema por webhook (F26, CRM-002)
+**Contexto:** a oportunidade só nascia digitada no Sinapse; site, formulários de evento e parceiros não tinham entrada.
+**Decisão:** `POST /api/leads/{organização}` com o mesmo token da entrada de mensagens (`SINAPSE_TOKEN_ENTRADA`). O
+`idLead` do sistema de origem é único por organização (025): reenviar devolve a mesma oportunidade (200). Contato
+(telefone normalizado ou e-mail) com oportunidade em andamento não abre outra: o pedido fica na auditoria dela. O dono é
+a pessoa do Comercial disponível com menos oportunidades em andamento; sem ninguém, fica sem dono para a gestão. Caminho
+próprio (e não `/api/entrada/...`) para não colidir com a entrada de mensagens. O teste de token foi para
+`nucleo/token-entrada.js`, usado pelas duas rotas.
+**Probabilidade por etapa (CRM-004/015):** padrão no código, com a da organização em
+`tenants.config.comercial.probabilidades` (inteiros 0–100; inválido volta ao padrão); a fórmula exibida é montada com
+os valores em vigor.
+

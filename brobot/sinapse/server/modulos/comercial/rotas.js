@@ -7,8 +7,11 @@ const atividades = require('./atividades');
 const contatos = require('./contatos');
 const { com } = require('../../http/servidor');
 const { comAuditoriaDeAcesso } = require('../ocorrencias/rotas');
-const { ETAPAS, ORIGENS, MOTIVOS_PERDA, FUNIS, PROBABILIDADE } = require('./funil');
+const { ETAPAS, ORIGENS, MOTIVOS_PERDA, FUNIS } = require('./funil');
 const s = require('./servico');
+const captura = require('./captura');
+const { conferirToken } = require('../../nucleo/token-entrada');
+const { tenantPorSlug } = require('../entrada/servico');
 
 const CAMPOS = {
   empresa: { tipo: 'texto', max: 160 }, cnpj: { tipo: 'texto', max: 20 }, contatoNome: { tipo: 'texto', max: 120 }, contatoTelefone: { tipo: 'texto', max: 30 },
@@ -30,7 +33,7 @@ module.exports = [
       const lista = await catalogo.listar(c, ctx);
       return { etapas: ETAPAS, produtos: Object.fromEntries(lista.filter((x) => x.ativo).map((x) => [x.codigo, x.nome])), catalogo: lista,
         origens: ORIGENS, motivosPerda: MOTIVOS_PERDA, tiposAtividade: atividades.TIPOS, estadosProposta: propostas.ESTADOS,
-        funis: FUNIS, probabilidade: PROBABILIDADE, papeisPessoa: contatos.PAPEIS };
+        funis: FUNIS, probabilidade: await s.probabilidadesDaOrganizacao(c), papeisPessoa: contatos.PAPEIS };
     }) },
   { metodo: 'POST', caminho: '/api/comercial/produtos', permissao: 'comercial.gerir', descricao: 'gerir o catálogo de produtos',
     handler: ({ db, ctx, corpo }) => {
@@ -39,6 +42,22 @@ module.exports = [
       if (!/^[a-z0-9_]{2,40}$/.test(d.codigo)) throw new ErroNegocio(400, 'entrada_invalida', 'Código do produto: letras minúsculas, números e _ (ex.: multas).');
       if (d.precoReferencia !== undefined) { d.precoReferencia = Number(String(d.precoReferencia).replace(/\./g, '').replace(',', '.')); if (!(d.precoReferencia >= 0)) throw new ErroNegocio(400, 'entrada_invalida', 'Preço de referência inválido.'); }
       return db.comoTenant(ctx.tenantId, (c) => catalogo.salvar(c, ctx, d));
+    } },
+  // CRM-002: lead de fora (site, formulário, parceiro) por webhook com o token de entrada. 201 = criado; 200 = já existia.
+  { metodo: 'POST', caminho: '/api/leads/:tenant', publica: true,
+    handler: async ({ req, db, cfg, params, corpo }) => {
+      conferirToken(req.headers['x-sinapse-token'], cfg.tokenEntrada);
+      const d = validar(corpo, { idLead: { obrigatorio: true, tipo: 'texto', min: 1, max: 120 }, empresa: { obrigatorio: true, tipo: 'texto', min: 2, max: 160 },
+        contatoNome: { obrigatorio: true, tipo: 'texto', min: 2, max: 120 }, contatoTelefone: { tipo: 'texto', max: 30 }, contatoEmail: { tipo: 'texto', max: 160 },
+        origem: { tipo: 'texto', em: Object.keys(ORIGENS).filter((o) => o !== 'base') }, frota: { tipo: 'inteiro' }, mensagem: { tipo: 'texto', max: 1000 } });
+      if (!d.contatoTelefone && !d.contatoEmail) throw new ErroNegocio(400, 'entrada_invalida', 'Informe o telefone ou o e-mail do contato.', [{ campo: 'contatoTelefone', problema: 'obrigatório' }]);
+      if (d.contatoEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.contatoEmail)) throw new ErroNegocio(400, 'entrada_invalida', 'E-mail inválido.', [{ campo: 'contatoEmail', problema: 'inválido' }]);
+      if (d.frota !== undefined && (d.frota < 0 || d.frota > 1000000)) throw new ErroNegocio(400, 'entrada_invalida', 'Frota inválida.');
+      const produtos = Array.isArray(corpo?.produtos) ? corpo.produtos.map(String).slice(0, 10) : undefined;
+      const t = await tenantPorSlug(db, params.tenant);
+      if (!t) throw new ErroNegocio(404, 'organizacao_inexistente', 'Organização não encontrada.');
+      const r = await db.comoTenant(t.id, (c) => captura.capturar(c, t.id, { ...d, origem: d.origem || 'site', produtos }));
+      return com(r.duplicada ? 200 : 201, r);
     } },
   { metodo: 'GET', caminho: '/api/comercial/oportunidades', permissao: 'comercial.ver',
     handler: ({ db, ctx, usuario, query }) => db.comoTenant(ctx.tenantId, (c) => s.listar(c, { q: query.q, minhas: query.minhas === '1', usuario, funil: query.funil })) },

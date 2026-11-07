@@ -68,14 +68,27 @@ function validarMudanca(atual, proposta, para) {
 // da carteira; a renovação dispensa o teste (o cliente já usa) e, ao ganhar, troca o valor do contrato.
 const FUNIS = { aquisicao: 'Aquisição', expansao: 'Expansão (upsell e cross-sell)', renovacao: 'Renovação' };
 
-// Previsão (CRM-015): probabilidade de fechamento por etapa. Fórmula mostrada na tela; ajuste aqui é decisão do
-// Comercial (registrar em DECISIONS.md) até virar configuração da organização.
+// Previsão (CRM-015): probabilidade de fechamento por etapa. Padrão abaixo; cada organização pode ter a sua em
+// tenants.config.comercial.probabilidades ({ etapa: 0 a 100 }, definida na implantação). A fórmula em vigor vai para a tela.
 const PROBABILIDADE = { novo: 0.1, qualificacao: 0.2, demonstracao: 0.35, proposta: 0.5, teste: 0.65, negociacao: 0.8 };
-const FORMULA_PREVISAO = 'Soma, por mês de fechamento previsto, de valor mensal × probabilidade da etapa (Novo 10%, Qualificação 20%, '
-  + 'Demonstração 35%, Proposta 50%, Teste 65%, Negociação 80%). Só oportunidades em andamento com data de fechamento prevista.';
+
+/** Regra pura: probabilidades da organização sobre o padrão; valor fora de 0–100 (inteiro) é ignorado. */
+function probabilidades(config) {
+  const p = { ...PROBABILIDADE };
+  if (config && typeof config === 'object') {
+    for (const etapa of Object.keys(PROBABILIDADE)) {
+      const v = Number(config[etapa]);
+      if (config[etapa] !== undefined && config[etapa] !== null && Number.isInteger(v) && v >= 0 && v <= 100) p[etapa] = v / 100;
+    }
+  }
+  return p;
+}
+
+const formulaPrevisao = (prob) => `Soma, por mês de fechamento previsto, de valor mensal × probabilidade da etapa (${
+  Object.entries(prob).map(([e, v]) => `${ETAPAS[e].rotulo} ${Math.round(v * 100)}%`).join(', ')}). Só oportunidades em andamento com data de fechamento prevista.`;
 
 /** Regra pura: previsão ponderada por mês (AAAA-MM), a partir de linhas { etapa, valor_mensal, fechamento_previsto }. */
-function previsao(linhas, meses = 3, hoje = new Date()) {
+function previsao(linhas, meses = 3, hoje = new Date(), prob = PROBABILIDADE) {
   const chaves = [];
   for (let i = 0; i < meses; i++) {
     const d = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() + i, 1));
@@ -84,17 +97,17 @@ function previsao(linhas, meses = 3, hoje = new Date()) {
   const porMes = Object.fromEntries(chaves.map((k) => [k, { mes: k, ponderado: 0, bruto: 0, oportunidades: 0 }]));
   let atrasadas = 0; let semData = 0;
   for (const l of linhas) {
-    if (!PROBABILIDADE[l.etapa]) continue;
+    if (prob[l.etapa] === undefined) continue;
     if (!l.fechamento_previsto) { semData++; continue; }
     const mes = String(l.fechamento_previsto).slice(0, 7);
     if (mes < chaves[0]) { atrasadas++; continue; }
     const alvo = porMes[mes];
     if (!alvo) continue;
     const v = Number(l.valor_mensal || 0);
-    alvo.bruto += v; alvo.ponderado += v * PROBABILIDADE[l.etapa]; alvo.oportunidades++;
+    alvo.bruto += v; alvo.ponderado += v * prob[l.etapa]; alvo.oportunidades++;
   }
   for (const m of Object.values(porMes)) { m.ponderado = Math.round(m.ponderado * 100) / 100; m.bruto = Math.round(m.bruto * 100) / 100; }
-  return { meses: chaves.map((k) => porMes[k]), semData, atrasadas, formula: FORMULA_PREVISAO };
+  return { meses: chaves.map((k) => porMes[k]), semData, atrasadas, formula: formulaPrevisao(prob), probabilidade: prob };
 }
 
-module.exports = { ETAPAS, ABERTAS, PRODUTOS, ORIGENS, MOTIVOS_PERDA, FUNIS, PROBABILIDADE, faltando, validarMudanca, previsao };
+module.exports = { ETAPAS, ABERTAS, PRODUTOS, ORIGENS, MOTIVOS_PERDA, FUNIS, PROBABILIDADE, probabilidades, faltando, validarMudanca, previsao };
