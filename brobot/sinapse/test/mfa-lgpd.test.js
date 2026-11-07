@@ -38,7 +38,9 @@ test('MFA: ativar com o QR, entrar em duas etapas, código errado e bloqueio', a
   const ini = await chamar(a.cookie, 'POST', '/mfa/iniciar', {});
   assert.match(ini.corpo.qr, /^data:image\/png;base64,/);
   assert.equal((await chamar(a.cookie, 'POST', '/mfa/confirmar', { codigo: '000000' })).status, 422);
-  assert.equal((await chamar(a.cookie, 'POST', '/mfa/confirmar', { codigo: totp.codigo(ini.corpo.segredo) })).corpo.ativo, true);
+  // o mesmo texto do código é reusado abaixo: gerar de novo pelo relógio pode cair no passo seguinte (outro código, válido)
+  const codigoAtivacao = totp.codigo(ini.corpo.segredo);
+  assert.equal((await chamar(a.cookie, 'POST', '/mfa/confirmar', { codigo: codigoAtivacao })).corpo.ativo, true);
   const [u] = await t.sql("SELECT mfa_segredo_cifrado FROM usuarios WHERE email = 'gestor@brobot.com.br'");
   assert.ok(!u.mfa_segredo_cifrado.includes(ini.corpo.segredo), 'segredo cifrado no banco');
   // novo login: senha certa ainda não basta
@@ -47,7 +49,7 @@ test('MFA: ativar com o QR, entrar em duas etapas, código errado e bloqueio', a
   assert.equal((await chamar(b.cookie, 'GET', '/sessao')).corpo.usuario, null, 'sessão pendente não vale');
   assert.equal((await chamar(b.cookie, 'GET', '/ocorrencias')).status, 401);
   assert.equal((await chamar(b.cookie, 'POST', '/sessao/mfa', { codigo: '111111' })).status, 422);
-  assert.equal((await chamar(b.cookie, 'POST', '/sessao/mfa', { codigo: totp.codigo(ini.corpo.segredo) })).status, 422, 'o código da ativação não vale de novo');
+  assert.equal((await chamar(b.cookie, 'POST', '/sessao/mfa', { codigo: codigoAtivacao })).status, 422, 'o código da ativação não vale de novo');
   await t.sql("UPDATE usuarios SET mfa_ultimo_passo = mfa_ultimo_passo - 3 WHERE email = 'gestor@brobot.com.br'"); // simula o passo seguinte (30 s depois)
   const ok = await chamar(b.cookie, 'POST', '/sessao/mfa', { codigo: totp.codigo(ini.corpo.segredo) });
   assert.equal(ok.corpo.usuario.mfaAtivo, true);

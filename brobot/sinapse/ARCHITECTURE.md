@@ -30,7 +30,7 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/supervisor    varredura de invariantes, escalonamento, handoff vencido, heartbeat, fila de falhas
         ├─ modulos/painel        indicadores da seção 13 e 6 dashboards (blocos = tabela de dados; gráfico, tabela e CSV leem a mesma)
         ├─ modulos/integracoes   Platform e OMIE (demonstração + CSV), WhatsApp oficial (Meta Cloud API, webhook assinado) ou por QR Code (Baileys, sessão no Volume), e-mail (demonstração)
-        └─ modulos/demo          dados fictícios e simulador (só com SINAPSE_DEMO ligado)
+        └─ modulos/demo          dados fictícios, vitrine /demo e simulador (só com SINAPSE_DEMO ligado)
         │
 server/jobs/fila.js — fila durável no PostgreSQL (FOR UPDATE SKIP LOCKED), backoff, fila de falhas, recorrentes
 server/db — adaptador pg | PGlite, `comoTenant` (RLS) / `sistema`, migrações versionadas com volta

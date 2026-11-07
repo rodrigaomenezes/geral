@@ -1,5 +1,5 @@
 // Service worker mínimo: guarda a casca do app para abrir rápido; dados da API sempre vêm da rede.
-const VERSAO = 'sinapse-v22';
+const VERSAO = 'sinapse-v23';
 const CASCA = ['/', '/styles.css', '/icon.svg', '/js/app.js', '/js/dom.js', '/js/api.js'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(CASCA))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
