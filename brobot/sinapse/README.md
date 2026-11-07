@@ -47,7 +47,7 @@ apagado): `TESTE_DATABASE_URL=postgres://... npm test`.
 | `SINAPSE_AMBIENTE` | para dados reais | `producao` trava o ambiente: recusa `SINAPSE_DEMO=1`, exige `DATABASE_URL` e TLS verificado |
 | `SINAPSE_DB_CA` | se o banco usar certificado próprio | Certificado da autoridade (PEM) do PostgreSQL; com `sslmode` na URL o certificado é sempre verificado |
 | `SINAPSE_DB_TLS_INSEGURO` | não | `1` aceita certificado sem verificação (só fora de produção; fica registrado no log) |
-| `SINAPSE_TOKEN_ENTRADA` | não | Token (24+ caracteres) do webhook `POST /api/entrada/{organização}/{canal}`; sem ele, a rota fica desligada |
+| `SINAPSE_TOKEN_ENTRADA` | não | Token (24+ caracteres) dos webhooks `POST /api/entrada/{organização}/{canal}` (mensagens) e `POST /api/leads/{organização}` (leads do site/formulário: `idLead`, `empresa`, `contatoNome`, `contatoTelefone` ou `contatoEmail`); sem ele, as rotas ficam desligadas |
 | `SINAPSE_MFA_OBRIGATORIO` | recomendado | `1` exige a verificação em duas etapas (aplicativo autenticador) para Administração e Supervisão. Sempre ligado com `SINAPSE_AMBIENTE=producao`. Precisa de `SINAPSE_CHAVE` |
 | `SINAPSE_SESSAO_INATIVIDADE_MIN` | não | Minutos sem uso até a sessão expirar (padrão 120) |
 | `SINAPSE_ADMIN_EMAIL` | na implantação real | E-mail da primeira pessoa da Administração. Com `SINAPSE_SENHA_ADMIN` e o banco vazio (sem demonstração), o Sinapse cria a organização e essa pessoa. Depois, cadastre as outras em **Pessoas e equipes** |

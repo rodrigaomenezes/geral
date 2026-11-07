@@ -10,7 +10,7 @@ const { publicar, auditar } = require('../../nucleo/registro');
 const { relogio, DIA } = require('../../nucleo/relogio');
 const { normalizarTelefone } = require('../../nucleo/telefone');
 const ocorrencias = require('../ocorrencias/servico');
-const { ETAPAS, ABERTAS, FUNIS, validarMudanca, previsao } = require('./funil');
+const { ETAPAS, ABERTAS, FUNIS, validarMudanca, previsao, probabilidades } = require('./funil');
 const catalogo = require('./catalogo');
 const propostas = require('./propostas');
 const atividades = require('./atividades');
@@ -308,6 +308,9 @@ async function detalhe(c, ctx, id) {
   return { ...o, historico, propostas: await propostas.listar(c, id), atividades: await atividades.listar(c, id), contatos: await contatos.listar(c, id), exigeTeste };
 }
 
+const probabilidadesDaOrganizacao = async (c) => probabilidades(uma(await c.query(
+  "SELECT config -> 'comercial' -> 'probabilidades' AS p FROM tenants WHERE id = nullif(current_setting('app.tenant_id', true), '')::uuid"))?.p);
+
 /** Indicadores do funil (para o Comercial e para a diretoria). */
 async function indicadores(c) {
   const porEtapa = (await c.query(`SELECT etapa, count(*)::int AS n, coalesce(sum(valor_mensal),0)::float AS valor FROM oportunidades
@@ -324,7 +327,7 @@ async function indicadores(c) {
   const porFunil = (await c.query(`SELECT funil, count(*) FILTER (WHERE etapa NOT IN ('ganha','perdida','suspensa'))::int AS abertas,
     coalesce(sum(valor_mensal) FILTER (WHERE etapa NOT IN ('ganha','perdida','suspensa')), 0)::float AS valor,
     count(*) FILTER (WHERE etapa = 'ganha' AND fechada_em > $1::timestamptz - interval '90 days')::int AS ganhas_90d FROM oportunidades GROUP BY funil`, [relogio.agora()])).rows;
-  return { porEtapa, testes, motivos, porFunil, previsao: previsao(abertas, 3, relogio.agora()) };
+  return { porEtapa, testes, motivos, porFunil, previsao: previsao(abertas, 3, relogio.agora(), await probabilidadesDaOrganizacao(c)) };
 }
 
 /** CS encaminha ao Comercial (CS-011): oportunidade de expansão ou renovação de um cliente da carteira, na fila do
@@ -337,4 +340,4 @@ async function encaminhar(c, ctx, { contaId, funil, observacao }) {
   return op;
 }
 
-module.exports = { encaminhar, criar, atualizar, mover, registrarTeste, definirProximaAcao, suspender, retomar, importarDoPipedrive, listar, detalhe, indicadores, normalizar, buscar };
+module.exports = { probabilidadesDaOrganizacao, encaminhar, criar, atualizar, mover, registrarTeste, definirProximaAcao, suspender, retomar, importarDoPipedrive, listar, detalhe, indicadores, normalizar, buscar };
