@@ -13,10 +13,12 @@ const publicoUsuario = (u, cfg) => u && ({
 });
 
 /** Marca da organização (white-label): só cores hex, nome curto e logo servido pelo próprio sistema. */
+const { corComTextoBranco } = require('../../nucleo/cores');
+
 function marcaSegura(m) {
   if (!m || typeof m !== 'object') return null;
-  const cor = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
-  return { nome: typeof m.nome === 'string' ? m.nome.slice(0, 40) : undefined, corPrimaria: cor(m.corPrimaria), corDestaque: cor(m.corDestaque),
+  // RNF-012: cor que não aguenta texto branco (contraste < 4,5:1) é ignorada e a tela fica com a cor padrão.
+  return { nome: typeof m.nome === 'string' ? m.nome.slice(0, 40) : undefined, corPrimaria: corComTextoBranco(m.corPrimaria), corDestaque: corComTextoBranco(m.corDestaque),
     logo: typeof m.logo === 'string' && /^\/marca\/[\w.-]+$/.test(m.logo) ? m.logo : undefined };
 }
 

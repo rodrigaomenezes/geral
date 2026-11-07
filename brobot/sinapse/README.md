@@ -87,8 +87,10 @@ Roteiro de 15 minutos em [`docs/ROTEIRO_APRESENTACAO.md`](docs/ROTEIRO_APRESENTA
 
 ## Conferência das telas
 
+`npm run carga` mede o tempo das telas do dia a dia com 20 usuários simultâneos (P95 deve ficar abaixo de 2 s).
 `npm run telas` abre todas as telas em 360 px com a demonstração e aponta rolagem lateral, campo sem rótulo, botão sem
-nome, imagem sem alt e erro de JavaScript. Precisa do Playwright com Chromium instalado na máquina.
+nome, imagem sem alt, contraste abaixo do AA, foco do teclado invisível e erro de JavaScript. Precisa do Playwright com
+Chromium instalado na máquina.
 
 ## Operação em produção (o que configurar fora do código)
 

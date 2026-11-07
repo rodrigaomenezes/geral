@@ -10,7 +10,8 @@
     "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
     "migrar": "node server/db/migrar-cli.js",
     "verificar": "node scripts/verificar.js",
-    "telas": "node scripts/telas.js"
+    "telas": "node scripts/telas.js",
+    "carga": "node scripts/carga.js"
   },
   "engines": {
     "node": ">=22"
