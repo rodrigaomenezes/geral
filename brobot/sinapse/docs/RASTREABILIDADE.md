@@ -348,3 +348,10 @@ dimensionamento e da infraestrutura definitiva.
 | Lead do site/formulário/parceiro por webhook, idempotente, sem duplicar contato, com dono distribuído (CRM-002) | ✔ testado | `comercial/captura.js`, 025 · `test/comercial-leads.test.js` |
 | Probabilidade por etapa da organização na previsão e na fórmula da tela (CRM-004, CRM-015) | ✔ testado | `comercial/funil.js` · idem |
 
+## Entrega de 07/11/2026 (F27 · Alertas sem excesso e fila técnica)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Teto de avisos não críticos por hora com resumo; adiados, não perdidos; urgente primeiro e sem espera; gravidade escrita (COM-009) | ✔ testado | `agenda/servico.js`, `telas/meu-dia.js` · `test/avisos.test.js` |
+| Fila técnica do Desenvolvimento do pedido à validação da operação (DEV-002, REC-005) | ✔ testado | `desenvolvimento/servico.js`, `telas/desenvolvimento.js` · `test/fila-tecnica.test.js` |
+

@@ -225,6 +225,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .sino-item.nao-lida { background: var(--info-f); }
 .sino-item span { font-size: .85rem; } .sino-item small { color: var(--suave); font-size: .72rem; }
 .sino-item.grav-critica { border-left-color: var(--perigo); } .sino-item.grav-alerta { border-left-color: #e0a000; }
+.sino-grav { align-self: flex-start; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-radius: 999px; padding: .05rem .5rem; }
+.sino-grav.grav-critica { background: var(--perigo-f); color: var(--perigo); } .sino-grav.grav-alerta { background: var(--alerta-f); color: var(--alerta); }
 
 /* Comercial */
 .quadro { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 82vw); gap: .75rem; overflow-x: auto; padding-bottom: .75rem; scroll-snap-type: x mandatory; }

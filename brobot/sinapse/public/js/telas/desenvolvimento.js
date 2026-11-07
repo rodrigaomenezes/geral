@@ -13,14 +13,28 @@ const ORIGEM = { cliente: 'pedido de cliente', ocorrencia: 'ocorrência', reinci
 
 export async function telaDesenvolvimento(el, ctx, id) {
   if (id) return detalheIncidente(el, ctx, id);
-  const aba = ctx.query?.get('aba') || 'incidentes';
+  const aba = ctx.query?.get('aba') || 'fila';
   const d = await api.get('/desenvolvimento');
   const recarregar = () => telaDesenvolvimento(el, ctx);
   const ir = (a) => { location.hash = `#/desenvolvimento?aba=${a}`; };
-  const abas = h('div', { class: 'abas', role: 'tablist' }, [['incidentes', 'Incidentes'], ['melhorias', 'Melhorias'], ['releases', 'Releases']].map(([k, r]) =>
+  const abas = h('div', { class: 'abas', role: 'tablist' }, [['fila', `Fila técnica (${d.fila.total})`], ['incidentes', 'Incidentes'], ['melhorias', 'Melhorias'], ['releases', 'Releases']].map(([k, r]) =>
     h('button', { class: `aba${k === aba ? ' ativa' : ''}`, type: 'button', role: 'tab', 'aria-selected': k === aba ? 'true' : 'false', onclick: () => ir(k) }, r)));
-  const conteudo = { incidentes: () => abaIncidentes(ctx, d, recarregar), melhorias: () => abaMelhorias(ctx, d, recarregar), releases: () => abaReleases(ctx, d, recarregar) }[aba]();
+  const conteudo = { fila: () => abaFila(d), incidentes: () => abaIncidentes(ctx, d, recarregar), melhorias: () => abaMelhorias(ctx, d, recarregar), releases: () => abaReleases(ctx, d, recarregar) }[aba]();
   trocar(el, h('div', { class: 'titulo-tela' }, h('h1', {}, 'Desenvolvimento')), abas, conteudo);
+}
+
+const COR_FILA = { aguardando_aceite: 'alerta', com_dev: 'info', aguardando_validacao: 'neutro' };
+
+function abaFila(d) {
+  if (!d.fila.itens.length) return vazio('Nenhuma demanda técnica em aberto.');
+  return h('div', { class: 'lista' }, d.fila.itens.map((o) => h('a', { class: `linha ${o.prazo_em && new Date(o.prazo_em) < new Date() ? 'linha-vencido' : ''}`, href: `#/ocorrencias/${o.id}` },
+    h('div', { class: 'linha-topo' }, h('strong', {}, o.protocolo), selo(PRIO[o.prioridade] || o.prioridade, o.prioridade === 'critica' || o.prioridade === 'alta' ? 'perigo' : 'neutro'),
+      selo(o.situacaoNome, COR_FILA[o.situacao]), o.vip ? selo('VIP', 'vip') : null),
+    h('div', { class: 'linha-titulo' }, o.titulo),
+    h('div', { class: 'linha-meta' }, o.conta ? h('span', {}, o.conta) : null, o.itens ? h('span', {}, `${o.itens} veículo(s)/erro(s)`) : null,
+      h('span', {}, o.responsavel ? `com ${o.responsavel}` : 'sem responsável'),
+      o.aceito_por ? h('span', {}, `aceita por ${o.aceito_por}`) : o.handoff_estado === 'pendente' ? h('span', {}, `aceite até ${dataHora(o.prazo_aceite_em)}`) : null,
+      o.prazo_em ? h('span', {}, `prazo ${dataHora(o.prazo_em)}`) : null))));
 }
 
 function abaIncidentes(ctx, d, recarregar) {
