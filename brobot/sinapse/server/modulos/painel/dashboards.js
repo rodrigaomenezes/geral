@@ -144,6 +144,38 @@ async function rodadas(c, f) {
   ];
 }
 
+// Saúde da conta (CS-002): transparente (cada ponto perdido tem motivo escrito) e configurável por organização em
+// tenants.config.saude (definido na implantação, como a alçada de desconto). Valor inválido volta ao padrão.
+const PESOS_SAUDE = { semDadoDeUso: 15, loginMais7Dias: 15, loginMais14Dias: 35, semPontoFocal: 25, porPendencia: 10, maxPendencias: 30,
+  ocorrenciasAtivas: 10, limiteOcorrencias: 3, atencaoFinanceira: 10, emRisco: 60 };
+const ROTULOS_PESOS = { semDadoDeUso: 'Sem dado de uso', loginMais7Dias: 'Último login há mais de 7 dias', loginMais14Dias: 'Sem login há mais de 14 dias',
+  semPontoFocal: 'Sem ponto focal', porPendencia: 'Cada pendência aberta', maxPendencias: 'Teto das pendências', ocorrenciasAtivas: 'Muitas ocorrências ativas',
+  limiteOcorrencias: 'A partir de quantas ocorrências', atencaoFinanceira: 'Atenção financeira', emRisco: 'Em risco abaixo de' };
+
+function pesosSaude(config) {
+  const p = { ...PESOS_SAUDE };
+  if (config && typeof config === 'object') {
+    for (const k of Object.keys(PESOS_SAUDE)) {
+      const v = Number(config[k]);
+      if (config[k] !== undefined && config[k] !== null && Number.isInteger(v) && v >= 0 && v <= 100) p[k] = v;
+    }
+  }
+  return p;
+}
+
+function saudeDaConta({ dias, temPontoFocal, pendencias, ocorrencias, financeiro }, p = PESOS_SAUDE) {
+  const motivos = [];
+  let perda = 0;
+  if (dias === null) { motivos.push('sem dado de uso'); perda += p.semDadoDeUso; }
+  else if (dias > 14) { motivos.push(`sem login há ${dias} dias`); perda += p.loginMais14Dias; }
+  else if (dias > 7) { motivos.push(`último login há ${dias} dias`); perda += p.loginMais7Dias; }
+  if (!temPontoFocal) { motivos.push('sem ponto focal'); perda += p.semPontoFocal; }
+  if (pendencias) { motivos.push(`${pendencias} pendência(s)`); perda += Math.min(p.maxPendencias, pendencias * p.porPendencia); }
+  if (ocorrencias >= p.limiteOcorrencias) { motivos.push(`${ocorrencias} ocorrências ativas`); perda += p.ocorrenciasAtivas; }
+  if (financeiro === 'em_atraso') { motivos.push('atenção financeira'); perda += p.atencaoFinanceira; }
+  return { pontos: Math.max(0, 100 - perda), motivos };
+}
+
 async function carteira(c, f) {
   const cart = f.carteira ? (f.carteira === 'vip' ? ' AND c.vip' : ' AND NOT c.vip') : '';
   const contas = (await c.query(`SELECT c.id, c.nome, c.vip, u.ultimo_login, u.consultas_30d,
@@ -153,24 +185,17 @@ async function carteira(c, f) {
       (SELECT situacao FROM status_financeiro s WHERE s.conta_id = c.id) AS financeiro
     FROM contas c LEFT JOIN uso_contas u ON u.conta_id = c.id WHERE c.arquivada_em IS NULL${cart} ORDER BY c.nome`)).rows;
   const agora = relogio.agora();
+  const pesos = pesosSaude((await c.query("SELECT config -> 'saude' AS s FROM tenants WHERE id = nullif(current_setting('app.tenant_id', true), '')::uuid")).rows[0]?.s);
   const linhas = contas.map((x) => {
     const dias = x.ultimo_login ? Math.floor((agora - new Date(x.ultimo_login)) / DIA) : null;
-    // Saúde transparente (CS-002): cada ponto perdido tem motivo escrito.
-    const motivos = [];
-    if (dias === null) motivos.push('sem dado de uso'); else if (dias > 14) motivos.push(`sem login há ${dias} dias`); else if (dias > 7) motivos.push(`último login há ${dias} dias`);
-    if (!x.tem_pf) motivos.push('sem ponto focal');
-    if (x.pendencias) motivos.push(`${x.pendencias} pendência(s)`);
-    if (x.ocorrencias >= 3) motivos.push(`${x.ocorrencias} ocorrências ativas`);
-    if (x.financeiro === 'em_atraso') motivos.push('atenção financeira');
-    const pontos = Math.max(0, 100 - (dias === null ? 15 : dias > 14 ? 35 : dias > 7 ? 15 : 0) - (x.tem_pf ? 0 : 25) - Math.min(30, x.pendencias * 10)
-      - (x.ocorrencias >= 3 ? 10 : 0) - (x.financeiro === 'em_atraso' ? 10 : 0));
+    const { pontos, motivos } = saudeDaConta({ dias, temPontoFocal: x.tem_pf, pendencias: x.pendencias, ocorrencias: x.ocorrencias, financeiro: x.financeiro }, pesos);
     return { rotulo: x.nome, vip: x.vip ? 'VIP' : '', saude: pontos, dias_sem_login: dias ?? '—', pendencias: x.pendencias, ocorrencias: x.ocorrencias, motivos: motivos.join('; ') || 'tudo em dia', link: `#/contas/${x.id}` };
   }).sort((a, b) => a.saude - b.saude);
   const faixas = [['até 7 dias', (d) => d !== '—' && d <= 7], ['8 a 14 dias', (d) => d !== '—' && d > 7 && d <= 14], ['mais de 14 dias', (d) => d !== '—' && d > 14], ['sem dado', (d) => d === '—']];
   return [
     { id: 'resumo', titulo: 'Carteira', tipo: 'tiles', linhas: [
       { rotulo: 'Contas', valor: contas.length, link: '#/contas' }, { rotulo: 'VIP', valor: contas.filter((x) => x.vip).length },
-      { rotulo: 'Sem ponto focal', valor: contas.filter((x) => !x.tem_pf).length, alerta: true }, { rotulo: 'Em risco (saúde < 60)', valor: linhas.filter((x) => x.saude < 60).length, alerta: true }] },
+      { rotulo: 'Sem ponto focal', valor: contas.filter((x) => !x.tem_pf).length, alerta: true }, { rotulo: `Em risco (saúde < ${pesos.emRisco})`, valor: linhas.filter((x) => x.saude < pesos.emRisco).length, alerta: true }] },
     { id: 'saude', titulo: 'Saúde das contas (menor primeiro)', tipo: 'barras', unidade: 'pontos', sequencial: true,
       colunas: [{ campo: 'rotulo', rotulo: 'Conta' }, { campo: 'vip', rotulo: 'VIP' }, { campo: 'saude', rotulo: 'Saúde' }, { campo: 'dias_sem_login', rotulo: 'Dias sem login' },
         { campo: 'pendencias', rotulo: 'Pendências' }, { campo: 'ocorrencias', rotulo: 'Ocorrências ativas' }, { campo: 'motivos', rotulo: 'Por quê' }],
@@ -178,6 +203,9 @@ async function carteira(c, f) {
     { id: 'ultimo_login', titulo: 'Último login na Platform', tipo: 'barras', unidade: 'contas',
       colunas: [{ campo: 'rotulo', rotulo: 'Faixa' }, { campo: 'valor', rotulo: 'Contas' }],
       linhas: faixas.map(([r, fn]) => ({ rotulo: r, valor: linhas.filter((x) => fn(x.dias_sem_login)).length })) },
+    { id: 'formula_saude', titulo: 'Como a saúde é calculada (começa em 100)', tipo: 'tabela',
+      colunas: [{ campo: 'rotulo', rotulo: 'Critério' }, { campo: 'valor', rotulo: 'Pontos' }],
+      linhas: Object.keys(PESOS_SAUDE).map((k) => ({ rotulo: ROTULOS_PESOS[k], valor: pesos[k] })) },
   ];
 }
 
@@ -274,4 +302,4 @@ async function montar(c, nome, query) {
   return { nome, titulo: d.titulo, filtros: { dias: f.dias, equipe: f.equipe, carteira: f.carteira }, geradoEm: relogio.agora(), blocos: await d.fn(c, f) };
 }
 
-module.exports = { DASHBOARDS, montar, filtros };
+module.exports = { DASHBOARDS, montar, filtros, saudeDaConta, pesosSaude, PESOS_SAUDE, ROTULOS_PESOS };

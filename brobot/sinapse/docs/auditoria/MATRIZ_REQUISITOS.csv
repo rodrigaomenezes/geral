@@ -18,7 +18,7 @@ INT-006;Criar, vincular, dividir, mesclar e relacionar ocorrências sem apagar h
 INT-007;Permitir resposta no canal de origem, com registro de envio e entrega.;IMPLEMENTADO E TESTADO;ocorrencias.responder → mensageria;WhatsApp oficial/QR status;
 INT-008;Manter fila de entrada não classificada com supervisão automática.;IMPLEMENTADO E TESTADO;"triagem com SLA próprio; supervisor escalona e chama a Supervisão";"AT-001; triagem-handoff.test";
 INT-009;Validar anexos, tipos, tamanho, malware e política de retenção.;PARCIAL;anexos (020): tipo pelo conteúdo, 10 MB, SHA-256, download seguro, retenção configurável;anexos.test;sem antivírus no servidor
-INT-010;Preservar histórico completo e pesquisa por cliente, veículo, CNPJ e protocolo com autorização.;IMPLEMENTADO SEM TESTE;busca em /api/ocorrencias;—;busca por veículo não comprovada
+INT-010;Preservar histórico completo e pesquisa por cliente, veículo, CNPJ e protocolo com autorização.;IMPLEMENTADO E TESTADO;"busca por protocolo, título, cliente, CNPJ (com pontuação) e placa dos itens (ocorrencias/servico.js filtroBusca); lista e quadro";cobertura-f25.test;
 WFL-001;Executar máquina de estados por tipo de processo e versão.;IMPLEMENTADO E TESTADO;ocorrencias/maquina.js;regras máquina;
 WFL-002;Validar pré-condições, guardas, evidências e permissões nas transições.;IMPLEMENTADO E TESTADO;maquina.planejar;regras máquina;
 WFL-003;Gerar tarefas automaticamente a partir de eventos e regras.;IMPLEMENTADO E TESTADO;processos/motor.js;processos execução;
@@ -57,7 +57,7 @@ PRE-008;Gerar contato D-1 apenas para pendências não resolvidas.;IMPLEMENTADO 
 PRE-009;Cancelar contatos futuros após confirmação técnica de correção.;IMPLEMENTADO E TESTADO;rodadas.revalidar encerra cadência;AT-008;confirmação técnica vem de CSV/demo
 PRE-010;Escalonar risco de rodada bloqueada ou conta sem resposta.;PARCIAL;escalonamento de risco;—;"sem teste dedicado; regra ""1 CNPJ desativa"" não automatizada (correto)"
 PRE-011;Emitir comunicado de veículos com sucesso/falha após rodada oficial.;PARCIAL;comunicado pós-rodada;AT-009;quem autoriza o comunicado: decisão pendente
-PRE-012;Medir taxa de correção antes de D0 e aderência da cadência.;IMPLEMENTADO SEM TESTE;dashboards rodadas;dashboards respondem;sem teste de fórmula
+PRE-012;Medir taxa de correção antes de D0 e aderência da cadência.;IMPLEMENTADO E TESTADO;dashboards rodadas;cobertura-f25.test (números conhecidos);
 POS-001;Receber resultado oficial por execução/conta/veículo.;PARCIAL;"CSV resultado oficial; demo";CSV Platform;layout não homologado
 POS-002;Comparar resultado com pendências da pré-rodada.;IMPLEMENTADO E TESTADO;jobExecutar compara pendências;AT-009;
 POS-003;Identificar erros novos de usuário, vínculo, cadastro e credencial.;IMPLEMENTADO E TESTADO;novas pendências no pós;AT-009;
@@ -67,7 +67,7 @@ POS-006;Distinguir encerramento de contato de resolução efetiva.;IMPLEMENTADO 
 POS-007;Manter pendência não resolvida visível e elegível para revalidação.;IMPLEMENTADO E TESTADO;pendência persistente;AT-009;
 POS-008;Vincular correção posterior ao histórico original.;IMPLEMENTADO E TESTADO;"pendência persistente corrigida na mesma linha; ocorrência original resolvida";correcao-posterior.test;
 POS-009;Monitorar reincidência e recomendar análise de causa raiz.;IMPLEMENTADO E TESTADO;reincidência na 3ª vez recomenda análise de causa raiz;monitoramento.test;
-POS-010;Publicar métricas de sucesso, falha e recuperação por rodada.;IMPLEMENTADO SEM TESTE;dashboards rodadas;dashboards respondem;fórmulas sem teste próprio
+POS-010;Publicar métricas de sucesso, falha e recuperação por rodada.;IMPLEMENTADO E TESTADO;dashboards rodadas;cobertura-f25.test (números conhecidos);
 REC-001;Ingerir volumetria e erros de consulta de placas recorrentes da Platform.;PARCIAL;importador platform_consultas + consultas_volume;monitoramento.test;layout CSV pendente de validação com arquivo real
 REC-002;Distinguir erro de consulta, erro de usuário e indisponibilidade externa.;IMPLEMENTADO E TESTADO;erros técnicos, de usuário e indisponibilidade separados;monitoramento.test;
 REC-003;Correlacionar erros repetidos e criar ocorrência única quando aplicável.;IMPLEMENTADO E TESTADO;alerta_chave com índice único: uma ocorrência ativa por alerta;monitoramento.test;
@@ -80,10 +80,10 @@ CRE-001;Ler somente status/metadados autorizados das credenciais na Platform.;PA
 CRE-002;Detectar credencial ausente, inválida, expirada, 2FA e vínculo SNE.;PARCIAL;status em credenciais_ref;—;2FA/SNE dependem do CSV
 CRE-003;Detectar consultas esperadas que não foram geradas e investigar causa.;PARCIAL;consultas não geradas viram ocorrência com a credencial com problema como causa provável;monitoramento.test;depende do CSV de volumetria
 CRE-004;Alertar sobre expiração com antecedência configurável.;IMPLEMENTADO E TESTADO;aviso de vencimento com antecedência configurável (padrão 15 dias);monitoramento.test;
-CRE-005;Solicitar regularização ao ponto focal com instruções seguras.;IMPLEMENTADO SEM TESTE;mensagens do processo;—;
+CRE-005;Solicitar regularização ao ponto focal com instruções seguras.;IMPLEMENTADO E TESTADO;instrução segura por erro (rodadas/erros.js) no aviso D-3;cobertura-f25.test;
 CRE-006;Verificar correção por nova consulta ou teste técnico.;PARCIAL;revalidação via CSV/demo;AT-008;
 CRE-007;Não copiar segredos, certificados privados ou senhas para o ERP.;IMPLEMENTADO E TESTADO;nenhuma coluna de segredo de cliente;AT-008 (revisão de esquema);verificado por leitura do esquema
-CRE-008;Permitir visão por conta, produto, criticidade e pendência.;IMPLEMENTADO SEM TESTE;tela de conta;—;
+CRE-008;Permitir visão por conta, produto, criticidade e pendência.;IMPLEMENTADO E TESTADO;tela de conta: credenciais só com status;cobertura-f25.test;
 COM-001;Gerir modelos versionados de WhatsApp, e-mail e notificações.;IMPLEMENTADO E TESTADO;modelos_mensagem versionados;mensagens padrão;
 COM-002;Submeter modelos à revisão/aprovação com histórico.;IMPLEMENTADO E TESTADO;revisão/aprovação por outra pessoa;mensagens padrão;
 COM-003;Personalizar mensagens com dados estruturados e validação.;IMPLEMENTADO E TESTADO;renderizarAtual com variáveis;mensagens padrão;
@@ -94,8 +94,8 @@ COM-007;Permitir comunicação humana sem perder trilha do atendimento.;IMPLEMEN
 COM-008;Oferecer central de pendências na experiência do cliente por integração à Platform.;BLOQUEADO POR API/DECISÃO;—;—;central do cliente fica na Platform
 COM-009;"Evitar alertas incessantes; aplicar severidade, frequência e acessibilidade.";PARCIAL;sino sem repetição;meu dia notificação uma vez;severidade/acessibilidade parcial
 COM-010;Publicar campanhas de adoção de produto com controle de frequência.;IMPLEMENTADO E TESTADO;"gatilho contas.semanal com chave por semana (1x); opt-out";insights-semanais.test;
-CS-001;Gerir carteira VIP, responsáveis, contatos e plano de relacionamento.;IMPLEMENTADO SEM TESTE;carteira VIP;—;
-CS-002;Calcular saúde de conta com indicadores transparentes e configuráveis.;IMPLEMENTADO SEM TESTE;saúde da conta com motivos;dashboards;fórmula configurável ausente
+CS-001;Gerir carteira VIP, responsáveis, contatos e plano de relacionamento.;IMPLEMENTADO E TESTADO;carteira VIP (filtro, roteamento ao CS);"cobertura-f25.test; vip.test";
+CS-002;Calcular saúde de conta com indicadores transparentes e configuráveis.;IMPLEMENTADO E TESTADO;"saúde da conta com motivos e pesos por organização (tenants.config.saude); fórmula visível no dashboard";cobertura-f25.test;pesos definidos na implantação (sem tela de edição)
 CS-003;Ler últimos acessos e uso por módulo via eventos autorizados da Platform.;PARCIAL;uso_contas via CSV;—;layout não homologado
 CS-004;Gerar tarefas para contas inativas ou com adoção insuficiente.;IMPLEMENTADO E TESTADO;conta ativa sem acesso há 30 dias ou sem consulta → alerta para o CS;treinamentos.test;depende do CSV de uso da Platform
 CS-005;Gerir sessões coletivas, convites, inscrições e presença.;IMPLEMENTADO E TESTADO;sessões, participantes, convites ao ponto focal, presença;treinamentos.test;inscrição pelo cliente ainda não
@@ -128,14 +128,14 @@ SUP-001;Verificar periodicamente ocorrências órfãs, vencidas ou sem próxima 
 SUP-002;Detectar filas paradas, agendadores inativos e webhooks interrompidos.;IMPLEMENTADO E TESTADO;supervisor: canal em silêncio, entrada parada, rotina parada (saude-canais.js);saude-canais.test;
 SUP-003;Manter heartbeat e monitor externo do supervisor.;PARCIAL;/api/health/supervisor;AT-013;monitor externo não configurado
 SUP-004;Executar reconciliação Platform↔ERP↔OMIE nas fronteiras permitidas.;PARCIAL;reconciliação OMIE;AT-006;Platform ausente
-SUP-005;Gerir dead-letter queue e reprocessamento com autorização.;IMPLEMENTADO SEM TESTE;jobs morto + reprocessar com motivo;—;sem teste do reprocessamento
+SUP-005;Gerir dead-letter queue e reprocessamento com autorização.;IMPLEMENTADO E TESTADO;"jobs morto + reprocessar com motivo e permissão; RLS";cobertura-f25.test;
 SUP-006;Produzir painéis por área, carteira, produto, cliente, período e SLA.;IMPLEMENTADO E TESTADO;6 dashboards;dashboards;
 SUP-007;Registrar toda alteração sensível com trilha auditável.;IMPLEMENTADO E TESTADO;auditoria só anexação;regras banco;
 SUP-008;Gerir retenção, exportação, anonimização e direitos de titulares conforme LGPD.;PARCIAL;exportar e anonimizar titular, auditado;mfa-lgpd.test;política de retenção a definir
 SUP-009;Disponibilizar logs, métricas, traces e alertas por correlação.;PARCIAL;"logs JSON com correlação; métricas Prometheus (/api/metricas)";metricas.test;traces distribuídos
 SUP-010;Permitir parametrização de regras com aprovação, simulação e rollback.;IMPLEMENTADO E TESTADO;processos com simulação/restauração;processos;
 SUP-011;Controlar indisponibilidades e contingência de canais.;PARCIAL;integracoes.disponivel;AT-005/007;
-SUP-012;Exibir cobertura de automação, exceções e trabalho manual residual.;IMPLEMENTADO SEM TESTE;dashboard automação;dashboards;
+SUP-012;Exibir cobertura de automação, exceções e trabalho manual residual.;IMPLEMENTADO E TESTADO;dashboard automação;cobertura-f25.test;
 RN-001;"VIP é atendido pelo CS; demais pelo Suporte, salvo exceção aprovada.";IMPLEMENTADO E TESTADO;equipeDaConta;regras;
 RN-002;Toda conta operacional precisa de ponto focal válido e canal de contato.;IMPLEMENTADO E TESTADO;"ponto focal válido = vigente + canal autorizado; supervisor abre tarefa e fecha ao corrigir";ponto-focal.test;
 RN-003;"Pré-rodada é iniciada D-4; contatos D-3, intermediário e D-1 conforme calendário aprovado.";IMPLEMENTADO E TESTADO;MARCOS;AT-008;
@@ -180,7 +180,7 @@ AT-014;Tenant A solicita dados de B Acesso negado e auditado.;IMPLEMENTADO E TES
 AT-015;Solicitação de bloqueio por inadimplência;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-015;
 AT-016;Falha de migração Rollback documentado e dados íntegros.;IMPLEMENTADO E TESTADO;ver aceite.test.js;AT-016;
 BL-01;"Coluna VIP em Consultas Identificação operacional; verificar se a informação ficará na Platform, ERP ou ambos.";BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
-BL-02;Classificação VIP em Credenciais Visualização por carteira e roteamento no ERP.;IMPLEMENTADO SEM TESTE;carteira VIP;—;
+BL-02;Classificação VIP em Credenciais Visualização por carteira e roteamento no ERP.;IMPLEMENTADO E TESTADO;carteira VIP e credenciais por conta;cobertura-f25.test;
 BL-03;Erros invisíveis Detectar consultas não geradas por ausência de credencial.;PARCIAL;erros invisíveis pela volumetria da Platform (CSV);monitoramento.test;layout CSV pendente de validação
 BL-04;"Central de pendências Notificações persistentes e acessíveis ao cliente; evitar pop-up invasivo sem limite.";BLOQUEADO POR API/DECISÃO;—;—;dados/telas da Platform
 BL-05;Insights Caça Condutores Mensagens de adoção 1x/semana, com preferências.;IMPLEMENTADO E TESTADO;"processo padrão semanal; opt-out";insights-semanais.test;

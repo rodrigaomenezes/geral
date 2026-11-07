@@ -418,3 +418,12 @@ próprio). Sem demonstração ligada, `/demo` só avisa que o ambiente guarda da
 **Consequência:** o ambiente com dados reais não tem `/demo`; para apresentar junto da produção, publique um segundo
 serviço com `SINAPSE_DEMO=1` (banco próprio).
 
+# T-048 — Saúde da conta configurável por organização (F25, CS-002)
+**Contexto:** a fórmula de saúde da conta era fixa no código; o requisito pede indicadores transparentes e configuráveis.
+**Decisão:** os pontos de cada critério e o corte de "em risco" ficam em `tenants.config.saude` (definidos na
+implantação, como a alçada de desconto e o aviso de credencial); valor ausente ou fora de 0–100 usa o padrão. O
+dashboard Carteira mostra a fórmula em vigor. Sem tela de edição nesta fatia: mudar a régua é decisão de gestão e
+entra na implantação.
+**Consequência:** a mesma régua vale para todos da organização; editar pela tela, com aprovação e histórico, fica como
+melhoria se a Brobot pedir.
+
