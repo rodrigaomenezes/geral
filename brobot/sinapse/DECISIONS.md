@@ -439,3 +439,13 @@ próprio (e não `/api/entrada/...`) para não colidir com a entrada de mensagen
 `tenants.config.comercial.probabilidades` (inteiros 0–100; inválido volta ao padrão); a fórmula exibida é montada com
 os valores em vigor.
 
+# T-050 — Teto de avisos por hora e fila técnica (F27, COM-009, DEV-002, REC-005)
+**Contexto:** o sino já não repetia o mesmo aviso, mas uma pessoa podia receber dezenas de avisos de uma vez; a
+gravidade só aparecia na cor. Demandas técnicas não tinham uma visão única do pedido à validação.
+**Decisão:** até 10 avisos não críticos por pessoa por hora; passou disso, um aviso de resumo e os demais ficam para o
+ciclo seguinte (o lembrete só é marcado como avisado quando o aviso sai). Urgente (crítico) nunca espera e aparece
+primeiro. A gravidade vai escrita no aviso e o número de não lidos entra no nome do botão. A aba "Fila técnica" do
+Desenvolvimento lista, numa consulta só e paginada, o que aguarda aceite, o que está com o Desenvolvimento e o que voltou
+aguardando a validação da operação, por prioridade e prazo.
+**Consequência:** o teto é fixo no código (10/h); se a Brobot quiser outro número, vira configuração da organização.
+

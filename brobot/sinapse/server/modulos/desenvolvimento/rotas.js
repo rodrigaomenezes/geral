@@ -15,6 +15,7 @@ module.exports = [
   { metodo: 'GET', caminho: '/api/desenvolvimento', permissao: 'ocorrencia.ver',
     handler: ({ db, ctx, query }) => db.comoTenant(ctx.tenantId, async (c) => ({
       incidentes: await s.listarIncidentes(c, { pagina: query.pagina }), melhorias: await s.listarMelhorias(c, { estado: query.estado }),
+      fila: await s.filaTecnica(c, { pagina: query.paginaFila }),
       releases: await s.listarReleases(c), severidades: s.SEVERIDADE, estadosIncidente: s.ESTADO_INCIDENTE, estadosMelhoria: s.ESTADO_MELHORIA })) },
   { metodo: 'POST', caminho: '/api/incidentes', permissao: 'dev.gerir', descricao: 'registrar incidentes',
     handler: ({ db, ctx, corpo }) => {

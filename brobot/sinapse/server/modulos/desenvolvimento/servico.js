@@ -112,6 +112,28 @@ async function listarIncidentes(c, { pagina = 1 } = {}) {
   return { itens: r.rows.map(({ total, ...x }) => x), total: r.rows[0]?.total || 0, pagina: p, porPagina: por };
 }
 
+/** DEV-002/REC-005: fila técnica. Toda ocorrência que passou pelo Desenvolvimento, até ser resolvida: aguardando aceite,
+ *  com o Desenvolvimento ou devolvida aguardando a validação da operação (DEV-005). Uma consulta só, paginada. */
+const SITUACAO_FILA = { aguardando_aceite: 'Aguardando aceite do Desenvolvimento', com_dev: 'Com o Desenvolvimento',
+  aguardando_validacao: 'Devolvida: aguardando validação da operação' };
+
+async function filaTecnica(c, { pagina = 1 } = {}) {
+  const por = 30; const p = Math.max(1, Number(pagina) || 1);
+  const r = await c.query(`SELECT o.id, o.protocolo, o.titulo, o.prioridade, o.estado, o.prazo_em, o.criado_em, ct.nome AS conta, ct.vip,
+      u.nome AS responsavel, (SELECT count(*)::int FROM ocorrencia_itens i WHERE i.ocorrencia_id = o.id) AS itens,
+      h.estado AS handoff_estado, h.criado_em AS pedido_em, h.prazo_aceite_em, ua.nome AS aceito_por, de.nome AS de_equipe,
+      CASE WHEN h.estado = 'pendente' THEN 'aguardando_aceite' WHEN e.codigo = 'dev' THEN 'com_dev' ELSE 'aguardando_validacao' END AS situacao,
+      count(*) OVER()::int AS total
+    FROM ocorrencias o JOIN equipes e ON e.id = o.equipe_id LEFT JOIN contas ct ON ct.id = o.conta_id LEFT JOIN usuarios u ON u.id = o.responsavel_id
+    LEFT JOIN LATERAL (SELECT hh.* FROM handoffs hh JOIN equipes pe ON pe.id = hh.para_equipe_id WHERE hh.ocorrencia_id = o.id AND pe.codigo = 'dev'
+      ORDER BY hh.criado_em DESC LIMIT 1) h ON true
+    LEFT JOIN usuarios ua ON ua.id = h.aceito_por LEFT JOIN equipes de ON de.id = h.de_equipe_id
+    WHERE o.estado NOT IN ('resolvida', 'encerrada_sem_resolucao') AND (e.codigo = 'dev' OR h.id IS NOT NULL)
+    ORDER BY array_position(ARRAY['critica','alta','media','baixa'], o.prioridade), o.prazo_em NULLS LAST, o.criado_em
+    LIMIT $1 OFFSET $2`, [por, (p - 1) * por]);
+  return { itens: r.rows.map(({ total, ...x }) => ({ ...x, situacaoNome: SITUACAO_FILA[x.situacao] })), total: r.rows[0]?.total || 0, pagina: p, porPagina: por };
+}
+
 async function detalheIncidente(c, id) {
   const i = uma(await c.query('SELECT i.*, u.nome AS responsavel FROM incidentes i LEFT JOIN usuarios u ON u.id = i.responsavel_id WHERE i.id = $1', [id]));
   if (!i) throw erro.naoEncontrado('Incidente');
@@ -239,5 +261,5 @@ async function listarReleases(c) {
     FROM releases r ORDER BY (r.estado = 'planejada') DESC, coalesce(r.publicada_em, r.criado_em) DESC LIMIT 30`)).rows;
 }
 
-module.exports = { SEVERIDADE, ESTADO_INCIDENTE, ESTADO_MELHORIA, abrirIncidente, atualizarIncidente, encerrarIncidente, listarIncidentes, detalheIncidente,
+module.exports = { SEVERIDADE, ESTADO_INCIDENTE, ESTADO_MELHORIA, SITUACAO_FILA, filaTecnica, abrirIncidente, atualizarIncidente, encerrarIncidente, listarIncidentes, detalheIncidente,
   proporMelhoria, agirMelhoria, listarMelhorias, criarRelease, incluirNaRelease, publicarRelease, listarReleases };

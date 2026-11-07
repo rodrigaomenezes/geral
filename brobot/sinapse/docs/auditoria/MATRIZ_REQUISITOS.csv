@@ -72,7 +72,7 @@ REC-001;Ingerir volumetria e erros de consulta de placas recorrentes da Platform
 REC-002;Distinguir erro de consulta, erro de usuário e indisponibilidade externa.;IMPLEMENTADO E TESTADO;erros técnicos, de usuário e indisponibilidade separados;monitoramento.test;
 REC-003;Correlacionar erros repetidos e criar ocorrência única quando aplicável.;IMPLEMENTADO E TESTADO;alerta_chave com índice único: uma ocorrência ativa por alerta;monitoramento.test;
 REC-004;Roteá-los a Suporte ou Desenvolvimento conforme matriz de responsabilidade.;IMPLEMENTADO E TESTADO;"erro técnico → Desenvolvimento (tipo técnica); demais → equipe da conta";monitoramento.test;
-REC-005;Exigir aceite e acompanhar tickets técnicos até validação.;PARCIAL;handoff com aceite;AT-010;
+REC-005;Exigir aceite e acompanhar tickets técnicos até validação.;IMPLEMENTADO E TESTADO;"handoff com aceite; fila técnica até a validação da operação (DEV-005)";"fila-tecnica.test; AT-010";
 REC-006;Reconciliar sucesso técnico com retorno da Platform.;BLOQUEADO POR API/DECISÃO;—;—;retorno Platform
 REC-007;Monitorar recorrências sem novas execuções e alertar.;IMPLEMENTADO E TESTADO;3 dias com consulta esperada e nada gerado → ocorrência alta;monitoramento.test;
 REC-008;Exibir histórico, volume afetado e impacto por cliente/produto.;IMPLEMENTADO E TESTADO;tela Consultas por conta/produto com esperado × gerado e alertas;monitoramento.test;
@@ -92,7 +92,7 @@ COM-005;Registrar envio, entrega, falha, resposta e correlação.;IMPLEMENTADO E
 COM-006;Aplicar retentativa e canal alternativo quando permitido.;IMPLEMENTADO E TESTADO;retentativa + e-mail;AT-007;
 COM-007;Permitir comunicação humana sem perder trilha do atendimento.;IMPLEMENTADO E TESTADO;"responder; eco do celular (QR)";WhatsApp QR;
 COM-008;Oferecer central de pendências na experiência do cliente por integração à Platform.;BLOQUEADO POR API/DECISÃO;—;—;central do cliente fica na Platform
-COM-009;"Evitar alertas incessantes; aplicar severidade, frequência e acessibilidade.";PARCIAL;sino sem repetição;meu dia notificação uma vez;severidade/acessibilidade parcial
+COM-009;"Evitar alertas incessantes; aplicar severidade, frequência e acessibilidade.";IMPLEMENTADO E TESTADO;"aviso uma vez por chave; teto de 10 não críticos por pessoa/hora com resumo (adiados, não perdidos); urgente nunca espera e vem primeiro; gravidade escrita e contador no nome do botão";avisos.test;
 COM-010;Publicar campanhas de adoção de produto com controle de frequência.;IMPLEMENTADO E TESTADO;"gatilho contas.semanal com chave por semana (1x); opt-out";insights-semanais.test;
 CS-001;Gerir carteira VIP, responsáveis, contatos e plano de relacionamento.;IMPLEMENTADO E TESTADO;carteira VIP (filtro, roteamento ao CS);"cobertura-f25.test; vip.test";
 CS-002;Calcular saúde de conta com indicadores transparentes e configuráveis.;IMPLEMENTADO E TESTADO;"saúde da conta com motivos e pesos por organização (tenants.config.saude); fórmula visível no dashboard";cobertura-f25.test;pesos definidos na implantação (sem tela de edição)
@@ -107,7 +107,7 @@ CS-010;Programar insights do Caça Condutores com frequência e opt-out.;IMPLEME
 CS-011;Manter histórico de contatos, riscos e oportunidades de expansão encaminhadas ao Comercial.;IMPLEMENTADO E TESTADO;encaminhar expansão/renovação ao Comercial pela Carteira;comercial-funis.test;
 CS-012;Gerir solicitações de cancelamento e transição ao offboarding operacional.;IMPLEMENTADO E TESTADO;iniciar offboarding pela Carteira com motivo do cancelamento;onboarding.test;
 DEV-001;Criar demanda técnica com dados mínimos e evidências sanitizadas.;IMPLEMENTADO E TESTADO;ocorrência técnica + sanitização de segredos em incidente/melhoria/evidência;desenvolvimento.test;
-DEV-002;Rastrear prioridade, impacto, responsável e aceite do Desenvolvimento.;PARCIAL;prioridade/responsável/aceite;AT-010;
+DEV-002;Rastrear prioridade, impacto, responsável e aceite do Desenvolvimento.;IMPLEMENTADO E TESTADO;fila técnica do Desenvolvimento: prioridade, impacto (conta, veículos), responsável, prazo e aceite (desenvolvimento/servico.js filaTecnica);"fila-tecnica.test; AT-010";
 DEV-003;Sincronizar estados e comentários de ferramentas técnicas autorizadas.;AUSENTE;—;—;sincronizar ferramenta técnica
 DEV-004;Notificar mudanças e falhas de handoff automaticamente.;IMPLEMENTADO E TESTADO;aviso à equipe de destino (pendente) e à de origem (expirado);"AT-010; triagem-handoff.test";
 DEV-005;Exigir validação operacional após correção antes de resolução final.;IMPLEMENTADO E TESTADO;"Dev não resolve técnica; melhoria liberada é validada pela operação com evidência";"regras; desenvolvimento.test";

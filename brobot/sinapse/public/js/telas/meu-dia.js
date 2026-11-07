@@ -79,25 +79,30 @@ export async function telaMeuDia(el, ctx) {
 }
 
 // ---------- Sino de notificações (no topo) ----------
+const GRAVIDADE = { alerta: 'Atenção', critica: 'Urgente' };
+
 export function sinoNotificacoes() {
   const contador = h('span', { class: 'sino-contador', hidden: true });
   const painel = h('div', { class: 'sino-painel', hidden: true });
+  const botao = h('button', { class: 'btn-sino', type: 'button', 'aria-label': 'Avisos', onclick: () => { painel.hidden = !painel.hidden; } }, '🔔', contador);
   let timer = null;
   async function carregar() {
     try {
       const n = await api.get('/notificacoes');
       contador.hidden = !n.naoLidas;
       contador.textContent = n.naoLidas > 9 ? '9+' : String(n.naoLidas);
+      botao.setAttribute('aria-label', n.naoLidas ? `Avisos: ${n.naoLidas} não lido${n.naoLidas > 1 ? 's' : ''}` : 'Avisos: nenhum novo');
       trocar(painel, h('div', { class: 'sino-topo' }, h('strong', {}, 'Avisos'),
         n.naoLidas ? h('button', { class: 'btn btn-pequeno', onclick: async () => { await api.post('/notificacoes/lidas', { todas: true }); carregar(); } }, 'Marcar todos como lidos') : null),
       n.itens.length ? n.itens.map((x) => h('a', { class: `sino-item ${x.lida_em ? '' : 'nao-lida'} grav-${x.gravidade}`, href: x.link || '#/meu-dia',
         onclick: () => { painel.hidden = true; if (!x.lida_em) api.post('/notificacoes/lidas', { ids: [x.id] }).then(carregar).catch(() => {}); } },
+      // a gravidade não fica só na cor da borda: vai escrita (leitor de tela e daltonismo)
+      x.gravidade !== 'info' ? h('span', { class: `sino-grav grav-${x.gravidade}` }, GRAVIDADE[x.gravidade]) : null,
       h('strong', {}, x.titulo), x.texto ? h('span', {}, x.texto) : null, h('small', {}, dataHora(x.criado_em)))) : vazio('Nenhum aviso.'));
     } catch { /* sem conexão: tenta no próximo ciclo */ }
     clearTimeout(timer);
     timer = setTimeout(carregar, 60e3);
   }
-  const botao = h('button', { class: 'btn-sino', type: 'button', 'aria-label': 'Avisos', onclick: () => { painel.hidden = !painel.hidden; } }, '🔔', contador);
   carregar();
   return h('div', { class: 'sino' }, botao, painel);
 }

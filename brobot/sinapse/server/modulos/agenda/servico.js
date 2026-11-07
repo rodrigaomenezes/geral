@@ -82,11 +82,31 @@ async function cancelarLembrete(c, ctx, id) {
   return { ok: true };
 }
 
+// COM-009: sem alertas incessantes. O mesmo aviso (mesma chave) sai uma vez só. Avisos não críticos têm teto por
+// pessoa por hora: passou do teto, a pessoa recebe um aviso de resumo e os demais ficam para a hora seguinte (adiados,
+// não perdidos: quem chama só marca como avisado o que foi entregue). Aviso crítico nunca espera.
+const LIMITE_AVISOS_POR_HORA = 10;
+
 async function notificar(c, ctx, usuarioIds, { titulo, texto, link, gravidade = 'info', chave }) {
+  let todosEntregues = true;
   for (const u of [...new Set(usuarioIds)]) {
+    const ja = uma(await c.query('SELECT 1 AS x FROM notificacoes WHERE usuario_id = $1 AND chave = $2', [u, chave]));
+    if (ja) continue;
+    if (gravidade !== 'critica') {
+      const { n } = uma(await c.query(`SELECT count(*)::int AS n FROM notificacoes WHERE usuario_id = $1 AND gravidade <> 'critica'
+        AND chave NOT LIKE 'resumo:%' AND criado_em > now() - interval '1 hour'`, [u]));
+      if (n >= LIMITE_AVISOS_POR_HORA) {
+        await c.query(`INSERT INTO notificacoes (tenant_id, usuario_id, titulo, texto, link, gravidade, chave)
+          VALUES ($1,$2,'Muitos avisos nesta hora', 'Os avisos menos urgentes foram agrupados e voltam na próxima hora. Veja tudo no Meu dia.', '#/meu-dia', 'info',
+            'resumo:' || to_char(now(), 'YYYY-MM-DD"T"HH24')) ON CONFLICT (tenant_id, usuario_id, chave) DO NOTHING`, [ctx.tenantId, u]);
+        todosEntregues = false;
+        continue;
+      }
+    }
     await c.query(`INSERT INTO notificacoes (tenant_id, usuario_id, titulo, texto, link, gravidade, chave) VALUES ($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT (tenant_id, usuario_id, chave) DO NOTHING`, [ctx.tenantId, u, titulo.slice(0, 200), texto ? texto.slice(0, 500) : null, link || null, gravidade, chave]);
   }
+  return todosEntregues;
 }
 
 const membros = async (c, equipeId) => (await c.query('SELECT id FROM usuarios WHERE equipe_id = $1 AND ativo', [equipeId])).rows.map((r) => r.id);
@@ -97,8 +117,8 @@ async function jobAvisar(c, ctx) {
   for (const l of (await c.query(`SELECT * FROM lembretes WHERE estado = 'ativo' AND quando <= $1 AND (avisado_para IS NULL OR avisado_para < quando) LIMIT 200`, [agora])).rows) {
     const para = l.usuario_id ? [l.usuario_id] : await membros(c, l.equipe_id);
     const link = l.ocorrencia_id ? `#/ocorrencias/${l.ocorrencia_id}` : l.oportunidade_id ? `#/comercial/${l.oportunidade_id}` : l.conta_id ? `#/contas/${l.conta_id}` : '#/meu-dia';
-    await notificar(c, ctx, para, { titulo: `⏰ ${l.titulo}`, texto: l.detalhe, link, gravidade: 'alerta', chave: `lembrete:${l.id}:${new Date(l.quando).toISOString()}` });
-    await c.query('UPDATE lembretes SET avisado_para = quando WHERE id = $1', [l.id]);
+    const entregue = await notificar(c, ctx, para, { titulo: `⏰ ${l.titulo}`, texto: l.detalhe, link, gravidade: 'alerta', chave: `lembrete:${l.id}:${new Date(l.quando).toISOString()}` });
+    if (entregue) await c.query('UPDATE lembretes SET avisado_para = quando WHERE id = $1', [l.id]); // adiado pelo teto: tenta de novo no próximo ciclo
   }
   for (const t of (await c.query(`SELECT id, titulo, equipe_id, ocorrencia_id FROM tarefas WHERE tipo = 'escalonamento' AND estado = 'aberta'
       AND criado_em > now() - interval '2 days' LIMIT 100`)).rows) {
@@ -121,7 +141,9 @@ async function jobAvisar(c, ctx) {
 }
 
 async function notificacoes(c, usuario) {
-  const itens = (await c.query('SELECT id, titulo, texto, link, gravidade, lida_em, criado_em FROM notificacoes WHERE usuario_id = $1 ORDER BY criado_em DESC LIMIT 30', [usuario.id])).rows;
+  // Crítico não lido vem primeiro (COM-009), depois o mais recente.
+  const itens = (await c.query(`SELECT id, titulo, texto, link, gravidade, lida_em, criado_em FROM notificacoes WHERE usuario_id = $1
+    ORDER BY (lida_em IS NULL AND gravidade = 'critica') DESC, criado_em DESC LIMIT 30`, [usuario.id])).rows;
   const naoLidas = uma(await c.query('SELECT count(*)::int AS n FROM notificacoes WHERE usuario_id = $1 AND lida_em IS NULL', [usuario.id])).n;
   return { itens, naoLidas };
 }
