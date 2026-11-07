@@ -328,3 +328,16 @@ dimensionamento e da infraestrutura definitiva.
 | Item | Situação | Onde · teste |
 | --- | --- | --- |
 | Mapeamento cliente ↔ OMIE sem duplicação nem troca indevida (FIN-002) | ✔ testado | `integracoes/csv/importadores.js`, 024 · `test/omie-mapa.test.js` |
+
+## Entrega de 07/11/2026 (F25 · Busca por veículo, saúde configurável e testes do que faltava)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Busca por placa (com ou sem traço) e CNPJ com pontuação na lista e no quadro (INT-010) | ✔ testado | `ocorrencias/servico.js` · `test/cobertura-f25.test.js` |
+| Correção pré-rodada, pós-rodada e sucesso da rodada oficial (PRE-012, POS-010) | ✔ testado | `painel/dashboards.js` · idem |
+| Reprocessar a fila de falhas: permissão, motivo, uma vez, sem cruzar organização (SUP-005) | ✔ testado | `supervisor/servico.js` · idem |
+| Automático × manual (SUP-012) | ✔ testado | `painel/dashboards.js` · idem |
+| Saúde da conta com pesos por organização e fórmula visível (CS-002) | ✔ testado | `painel/dashboards.js` (`tenants.config.saude`) · idem |
+| Carteira VIP e credenciais por conta só com status (CS-001, BL-02, CRE-008) | ✔ testado | `clientes/servico.js` · idem |
+| Instruções seguras ao ponto focal no aviso D-3 (CRE-005) | ✔ testado | `rodadas/erros.js` · idem |
+

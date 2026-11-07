@@ -242,6 +242,22 @@ function situacaoSla(o, agora) {
   return 'no_prazo';
 }
 
+// INT-010: busca por protocolo, título, cliente, CNPJ (com ou sem pontuação) e placa de veículo dos itens da ocorrência.
+function filtroBusca(q, params) {
+  const texto = String(q).trim().slice(0, 100);
+  params.push(`%${texto}%`);
+  const n = `$${params.length}`;
+  const digitos = texto.replace(/\D/g, '');
+  const placa = texto.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const partes = [`o.protocolo ILIKE ${n}`, `o.titulo ILIKE ${n}`, `c.nome ILIKE ${n}`, `c.cnpj LIKE ${n}`];
+  if (digitos.length >= 8) { params.push(`%${digitos}%`); partes.push(`c.cnpj LIKE $${params.length}`); }
+  if (placa.length === 7) {
+    params.push(placa);
+    partes.push(`EXISTS (SELECT 1 FROM ocorrencia_itens i WHERE i.ocorrencia_id = o.id AND upper(replace(i.placa, '-', '')) = $${params.length})`);
+  }
+  return `(${partes.join(' OR ')})`;
+}
+
 async function listar(c, usuario, f = {}) {
   const params = [];
   const onde = [];
@@ -252,11 +268,7 @@ async function listar(c, usuario, f = {}) {
   if (f.equipe) add('e.codigo = ?', f.equipe);
   if (f.conta) add('o.conta_id = ?', f.conta);
   if (f.minhas) add('o.responsavel_id = ?', usuario.id);
-  if (f.q) {
-    params.push(`%${f.q}%`);
-    const n = `$${params.length}`;
-    onde.push(`(o.protocolo ILIKE ${n} OR o.titulo ILIKE ${n} OR c.nome ILIKE ${n} OR c.cnpj LIKE ${n})`);
-  }
+  if (f.q) onde.push(filtroBusca(f.q, params));
   const pagina = Math.max(1, Number(f.pagina) || 1);
   params.push(POR_PAGINA, (pagina - 1) * POR_PAGINA);
   const r = await c.query(
@@ -290,11 +302,7 @@ async function quadro(c, usuario, f = {}) {
   else if (f.responsavel) add('o.responsavel_id = ?', f.responsavel);
   if (f.vip) onde.push('c.vip');
   if (f.vencidas) onde.push("o.estado NOT IN ('resolvida','encerrada_sem_resolucao','aguardando_cliente','aguardando_terceiro') AND o.prazo_em < $1::timestamptz");
-  if (f.q) {
-    params.push(`%${f.q}%`);
-    const n = `$${params.length}`;
-    onde.push(`(o.protocolo ILIKE ${n} OR o.titulo ILIKE ${n} OR c.nome ILIKE ${n} OR c.cnpj LIKE ${n})`);
-  }
+  if (f.q) onde.push(filtroBusca(f.q, params));
   params.push(POR_COLUNA);
   const r = await c.query(
     `WITH base AS (
