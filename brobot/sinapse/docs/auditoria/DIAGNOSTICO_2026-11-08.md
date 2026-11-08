@@ -102,7 +102,7 @@ Itens verificados e sem defeito:
 
 | # | Problema | Solução proposta | Arquivos | Teste / critério | Depende de |
 | --- | --- | --- | --- | --- | --- |
-| P1-1 | Arquivo esperado não chega e ninguém percebe | Expectativa por tipo (a cada N horas, em `tenants.config.csv.esperados`); o supervisor abre divergência e tarefa uma vez quando a última importação está vencida | `integracoes/csv`, `supervisor` | Sem arquivo no prazo → divergência; arquivo novo fecha a divergência | Frequência de cada arquivo (Brobot) |
+| P1-1 ✔ (08/11, T-053, semanal) | Arquivo esperado não chega e ninguém percebe | Expectativa por tipo (a cada N horas, em `tenants.config.csv.esperados`); o supervisor abre divergência e tarefa uma vez quando a última importação está vencida | `integracoes/csv`, `supervisor` | Sem arquivo no prazo → divergência; arquivo novo fecha a divergência | Frequência de cada arquivo (Brobot) |
 | P1-2 | Arquivo vazio ou só com cabeçalho some sem registro | Registrar a tentativa como "vazio" (com hash e motivo) em vez de só recusar; "válido sem registros" só quando o layout disser o que isso significa | `integracoes/csv/servico.js` | Vazio fica no histórico; não conta como sucesso | Layout real (R-15) para o segundo caso |
 | P1-3 | Lote de importação sem competência nem versão de layout | Campos opcionais no lote, preenchidos pelo mapa ou pelo arquivo | `integracoes/csv`, migração aditiva | Prévia mostra; histórico guarda | Layout real |
 | P1-4 | Consulta lenta trava o worker | `statement_timeout` por transação de job, configurável | `server/db/index.js` | Consulta acima do limite falha e vai para retentativa | — |
@@ -114,7 +114,7 @@ Itens verificados e sem defeito:
 | --- | --- | --- |
 | P2-1 | CRM: alertas configuráveis (lead sem primeiro contato, proposta sem acompanhamento, negociação parada, renovação próxima, perdida para reativar) a partir do motor de processos existente | Prazos de cada regra (Comercial) |
 | P2-2 | Passagem venda → CS com aceite formal do CS (CRM-013) | Regra de aceite (CS) |
-| P2-3 | Funis com etapas configuráveis e versionadas (CRM-003) | Etapas por funil (Comercial); muda o modelo de dados |
+| P2-3 ✔ (08/11, T-054) | Funis com etapas configuráveis e versionadas (CRM-003) | Padrão agora, configurável depois, teste antes do fechamento |
 | P2-4 | Migração completa do Pipedrive com conferência de contagens e amostras | Exportação real |
 | P2-5 | Indicadores de linha de base do piloto: taxa de automação, intervenções humanas, tempo de detecção e de recuperação | — |
 | P2-6 | Normalizar a coluna "teste" da matriz para o nome do arquivo | — |
@@ -154,3 +154,14 @@ Novas nesta etapa:
 | `npm test` (PostgreSQL 16) | 174 testes, 174 passando |
 | Teste novo `test/envio-duas-fases.test.js` | provedor recusou (sai uma vez depois); queda depois do envio (sem reenvio, `incerta` em 10 min, uma tarefa, auditoria); job sem fim → fila de falhas |
 | Evidência da matriz (script) | 158 "prontos e testados": todos com teste localizável; 22 por apelido; RN-013 por ausência |
+
+## 8. Respostas da Brobot (08/11) e o que entrou
+
+| Pergunta | Resposta | O que entrou |
+| --- | --- | --- |
+| Frequência dos arquivos | Semanal | T-053 |
+| Etapas do funil | O padrão agora, configurável depois, com o teste antes do fechamento | T-054 |
+| Processos administrativos | Ficam no OMIE | O item 12 sai do escopo do Sinapse |
+
+Testes: 180/180 no PGlite e no PostgreSQL; `npm run telas` sem problema nas 25 telas.
+

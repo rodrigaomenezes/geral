@@ -19,3 +19,11 @@ DP-11 = opção (a), colunas pelos estados; F0 aprovada. DP-01: segue **demonstr
 | DP-10 | Central de pendências do cliente: o Sinapse fornece os dados e a Platform exibe? | COM-008; BL-04 | — | Sem decisão, fica fora |
 | DP-11 | Kanban de tickets: colunas por **estado da ocorrência** ou por **etapa de trabalho configurável**? | Pedido de 05/11 ("tickets com tarefas… visão Kanban") | (a) estados da máquina (sem schema novo); (b) colunas configuráveis por equipe | (a) arrastar = transição validada pela máquina (com evidência/motivo quando exigido); (b) exige tabela e regra nova |
 | DP-12 | Documentos originais | Diretriz §0.3 | Recebidos em 05/11: especificação, ata e 5 fotos (Melhorias Plataforma, Placas Recorrentes, Pré-rodada, Pós-rodada, Onboarding), guardados **fora do repositório** (área temporária da sessão). **Falta a foto Treinamentos CS** | CS-005…009 seguem pela especificação; a foto pode trazer detalhe novo |
+
+## Respostas da Brobot em 08/11/2026
+| # | Pergunta | Resposta | Onde entrou |
+| --- | --- | --- | --- |
+| DP-13 | Com que frequência cada arquivo da Platform e do OMIE deve chegar? | **Semanal** | `integracoes/csv/chegada.js`: sem arquivo novo em 7 dias → divergência e tarefa (Operações para Platform, Financeiro para OMIE); `tenants.config.csv_esperados` muda por tipo (T-053) |
+| DP-14 | Quais etapas cada funil do Comercial deve ter? | **O padrão agora, configurável depois, com o teste antes do fechamento** | `comercial/funil.js` `configFunil`: só Qualificação e Demonstração podem sair; nomes e campos exigidos configuráveis; o teste continua obrigatório (T-054) |
+| DP-15 | Processos administrativos (RH, DP, faturamento, tesouraria, cobrança, contabilidade, repasses) | **Existem, mas não fazem parte do processo do Sinapse: ficam no OMIE** | Fora do escopo. O Sinapse só acompanha o que já integra (situação financeira e eventos ao Financeiro) |
+

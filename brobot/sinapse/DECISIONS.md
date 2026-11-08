@@ -477,3 +477,32 @@ duplicado ao cliente.
 **Consequência:** em caso de dúvida, o sistema prefere pedir conferência humana a arriscar a duplicidade. A migração
 026 é aditiva; a volta converte `enviando`/`incerta` em `falhou` com o motivo.
 
+# T-053 — Arquivo CSV semanal: ausência vira divergência (DP-13, R-22)
+**Contexto:** quando um arquivo da Platform ou do OMIE deixava de chegar, ninguém era avisado, e o Sinapse seguia com
+dado velho como se estivesse certo.
+**Decisão:**
+- Cada arquivo recorrente é esperado a cada **7 dias**: `platform_rodada`, `platform_credenciais`, `platform_uso`,
+  `platform_consultas` e `omie_clientes`. A migração do Pipedrive é pontual e fica fora.
+- Sem importação nova no prazo, o supervisor abre uma divergência `csv_atrasado` e uma tarefa, uma vez por episódio.
+  Se o arquivo nunca chegou, conta a partir da criação da organização.
+- A tarefa vai para Operações (Platform) ou Financeiro (OMIE); se a organização não tem a equipe, vai para a Supervisão.
+- Quando o arquivo chega, a divergência é tratada sozinha.
+- `tenants.config.csv_esperados` muda o prazo por tipo (0 desliga; valor inválido volta ao padrão).
+- As idades são medidas pelo relógio do banco, o mesmo de `importacoes.criado_em`.
+
+# T-054 — Funil padrão configurável, com o teste antes do fechamento (DP-14, CRM-003)
+**Decisão:**
+- Os três funis começam com as etapas padrão.
+- Cada organização pode configurar em `tenants.config.comercial.funis.<funil>` o objeto
+  `{ versao, omitir, rotulos, exigir }`:
+  - `omitir`: só Qualificação e Demonstração podem sair;
+  - `rotulos`: o nome de cada etapa (2 a 40 caracteres);
+  - `exigir`: campos a mais por etapa, de uma lista fechada.
+- O que não vale é ignorado e listado em `problemas`.
+- O servidor recusa mover para uma etapa fora do funil (`etapa_fora_do_funil`).
+- O teste continua obrigatório antes da negociação (salvo o que o catálogo dispensa e a renovação).
+- A tela usa as etapas e os nomes em vigor.
+
+**Consequência:** a edição pela tela, com aprovação e histórico, fica para quando a Brobot pedir; hoje a configuração
+entra na implantação, com `versao`.
+

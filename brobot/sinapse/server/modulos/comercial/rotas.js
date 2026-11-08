@@ -33,7 +33,7 @@ module.exports = [
       const lista = await catalogo.listar(c, ctx);
       return { etapas: ETAPAS, produtos: Object.fromEntries(lista.filter((x) => x.ativo).map((x) => [x.codigo, x.nome])), catalogo: lista,
         origens: ORIGENS, motivosPerda: MOTIVOS_PERDA, tiposAtividade: atividades.TIPOS, estadosProposta: propostas.ESTADOS,
-        funis: FUNIS, probabilidade: await s.probabilidadesDaOrganizacao(c), papeisPessoa: contatos.PAPEIS };
+        funis: FUNIS, funisConfig: await s.funisDaOrganizacao(c), probabilidade: await s.probabilidadesDaOrganizacao(c), papeisPessoa: contatos.PAPEIS };
     }) },
   { metodo: 'POST', caminho: '/api/comercial/produtos', permissao: 'comercial.gerir', descricao: 'gerir o catálogo de produtos',
     handler: ({ db, ctx, corpo }) => {

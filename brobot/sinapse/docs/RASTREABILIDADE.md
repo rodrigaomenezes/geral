@@ -364,3 +364,11 @@ dimensionamento e da infraestrutura definitiva.
 | Cor da marca da organização só vale com contraste AA sobre texto branco | ✔ testado | `nucleo/cores.js` · idem |
 | P95 das telas operacionais em carga (RNF-003) | ◐ medido localmente | `npm run carga`: 20 usuários P95 ≈ 0,2 s; 50 usuários P95 ≤ 0,73 s; repetir em produção |
 
+## Entrega de 08/11/2026 (respostas da Brobot: arquivos semanais e funil configurável)
+
+| Item | Situação | Onde · teste |
+| --- | --- | --- |
+| Arquivo semanal da Platform e do OMIE que não chega vira divergência e tarefa da equipe; fecha sozinha quando chega (R-22, DP-13) | ✔ testado | `integracoes/csv/chegada.js` · `test/csv-chegada.test.js` |
+| Funil padrão configurável por organização, teste sempre antes do fechamento (CRM-003, DP-14) | ✔ testado | `comercial/funil.js` · `test/funil-configuravel.test.js` |
+| Envio em duas fases e job sem fim (R-20, R-21) | ✔ testado | `comunicacao/servico.js`, `jobs/fila.js` · `test/envio-duas-fases.test.js` |
+

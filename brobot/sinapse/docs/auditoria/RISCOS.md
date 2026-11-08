@@ -48,5 +48,5 @@ no banco; `npm audit` sem vulnerabilidades.
     Agora, esgotadas as tentativas, vai para a fila de falhas com auditoria.
   - **R-22 (novo) em aberto.** Arquivo CSV esperado que não chega não gera alerta (P1-1; frequência a definir com a
     Brobot).
-  - **R-23 (novo) em aberto.** Arquivo só com cabeçalho é recusado sem registro no histórico (P1-2).
-
+  - **R-23 (novo) em aberto.** Arquivo só com cabeçalho é recusado sem registro no histórico (P1-2).- **08/11 (respostas da Brobot):** R-22 mitigado, com teste. O arquivo semanal que não chega vira divergência e tarefa,
+  e a divergência fecha sozinha quando o arquivo chega (T-053).
