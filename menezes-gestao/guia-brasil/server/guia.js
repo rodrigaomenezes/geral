@@ -15,7 +15,36 @@ Regras:
 - Use primeiro o CONTEÚDO DO PACOTE fornecido (curado). Pode complementar com conhecimento geral consolidado.
 - Separe fato de lenda ("conta-se que..."). Se não tiver certeza, diga que não tem certeza.
 - Nunca invente horários, preços, telefones ou informações de segurança: diga para conferir em fonte oficial.
-- Fale de coisas que o viajante pode ver ou fazer perto de onde está. Sem listas longas, sem markdown.`;
+- Fale de coisas que o viajante pode ver ou fazer perto de onde está. Sem listas longas, sem markdown.
+- Quando o conteúdo do pacote não bastar (comida, eventos, curiosidades, o que há por perto, algo atual), pesquise na
+  web e responda com o que encontrou. Horário, preço e funcionamento: só se a fonte disser, citando que é preciso
+  confirmar no local ou no site oficial.`;
+
+// Busca na web da IA do servidor (Claude): poucas buscas por pergunta para manter o custo e o tempo baixos (G-019).
+const MAX_BUSCAS = 3;
+const MAX_FONTES = 3;
+
+/** Ferramenta de busca na web, localizada na cidade do destino quando há uma. */
+function ferramentaWeb(pacote) {
+  const local = pacote && !pacote.semDestino && pacote.cidade
+    ? { user_location: { type: 'approximate', city: pacote.cidade, country: 'BR', timezone: 'America/Sao_Paulo' } } : {};
+  return { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_BUSCAS, ...local };
+}
+
+/** Texto final e fontes de uma resposta com busca: o texto que vem depois da última busca; fontes citadas, sem repetir. */
+export function textoEFontes(resp) {
+  const blocos = resp.content || [];
+  let inicio = 0;
+  blocos.forEach((b, i) => { if (b.type === 'web_search_tool_result') inicio = i + 1; });
+  const finais = blocos.slice(inicio).filter((b) => b.type === 'text');
+  const texto = (finais.length ? finais : blocos.filter((b) => b.type === 'text')).map((b) => b.text).join('').trim();
+  const vistas = new Map();
+  for (const b of blocos) for (const c of (b.type === 'text' && b.citations) || []) {
+    if (c.url && /^https:\/\//.test(c.url) && !vistas.has(c.url)) vistas.set(c.url, { titulo: String(c.title || c.url).slice(0, 120), url: c.url });
+  }
+  for (const f of resp.fontes || []) if (f.url && /^https:\/\//.test(f.url) && !vistas.has(f.url)) vistas.set(f.url, { titulo: String(f.titulo || f.url).slice(0, 120), url: f.url });
+  return { texto, fontes: [...vistas.values()].slice(0, MAX_FONTES) };
+}
 
 const ESQUEMA_FOTO = {
   type: 'object',
@@ -76,16 +105,32 @@ const SEM_RESPOSTA = {
   semDestino: 'Para eu responder sem IA, escolha um destino em Viagem: aí falo dos pontos turísticos, da história e da comida típica. Para perguntas livres sobre qualquer lugar, conecte sua IA em Viagem.',
 };
 
-function respostaLocalConversa(pacote, mensagem, poiId, motivo = 'semIa') {
+/**
+ * Sem IA (ou com a IA fora): conteúdo do pacote; se ele não tiver a resposta exata, pesquisa na Wikipédia (G-019).
+ * Uma pergunta pronta do pacote vence a pesquisa; a narração genérica do ponto perde para um trecho que responda.
+ */
+async function respostaLocalConversa(pacote, mensagem, poiId, motivo, pesquisar) {
   const r = responderLocal(pacote, mensagem, poiId);
+  if (r && r.origem === 'pergunta') return { texto: r.texto, poiId: r.poiId, motor: 'local', confianca: r.confianca };
+  if (pesquisar) {
+    const foco = pacote.pois.find((p) => p.id === (r?.poiId || poiId));
+    try {
+      const artigo = foco && foco.fonte && /pt\.wikipedia\.org\/wiki\//.test(foco.fonte.url) ? decodeURIComponent(foco.fonte.url.split('/wiki/')[1]).replace(/_/g, ' ') : '';
+      const achado = await pesquisar(mensagem, { cidade: pacote.semDestino ? '' : pacote.cidade, artigo });
+      if (achado) return { texto: `Pesquisei na Wikipédia (artigo "${achado.titulo}"): ${achado.texto}`, poiId: foco ? foco.id : null, motor: 'pesquisa', fontes: [{ titulo: `Wikipédia: ${achado.titulo}`, url: achado.url }] };
+    } catch { /* sem pesquisa: segue com o pacote */ }
+  }
   if (r) return { texto: r.texto, poiId: r.poiId, motor: 'local', confianca: r.confianca };
   return { texto: SEM_RESPOSTA[pacote.semDestino && motivo === 'semIa' ? 'semDestino' : motivo], poiId: null, motor: 'local', confianca: 0, semResposta: true };
 }
 
-/** Conversa: { pacote, mensagem, pos, poiId, historico:[{papel:'usuario'|'guia', texto}], nivel } */
-export async function conversar(entrada, cliente) {
+/**
+ * Conversa: { pacote, mensagem, pos, poiId, historico:[{papel:'usuario'|'guia', texto}], nivel }.
+ * `pesquisar(pergunta, {cidade, foco})` (opcional): pesquisa na Wikipédia quando não há IA. `web`: a IA pode buscar na web.
+ */
+export async function conversar(entrada, cliente, { pesquisar = null, web = true } = {}) {
   const { pacote, mensagem, pos, poiId, historico = [], nivel = 'medio' } = entrada;
-  if (!cliente) return respostaLocalConversa(pacote, mensagem, poiId);
+  if (!cliente) return respostaLocalConversa(pacote, mensagem, poiId, 'semIa', pesquisar);
   try {
     const mensagens = [];
     for (const h of historico.slice(-8)) {
@@ -96,21 +141,27 @@ export async function conversar(entrada, cliente) {
     const pedido = `${contexto(pacote, pos, poiId)}\n\n${NIVEL[nivel] || NIVEL.medio}\n\nPergunta do viajante: ${mensagem}`;
     if (mensagens.length && mensagens.at(-1).role === 'user') mensagens.push({ role: 'assistant', content: 'Certo.' });
     mensagens.push({ role: 'user', content: pedido });
-    const resp = await cliente.beta.messages.create({
+    const pedido0 = {
       model: MODELO,
-      max_tokens: 900,
+      max_tokens: 1200,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       output_config: { effort: 'low' },
       system: SISTEMA,
       messages: mensagens,
-    });
+      ...(web ? { tools: [ferramentaWeb(pacote)] } : {}),
+    };
+    let resp = await cliente.beta.messages.create(pedido0);
+    // Busca longa: a API pausa o turno; mandamos de volta para continuar (no máximo 2 vezes).
+    for (let i = 0; i < 2 && resp.stop_reason === 'pause_turn'; i++) {
+      resp = await cliente.beta.messages.create({ ...pedido0, messages: [...mensagens, { role: 'assistant', content: resp.content }] });
+    }
     if (resp.stop_reason === 'refusal') throw new Error('A IA não respondeu a esta pergunta.');
-    const texto = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const { texto, fontes } = textoEFontes(resp);
     if (!texto) throw new Error('Resposta vazia da IA.');
-    return { texto, poiId: poiId || null, motor: 'ia', modelo: resp.model, provedor: cliente.provedor || 'servidor' };
+    return { texto, poiId: poiId || null, motor: 'ia', modelo: resp.model, provedor: cliente.provedor || 'servidor', ...(fontes.length ? { fontes } : {}) };
   } catch (e) {
-    return { ...respostaLocalConversa(pacote, mensagem, poiId, 'iaFalhou'), ...erroDaIa(e, cliente) };
+    return { ...(await respostaLocalConversa(pacote, mensagem, poiId, 'iaFalhou', pesquisar)), ...erroDaIa(e, cliente) };
   }
 }
 

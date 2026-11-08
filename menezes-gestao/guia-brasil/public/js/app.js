@@ -445,7 +445,7 @@ plat.aoAbrirAlerta((id) => {
 /** Atribuição do texto (Wikipédia, CC BY-SA) quando o ponto veio de um destino montado na hora. */
 function mostrarFonte(poi) {
   const a = $('#agora-fonte');
-  if (poi && poi.fonte) { a.hidden = false; a.href = poi.fonte.url; a.textContent = `Fonte: ${poi.fonte.nome} (CC BY-SA)`; }
+  if (poi && poi.fonte) { a.hidden = false; a.href = poi.fonte.url; a.textContent = `Fonte: ${poi.fonte.nome} (${poi.fonte.nome === 'Wikidata' ? 'CC0' : 'CC BY-SA'})`; }
   else a.hidden = true;
 }
 
@@ -506,9 +506,18 @@ function avaliar(contexto) {
   return caixa;
 }
 const rotuloMotor = (r) => {
+  if (r.motor === 'pesquisa') return 'Pesquisado na Wikipédia';
   if (r.motor !== 'ia') return 'Resposta do conteúdo da viagem';
-  return r.provedor === 'openrouter' ? `Resposta da sua IA${r.modelo ? ` (${r.modelo})` : ''}` : 'Resposta da IA';
+  const web = r.fontes && r.fontes.length ? ', com busca na web' : '';
+  return r.provedor === 'openrouter' ? `Resposta da sua IA${r.modelo ? ` (${r.modelo})` : ''}${web}` : `Resposta da IA${web}`;
 };
+
+/** Links das fontes de uma resposta (busca na web ou Wikipédia). Só https. */
+function linksDeFontes(fontes) {
+  const ok = (fontes || []).filter((f) => f && /^https:\/\//.test(f.url)).slice(0, 3);
+  if (!ok.length) return null;
+  return el('div', { class: 'fontes' }, 'Fontes: ', ...ok.flatMap((f, i) => [i ? ' · ' : '', el('a', { href: f.url, target: '_blank', rel: 'noopener' }, f.titulo || f.url)]));
+}
 
 // ---------- Conversa ----------
 function renderConversa() {
@@ -523,6 +532,8 @@ function renderConversa() {
     if (m.papel === 'guia' && !m.pendente) {
       li.append(el('br'), el('button', { class: 'ouvir', type: 'button', onclick: () => falar(m.texto, true) }, 'Ouvir'));
       if (m.motor) li.append(el('div', { class: 'motor' }, rotuloMotor(m)));
+      const fontes = linksDeFontes(m.fontes);
+      if (fontes) li.append(fontes);
       if (app.pacote) li.append(avaliar({ poiId: m.poiId, motor: m.motor, resposta: m.texto }));
     }
     return li;
@@ -571,11 +582,14 @@ async function perguntar(texto) {
   const corpo = { pacoteId: app.pacote?.id, mensagem: texto, pos: app.pos, poiId: app.emFoco?.id, historico, nivel: app.prefs.nivel };
   const pensando = { papel: 'guia', texto: 'Pensando...', pendente: true, temporario: true };
   addMensagem(pensando);
+  // Resposta que demora é pesquisa (na web ou na Wikipédia): avisa para a pessoa não achar que travou.
+  const aviso = setTimeout(() => { pensando.texto = 'Pesquisando sobre isso...'; renderConversa(); }, 3500);
   let r;
   if (online()) {
-    try { r = await api('/api/conversa', corpo, 50000); }
+    try { r = await api('/api/conversa', corpo, 60000); }
     catch (e) { if (!falhaDeRede(e)) r = { texto: e.message, motor: 'local' }; }
   }
+  clearTimeout(aviso);
   app.conversa = app.conversa.filter((m) => !m.temporario);
   if (!r) { // offline: responde com o pacote e, se não souber, guarda para quando a internet voltar
     const local = app.pacote ? responderLocal(app.pacote, texto, app.emFoco?.id) : null;
@@ -587,7 +601,7 @@ async function perguntar(texto) {
       atualizarFila();
     }
   }
-  addMensagem({ papel: 'guia', texto: r.texto, motor: r.motor, provedor: r.provedor, modelo: r.modelo, poiId: r.poiId || null, semResposta: !!r.semResposta });
+  addMensagem({ papel: 'guia', texto: r.texto, motor: r.motor, provedor: r.provedor, modelo: r.modelo, poiId: r.poiId || null, semResposta: !!r.semResposta, ...(r.fontes ? { fontes: r.fontes } : {}) });
   if (app.prefs.voz && document.visibilityState === 'visible') falar(r.texto);
 }
 $('#form-conversa').addEventListener('submit', (e) => {
