@@ -32,8 +32,37 @@ const NOMES_CAMPOS = {
   teste_resultado_aprovado: 'resultado do teste aprovado', contato_contato: 'telefone ou e-mail do contato', motivo_perda: 'motivo da perda',
 };
 
-function faltando(o, etapa) {
-  return ETAPAS[etapa].exige.filter((campo) => {
+// CRM-003: funil configurável por organização (decisão da Brobot, 08/11/2026: começa com o padrão e pode ser configurado
+// depois, sempre com o teste antes do fechamento). Em `tenants.config.comercial.funis.<funil>`:
+//   { versao, omitir: ['qualificacao'|'demonstracao'], rotulos: { etapa: 'Nome' }, exigir: { etapa: ['campo', …] } }
+// Só as etapas opcionais podem sair; Novo, Proposta, Teste, Negociação e Ganha ficam sempre (o teste continua
+// exigido antes da negociação, salvo o que o catálogo dispensa e a renovação). O que não vale é ignorado e listado.
+const OPCIONAIS = ['qualificacao', 'demonstracao'];
+const CAMPOS_EXTRAS = ['contato_nome', 'contato_contato', 'produtos', 'frota', 'valor_mensal', 'cnpj'];
+
+function configFunil(config) {
+  const cfg = { versao: 0, etapas: [...ABERTAS], rotulos: Object.fromEntries(Object.entries(ETAPAS).map(([k, v]) => [k, v.rotulo])), exigeExtra: {}, problemas: [] };
+  if (!config || typeof config !== 'object') return cfg;
+  if (Number.isInteger(config.versao) && config.versao > 0) cfg.versao = config.versao;
+  for (const e of Array.isArray(config.omitir) ? config.omitir : []) {
+    if (OPCIONAIS.includes(e)) cfg.etapas = cfg.etapas.filter((x) => x !== e);
+    else cfg.problemas.push(`A etapa "${e}" não pode sair do funil (só ${OPCIONAIS.join(' e ')}).`);
+  }
+  for (const [e, r] of Object.entries(config.rotulos && typeof config.rotulos === 'object' ? config.rotulos : {})) {
+    if (ETAPAS[e] && typeof r === 'string' && r.trim().length >= 2 && r.trim().length <= 40) cfg.rotulos[e] = r.trim();
+    else cfg.problemas.push(`Nome inválido para a etapa "${e}" (2 a 40 caracteres, etapa conhecida).`);
+  }
+  for (const [e, campos] of Object.entries(config.exigir && typeof config.exigir === 'object' ? config.exigir : {})) {
+    if (!cfg.etapas.includes(e) && e !== 'ganha') { cfg.problemas.push(`"${e}" não é etapa deste funil.`); continue; }
+    const ok = (Array.isArray(campos) ? campos : []).filter((x) => CAMPOS_EXTRAS.includes(x));
+    if (ok.length !== (Array.isArray(campos) ? campos.length : 0)) cfg.problemas.push(`Campo não permitido em "${e}" (use: ${CAMPOS_EXTRAS.join(', ')}).`);
+    if (ok.length) cfg.exigeExtra[e] = ok;
+  }
+  return cfg;
+}
+
+function faltando(o, etapa, cfg) {
+  return [...new Set([...ETAPAS[etapa].exige, ...((cfg && cfg.exigeExtra[etapa]) || [])])].filter((campo) => {
     if (campo === 'teste_resultado_aprovado') return o.teste_resultado !== 'aprovado' && !o.teste_dispensado;
     if (campo === 'contato_contato') return !o.contato_telefone && !o.contato_email;
     if (campo === 'produtos') return !o.produtos || !o.produtos.length;
@@ -43,8 +72,11 @@ function faltando(o, etapa) {
 
 /** Valida a mudança de etapa sobre a oportunidade já com os dados novos aplicados.
  *  `proposta.teste_dispensado` = nenhum produto exige teste (o serviço calcula pelo catálogo). */
-function validarMudanca(atual, proposta, para) {
+function validarMudanca(atual, proposta, para, cfg) {
   if (!ETAPAS[para] || para === 'suspensa') throw erro.entrada(`Etapa desconhecida: ${para}.`);
+  if (cfg && ABERTAS.includes(para) && !cfg.etapas.includes(para)) {
+    throw erro.regra('etapa_fora_do_funil', `A etapa "${ETAPAS[para].rotulo}" não faz parte deste funil. Avance para a próxima etapa do funil.`);
+  }
   if (!ABERTAS.includes(atual.etapa)) throw erro.conflito('Esta oportunidade já foi encerrada (ganha ou perdida).');
   if (para === 'ganha' && atual.etapa !== 'negociacao') {
     throw erro.regra('fechamento_sem_negociacao', 'Só se fecha a partir da Negociação, depois do teste aprovado.');
@@ -52,9 +84,9 @@ function validarMudanca(atual, proposta, para) {
   if (para === 'negociacao' && !['teste', 'negociacao'].includes(atual.etapa) && !(proposta.teste_dispensado && atual.etapa === 'proposta')) {
     throw erro.regra('negociacao_sem_teste', 'Antes da negociação o cliente precisa passar pela fase de Teste.');
   }
-  const falta = faltando(proposta, para);
+  const falta = faltando(proposta, para, cfg);
   if (falta.length) {
-    throw erro.regra('etapa_incompleta', `Para ir para "${ETAPAS[para].rotulo}" preencha: ${falta.map((c) => NOMES_CAMPOS[c]).join(', ')}.`,
+    throw erro.regra('etapa_incompleta', `Para ir para "${cfg ? cfg.rotulos[para] : ETAPAS[para].rotulo}" preencha: ${falta.map((c) => NOMES_CAMPOS[c]).join(', ')}.`,
       falta.map((campo) => ({ campo, problema: 'obrigatório nesta etapa' })));
   }
   if (para === 'teste') {
@@ -110,4 +142,4 @@ function previsao(linhas, meses = 3, hoje = new Date(), prob = PROBABILIDADE) {
   return { meses: chaves.map((k) => porMes[k]), semData, atrasadas, formula: formulaPrevisao(prob), probabilidade: prob };
 }
 
-module.exports = { ETAPAS, ABERTAS, PRODUTOS, ORIGENS, MOTIVOS_PERDA, FUNIS, PROBABILIDADE, probabilidades, faltando, validarMudanca, previsao };
+module.exports = { ETAPAS, ABERTAS, PRODUTOS, ORIGENS, MOTIVOS_PERDA, FUNIS, PROBABILIDADE, OPCIONAIS, CAMPOS_EXTRAS, configFunil, probabilidades, faltando, validarMudanca, previsao };

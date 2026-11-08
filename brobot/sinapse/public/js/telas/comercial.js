@@ -10,6 +10,9 @@ import { ligar } from '../telefone.js';
 let CAT = null;
 const catalogo = async () => (CAT ||= await api.get('/comercial/catalogo'));
 const ABERTAS = ['novo', 'qualificacao', 'demonstracao', 'proposta', 'teste', 'negociacao'];
+// CRM-003: etapas e nomes do funil em vigor na organização (o servidor confere de novo ao mover).
+const etapasDo = (funil) => CAT.funisConfig?.[funil]?.etapas || ABERTAS;
+const nomeEtapa = (e, funil) => CAT.funisConfig?.[funil]?.rotulos?.[e] || CAT.etapas[e]?.rotulo || e;
 const moeda = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }));
 // Centavos aparecem em proposta e preço unitário (o funil arredonda para leitura rápida).
 const moeda2 = (v) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -132,9 +135,9 @@ export async function telaComercial(el, ctx, id) {
       k('Ganhas (90 dias)', String(porEtapa.ganha?.n || 0), moeda(porEtapa.ganha?.valor || 0)), k('Ciclo médio', ind.testes.ciclo_dias ? `${Math.round(ind.testes.ciclo_dias)} dias` : '—'),
       h('div', { class: 'kpi' }, h('span', { class: 'kpi-rotulo' }, 'Próxima ação vencida'), h('strong', { class: `kpi-valor${ind.testes.acao_vencida ? ' kpi-alerta' : ''}` }, String(ind.testes.acao_vencida))));
     const agora = new Date();
-    trocar(quadro, [...ABERTAS, 'suspensa', 'ganha'].map((e) => {
+    trocar(quadro, [...(funilAtual ? etapasDo(funilAtual) : ABERTAS), 'suspensa', 'ganha'].map((e) => {
       const cards = itens.filter((o) => o.etapa === e);
-      return h('section', { class: `coluna coluna-${e}` }, h('div', { class: 'coluna-topo' }, h('strong', {}, CAT.etapas[e].rotulo), h('span', { class: 'suave' }, `${cards.length} · ${moeda(cards.reduce((s, o) => s + Number(o.valor_mensal || 0), 0))}`)),
+      return h('section', { class: `coluna coluna-${e}` }, h('div', { class: 'coluna-topo' }, h('strong', {}, funilAtual ? nomeEtapa(e, funilAtual) : CAT.etapas[e].rotulo), h('span', { class: 'suave' }, `${cards.length} · ${moeda(cards.reduce((s, o) => s + Number(o.valor_mensal || 0), 0))}`)),
         cards.length ? cards.map((o) => h('a', { class: `cartao-op ${o.proxima_acao_em && new Date(o.proxima_acao_em) < agora ? 'op-vencida' : ''}`, href: `#/comercial/${o.id}` },
           h('div', { class: 'linha-topo' }, h('strong', {}, o.empresa), o.funil !== 'aquisicao' ? selo(o.funil === 'renovacao' ? 'renovação' : 'expansão', 'vip') : null, o.etapa === 'teste' ? selo(o.teste_resultado || `até ${data(o.teste_fim)}`, o.teste_resultado === 'aprovado' ? 'ok' : o.teste_resultado ? 'perigo' : 'info') : null),
           h('div', { class: 'linha-meta' }, h('span', {}, moeda(o.valor_mensal)), o.frota ? h('span', {}, `${o.frota} veíc.`) : null, h('span', {}, o.responsavel_nome || 'sem dono')),
@@ -156,15 +159,16 @@ async function detalhe(el, ctx, id) {
   const o = await api.get(`/comercial/oportunidades/${id}`);
   const recarregar = () => detalhe(el, ctx, id);
   const aberta = ABERTAS.includes(o.etapa);
-  const i = ABERTAS.indexOf(o.etapa);
+  const trilha = etapasDo(o.funil);
+  const i = trilha.indexOf(o.etapa);
   const proxima = o.etapa === 'negociacao' ? 'ganha' : o.etapa === 'teste' ? (o.teste_resultado === 'aprovado' ? 'negociacao' : null)
-    : o.etapa === 'proposta' && !o.exigeTeste ? 'negociacao' : ABERTAS[i + 1];
+    : o.etapa === 'proposta' && !o.exigeTeste ? 'negociacao' : trilha[i + 1];
   const pode = ctx.pode('comercial.editar');
   const par = (r, v) => [h('dt', {}, r), h('dd', {}, v ?? '—')];
   trocar(el,
     h('a', { class: 'voltar', href: '#/comercial' }, '← Comercial'),
     h('div', { class: 'titulo-tela' }, h('h1', {}, `${o.codigo} · ${o.empresa}`)),
-    h('div', { class: 'etapas-trilha' }, [...ABERTAS, 'ganha'].map((e, j) => h('span', { class: `etapa-passo ${e === o.etapa ? 'atual' : j < i || o.etapa === 'ganha' ? 'feito' : ''}` }, CAT.etapas[e].rotulo)),
+    h('div', { class: 'etapas-trilha' }, [...trilha, 'ganha'].map((e, j) => h('span', { class: `etapa-passo ${e === o.etapa ? 'atual' : j < i || o.etapa === 'ganha' ? 'feito' : ''}` }, nomeEtapa(e, o.funil))),
       o.etapa === 'perdida' ? selo(`Perdida: ${CAT.motivosPerda[o.motivo_perda]}`, 'perigo') : null,
       o.etapa === 'suspensa' ? selo(`Suspensa (estava em ${CAT.etapas[o.suspensa_de]?.rotulo}): ${o.motivo_suspensao}`, 'alerta') : null,
       o.fonte === 'pipedrive' ? selo('migrada do Pipedrive', 'neutro') : null, selo(CAT.funis[o.funil]?.split(' (')[0] || o.funil, o.funil === 'aquisicao' ? 'neutro' : 'vip'), o.teste_dispensado ? selo('teste dispensado pelo catálogo', 'info') : null),
@@ -172,7 +176,7 @@ async function detalhe(el, ctx, id) {
       !o.responsavel_id ? h('button', { class: 'btn btn-primario', onclick: async () => {
         try { await api.post(`/comercial/oportunidades/${id}`, { responsavelId: ctx.usuario.id, versao: o.version }); aviso('Oportunidade assumida.'); recarregar(); } catch (e) { aviso(textoErro(e), 'erro'); }
       } }, 'Assumir') : null,
-      proxima ? h('button', { class: 'btn btn-primario', onclick: () => mover(o, proxima, recarregar) }, proxima === 'ganha' ? 'Fechar venda' : `Avançar para ${CAT.etapas[proxima].rotulo}`) : null,
+      proxima ? h('button', { class: 'btn btn-primario', onclick: () => mover(o, proxima, recarregar) }, proxima === 'ganha' ? 'Fechar venda' : `Avançar para ${nomeEtapa(proxima, o.funil)}`) : null,
       o.etapa === 'teste' ? h('button', { class: `btn ${o.teste_resultado ? '' : 'btn-primario'}`, onclick: () => modal('Resultado do teste', (fechar) => formulario([
         campo('O teste foi', opcoes(h('select', { name: 'resultado', required: true }), { aprovado: 'Aprovado (critério atingido)', reprovado: 'Reprovado' }, 'Escolha')),
         campo('Parecer', h('textarea', { name: 'parecer', rows: 3, required: true, minlength: 5 }), `Critério combinado: ${o.teste_criterio}`),

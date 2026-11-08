@@ -24,6 +24,7 @@ const saudeCanais = require('./saude-canais');
 const pontoFocalSaude = require('../clientes/ponto-focal-saude');
 const anexos = require('../ocorrencias/anexos');
 const comunicacao = require('../comunicacao/servico');
+const chegadaCsv = require('../integracoes/csv/chegada');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -97,11 +98,13 @@ async function jobVarrer(c, ctx) {
   resumo.vipAvisos = vipVal.avisos; resumo.vipExpirados = vipVal.expirados;
   // INT-009: retenção de anexos (só com política configurada).
   resumo.anexosExpurgados = await anexos.aplicarRetencao(c, ctx);
+  // R-22: arquivo CSV esperado (semanal) que não chegou vira divergência e tarefa; chegou, fecha sozinha.
+  resumo.arquivosAtrasados = await chegadaCsv.verificarChegada(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // R-20: envio que começou e não foi confirmado vira "incerta" e tarefa de conferência (nunca reenvio automático).
   resumo.enviosIncertos = await comunicacao.verificarEnviosIncertos(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // SUP-002: canal em silêncio, entrada parada e rotina parada.
   Object.assign(resumo, await saudeCanais.verificarCanais(c, ctx, { carregarCalendario: ocorrencias.carregarCalendario, criarTarefa: (t) => tarefas.criar(c, ctx, t) }));
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados || resumo.pedidosAoCliente || resumo.pontosFocaisInvalidos || resumo.enviosIncertos) {
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados || resumo.pedidosAoCliente || resumo.pontosFocaisInvalidos || resumo.enviosIncertos || resumo.arquivosAtrasados) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };

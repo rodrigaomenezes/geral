@@ -10,7 +10,7 @@ const { publicar, auditar } = require('../../nucleo/registro');
 const { relogio, DIA } = require('../../nucleo/relogio');
 const { normalizarTelefone } = require('../../nucleo/telefone');
 const ocorrencias = require('../ocorrencias/servico');
-const { ETAPAS, ABERTAS, FUNIS, validarMudanca, previsao, probabilidades } = require('./funil');
+const { ETAPAS, ABERTAS, FUNIS, validarMudanca, previsao, probabilidades, configFunil } = require('./funil');
 const catalogo = require('./catalogo');
 const propostas = require('./propostas');
 const atividades = require('./atividades');
@@ -132,7 +132,8 @@ async function mover(c, ctx, id, para, d = {}, versao) {
     }
   }
   if (dispensa) proposta.teste_dispensado = true;
-  validarMudanca(atual, proposta, para);
+  const cfgFunil = (await funisDaOrganizacao(c))[atual.funil];
+  validarMudanca(atual, proposta, para, cfgFunil);
   const agora = relogio.agora();
   const colunas = Object.fromEntries(Object.entries(o).filter(([k]) => CAMPOS.includes(k)));
   Object.assign(colunas, { etapa: para, etapa_desde: agora });
@@ -144,7 +145,7 @@ async function mover(c, ctx, id, para, d = {}, versao) {
     venda = await criarContaDaVenda(c, ctx, proposta);
     Object.assign(colunas, { conta_id: venda.contaId, fechada_em: agora, proxima_acao: null, proxima_acao_em: null });
   } else if (!colunas.proxima_acao && ABERTAS.includes(para)) {
-    colunas.proxima_acao = d.proximaAcao || ACAO_PADRAO[para] || `Avançar ${ETAPAS[para].rotulo.toLowerCase()}`;
+    colunas.proxima_acao = d.proximaAcao || ACAO_PADRAO[para] || `Avançar ${cfgFunil.rotulos[para].toLowerCase()}`;
     colunas.proxima_acao_em = d.proximaAcaoEm || new Date(agora.getTime() + 2 * DIA);
   }
   const r = await gravar(c, atual, colunas, versao);
@@ -308,6 +309,12 @@ async function detalhe(c, ctx, id) {
   return { ...o, historico, propostas: await propostas.listar(c, id), atividades: await atividades.listar(c, id), contatos: await contatos.listar(c, id), exigeTeste };
 }
 
+/** CRM-003: funis em vigor da organização ({ aquisicao: cfg, expansao: cfg, renovacao: cfg }). */
+async function funisDaOrganizacao(c) {
+  const f = uma(await c.query("SELECT config -> 'comercial' -> 'funis' AS f FROM tenants WHERE id = nullif(current_setting('app.tenant_id', true), '')::uuid"))?.f || {};
+  return Object.fromEntries(Object.keys(FUNIS).map((k) => [k, configFunil(f[k])]));
+}
+
 const probabilidadesDaOrganizacao = async (c) => probabilidades(uma(await c.query(
   "SELECT config -> 'comercial' -> 'probabilidades' AS p FROM tenants WHERE id = nullif(current_setting('app.tenant_id', true), '')::uuid"))?.p);
 
@@ -340,4 +347,4 @@ async function encaminhar(c, ctx, { contaId, funil, observacao }) {
   return op;
 }
 
-module.exports = { probabilidadesDaOrganizacao, encaminhar, criar, atualizar, mover, registrarTeste, definirProximaAcao, suspender, retomar, importarDoPipedrive, listar, detalhe, indicadores, normalizar, buscar };
+module.exports = { funisDaOrganizacao, probabilidadesDaOrganizacao, encaminhar, criar, atualizar, mover, registrarTeste, definirProximaAcao, suspender, retomar, importarDoPipedrive, listar, detalhe, indicadores, normalizar, buscar };
