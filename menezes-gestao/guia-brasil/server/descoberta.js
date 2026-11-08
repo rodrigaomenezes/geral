@@ -9,7 +9,7 @@
 //      O texto vem do artigo da Wikipédia quando existe; senão, da descrição do Wikidata.
 // Texto da Wikipédia (CC BY-SA) e do Wikidata (CC0): cada ponto leva `fonte` com o link, mostrado no app.
 // Cache em memória (lugares iguais não batem de novo nos serviços) e chamadas ao Nominatim espaçadas (≤ 1/s).
-import { validarPacote, VERSAO_PACOTE, distanciaM } from '../public/js/nucleo.js';
+import { validarPacote, VERSAO_PACOTE, distanciaM, normalizar, palavras } from '../public/js/nucleo.js';
 
 const AGENTE = 'GuIA-Brasil/0.1 (+https://github.com/rodrigaomenezes/geral)';
 const WIKI = 'https://pt.wikipedia.org/w/api.php';
@@ -17,8 +17,10 @@ const NOMINATIM = 'https://nominatim.openstreetmap.org';
 const WIKIDATA = 'https://query.wikidata.org/sparql';
 const RAIO_M = 10000; // máximo da busca por coordenadas da Wikipédia
 const RAIOS_WIKIDATA_KM = [3, 10]; // primeiro o bairro e o centro; amplia se achar pouco
-const MIN_PONTOS_PERTO = 8;
-const MAX_PONTOS = 30;
+const MIN_PONTOS_PERTO = 15;
+const MAX_PONTOS = 50;
+const MAX_ARTIGOS_COMPLETOS = 40; // textos completos baixados por destino (um pedido por artigo)
+const PEDIDOS_SIMULTANEOS = 6;
 const CACHE_MS = 24 * 3600000;
 const TEMPO_MAX_MS = 15000;
 
@@ -45,6 +47,9 @@ function juntarAte(lista, maxChars) {
   return out;
 }
 
+/** "Igreja de São José (Ouro Preto)" → "Igreja de São José": o parêntese só desambigua títulos da Wikipédia. */
+export const nomeDeExibicao = (t) => String(t || '').replace(/\s*\([^()]*\)\s*$/, '').trim() || String(t || '');
+
 /** Artigo da Wikipédia → ponto do pacote (ou null se o texto for curto demais para narrar). */
 export function pontoDeArtigo(a) {
   const fs = frases(a.extract);
@@ -54,7 +59,7 @@ export function pontoDeArtigo(a) {
   const medio = juntarAte(fs, 420);
   return {
     id: `w${a.pageid}`,
-    nome: a.title,
+    nome: nomeDeExibicao(a.title),
     categoria: 'lugar',
     lat: +a.lat.toFixed(6), lng: +a.lon.toFixed(6),
     raioM: 60,
@@ -62,8 +67,102 @@ export function pontoDeArtigo(a) {
     narrativa: { curto, medio, longo },
     curiosidades: [],
     perguntas: [],
-    fonte: { nome: 'Wikipédia', url: `https://pt.wikipedia.org/?curid=${a.pageid}` },
+    fonte: { nome: 'Wikipédia', url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(String(a.title).replace(/ /g, '_'))}` },
   };
+}
+
+// ---------- Texto completo do artigo: seções viram narração longa, curiosidades e perguntas prontas (G-019) ----------
+const SECOES_FORA = /^(ver também|referências|referências bibliográficas|ligações externas|links externos|bibliografia|notas|notas e referências|galeria|galeria de imagens|leitura adicional|fontes)$/i;
+
+/** Texto do artigo no formato de seções ("== História ==") → { intro, secoes: [{ titulo, texto }] }. */
+export function secoesDoArtigo(texto) {
+  const partes = String(texto || '').split(/\n(={2,4})\s*([^=\n]+?)\s*\1\n/);
+  const secoes = [];
+  for (let i = 1; i + 2 < partes.length + 1; i += 3) {
+    const titulo = (partes[i + 1] || '').trim();
+    const corpo = (partes[i + 2] || '').trim();
+    if (titulo && corpo.length >= 40 && !SECOES_FORA.test(titulo)) secoes.push({ titulo, texto: corpo });
+  }
+  return { intro: (partes[0] || '').trim(), secoes };
+}
+
+// Palavras que as pessoas usam para perguntar sobre cada tipo de seção (a busca local compara palavra por palavra).
+const ASSUNTOS = [
+  [/hist|origem|fundaç|antecedent|cronolog|século|período/i, 'Qual a história de %s?', 'historia origem construido construida construiu construcao fundado fundada fundou fundacao inaugurado inaugurada inauguracao antigo antiga surgiu criado criada ano epoca'],
+  [/arquitet|descriç|caracter|estrutura|edifíc|construç|estilo/i, 'Como é a arquitetura de %s?', 'arquitetura estilo fachada construcao predio edificio descricao parece interior torre'],
+  [/acervo|coleç|exposiç|obras/i, 'O que tem no acervo de %s?', 'acervo colecao exposicao obras pecas ver expostas'],
+  [/festa|evento|cultura|tradiç|celebra|religi|devoç/i, 'Que festas e tradições envolvem %s?', 'festa festas evento eventos tradicao tradicoes cultura celebracao religiosa devocao'],
+  [/turis|visita|atraç|funcionamento|uso atual|atualidade/i, 'O que dá para fazer em %s hoje?', 'visitar visita turismo fazer hoje atualmente funciona'],
+  [/restaur|reforma|preserv|tomba|conserva/i, '%s foi restaurado ou tombado?', 'restauracao restaurado reforma reformado tombado tombamento preservacao patrimonio iphan'],
+];
+
+function assuntoDaSecao(titulo, nome) {
+  for (const [re, modelo, chaves] of ASSUNTOS) if (re.test(titulo)) return { p: modelo.replace('%s', nome), chaves: chaves.split(' ') };
+  return { p: `${titulo} · ${nome}`, chaves: palavras(titulo) };
+}
+
+/** Ponto com o artigo inteiro: narração longa maior, até 4 curiosidades e uma pergunta pronta por seção. */
+export function enriquecerComArtigo(poi, textoCompleto) {
+  const { secoes } = secoesDoArtigo(textoCompleto);
+  if (!secoes.length) return poi;
+  const doCorpo = secoes.flatMap((s) => frases(s.texto));
+  const longo = juntarAte([...frases(poi.narrativa.longo), ...doCorpo], 1600);
+  const ja = new Set(frases(poi.narrativa.longo));
+  const curiosidades = [...new Set(secoes.map((s) => frases(s.texto).find((f) => f.length >= 50 && f.length <= 260 && !ja.has(f))).filter(Boolean))].slice(0, 4);
+  const vistas = new Set();
+  const perguntas = [];
+  for (const s of secoes) {
+    const { p, chaves } = assuntoDaSecao(s.titulo, poi.nome);
+    if (vistas.has(p)) { const f = perguntas.find((x) => x.p === p); if (f.r.length < 500) f.r = juntarAte([...frases(f.r), ...frases(s.texto)], 700); continue; }
+    const r = juntarAte(frases(s.texto), 700);
+    if (r.length < 40) continue;
+    vistas.add(p);
+    perguntas.push({ p, r, chaves });
+    if (perguntas.length >= 6) break;
+  }
+  return {
+    ...poi,
+    narrativa: { ...poi.narrativa, longo: longo.length > poi.narrativa.longo.length ? longo : poi.narrativa.longo },
+    curiosidades: [...(poi.curiosidades || []), ...curiosidades].slice(0, 4),
+    perguntas: [...(poi.perguntas || []), ...perguntas],
+  };
+}
+
+// Frases de um texto que mais respondem a uma pergunta (palavras em comum, comparando o começo das palavras:
+// "construiu" casa com "construído").
+// Começo da palavra que conta: "construiu" → "constr" casa com "construído" e não com "constituição".
+const raiz = (w) => w.slice(0, Math.max(5, w.length - 3));
+// Jeitos diferentes de falar do mesmo assunto de turismo: cada grupo conta como uma palavra da pergunta. Sinônimo
+// casa por palavra inteira ou, se tiver 6 letras ou mais, pelo começo ("comer" não casa com "comércio").
+const SINONIMOS = [
+  'comida comer culinaria gastronomia prato pratos culinario culinarios',
+  'tipica tipico tipicas tipicos tradicional tradicionais regional regionais',
+  'festa festas festival festejo festejos micareta carnaval',
+  'fundou fundada fundado fundacao fundador fundadores',
+  'construiu construido construida construcao construcoes erguido erguida edificado',
+  'igreja igrejas templo capela catedral',
+].map((g) => g.split(' '));
+// Palavras que não dizem o assunto da pergunta ("quem fundou a cidade?" é sobre fundação, não sobre "cidade").
+const GENERICAS = new Set('cidade cidades lugar lugares local daqui coisa coisas hoje ver tem fica ficam existe existem bom boa melhor melhores gente pessoa'.split(' '));
+/** Palavras da pergunta → grupos: { sinonimos } (casam por palavra) ou { raiz } (casa pelo começo). */
+export function gruposDaPergunta(chaves) {
+  return chaves.filter((c) => !GENERICAS.has(c)).map((c) => SINONIMOS.find((g) => g.includes(c)) || [`~${raiz(c)}`]);
+}
+const casa = (token, alvo) => (alvo.startsWith('~') ? token.startsWith(alvo.slice(1)) : token === alvo || (alvo.length >= 6 && token.startsWith(alvo)));
+function notaDaFrase(frase, grupos) {
+  const tokens = normalizar(frase).split(' ');
+  return grupos.filter((g) => g.some((alvo) => tokens.some((t) => casa(t, alvo)))).length;
+}
+
+/** Trecho de um texto que responde à pergunta, ou null se nada casa o suficiente. Exportado para teste. */
+export function trechoQueResponde(texto, chaves, minimo) {
+  const grupos = Array.isArray(chaves[0]) ? chaves : gruposDaPergunta(chaves);
+  if (!grupos.length) return null;
+  const fs = frases(texto.replace(/\n={2,4}[^=\n]+={2,4}\n/g, '\n'));
+  const notas = fs.map((f, i) => ({ f, i, n: notaDaFrase(f, grupos) })).filter((x) => x.n >= minimo && x.f.length >= 25);
+  if (!notas.length) return null;
+  const melhores = notas.sort((a, b) => b.n - a.n || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i);
+  return { texto: juntarAte(melhores.map((x) => x.f), 600), nota: melhores[0].n };
 }
 
 // Tipo turístico → categoria do ponto. Vale o primeiro que casar com os tipos (P31) e a descrição do item.
@@ -121,8 +220,9 @@ export function pontoDeItem(item, extract) {
   return {
     ...base,
     id: `q${qid.replace(/^Q/i, '')}`,
-    nome: item.nome,
+    nome: nomeDeExibicao(item.nome),
     categoria: item.categoria,
+    ...(item.artigo ? { _artigo: item.artigo } : {}),
     fonte: item.artigo
       ? { nome: 'Wikipédia', url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(item.artigo.replace(/ /g, '_'))}` }
       : { nome: 'Wikidata', url: `https://www.wikidata.org/wiki/${qid}` },
@@ -281,13 +381,76 @@ export function criarDescoberta({ fetchImpl = fetch } = {}) {
       const categoria = categoriaTuristica([frases(extract)[0] || ''], '', a.title);
       if (!categoria) return null;
       const p = pontoDeArtigo({ ...a, extract });
-      return p && { ...p, categoria };
+      return p && { ...p, categoria, _artigo: a.title };
     }).filter(Boolean);
+  }
+
+  /** Texto completo de um artigo (com seções). A API só devolve um texto completo por pedido. */
+  async function textoCompleto(titulo) {
+    const chave = `t:${titulo}`;
+    const c = cache.obter(chave); if (c !== undefined) return c;
+    const r = await obterJson(`${WIKI}?${new URLSearchParams({
+      action: 'query', prop: 'extracts', explaintext: '1', exsectionformat: 'wiki', redirects: '1',
+      titles: titulo, format: 'json', formatversion: '2', origin: '*' })}`);
+    const pg = ((r.query && r.query.pages) || [])[0];
+    const texto = (pg && pg.extract) || '';
+    cache.guardar(chave, texto);
+    return texto;
+  }
+
+  /** Vários textos completos, no máximo PEDIDOS_SIMULTANEOS por vez; falha de um artigo não derruba os outros. */
+  async function textosCompletos(titulos) {
+    const out = new Map();
+    let i = 0;
+    const trabalhador = async () => {
+      while (i < titulos.length) {
+        const t = titulos[i++];
+        try { out.set(t, await textoCompleto(t)); } catch { /* fica com o resumo */ }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PEDIDOS_SIMULTANEOS, titulos.length) }, trabalhador));
+    return out;
+  }
+
+  /**
+   * Pesquisa na Wikipédia uma pergunta que o roteiro não responde (sem IA). Procura, nesta ordem, no artigo do ponto
+   * em foco, no artigo da cidade e nos 3 primeiros da busca (só os que citam a cidade, para não responder com o
+   * mercado de outra cidade). Vence o trecho que casa mais palavras da pergunta. Devolve { texto, titulo, url } ou null.
+   */
+  async function pesquisar(pergunta, { cidade = '', artigo = '' } = {}) {
+    const daCidade = new Set(palavras(cidade));
+    const chaves = [...new Set(palavras(pergunta))].filter((w) => !daCidade.has(w) && !GENERICAS.has(w));
+    if (!chaves.length) return null;
+    const chave = `q:${normalizar(`${chaves.join(' ')}|${cidade}|${artigo}`)}`;
+    const c = cache.obter(chave); if (c !== undefined) return c;
+    const grupos = gruposDaPergunta(chaves);
+    const minimo = Math.min(2, grupos.length);
+    const candidatos = [...new Set([artigo, cidade].filter(Boolean))].map((titulo) => ({ titulo, exigeCidade: false }));
+    try {
+      const r = await obterJson(`${WIKI}?${new URLSearchParams({
+        action: 'query', list: 'search', srsearch: `${chaves.slice(0, 6).join(' ')}${cidade ? ` "${cidade}"` : ''}`,
+        srlimit: '3', srnamespace: '0', format: 'json', formatversion: '2', origin: '*' })}`);
+      for (const a of (r.query && r.query.search) || []) if (!candidatos.some((x) => x.titulo === a.title)) candidatos.push({ titulo: a.title, exigeCidade: !!cidade });
+    } catch { /* sem busca: fica com o ponto e a cidade */ }
+    const nomeCidade = normalizar(cidade);
+    let melhor = null;
+    const textos = await textosCompletos(candidatos.map((x) => x.titulo));
+    candidatos.forEach(({ titulo, exigeCidade }, ordem) => {
+      const texto = textos.get(titulo) || '';
+      if (!texto) return;
+      const t = trechoQueResponde(texto, grupos, minimo);
+      // Artigo achado pela busca vale só se é da cidade: no título ou no próprio trecho ("Olinda" citando Ouro Preto não).
+      if (t && exigeCidade && !normalizar(titulo).includes(nomeCidade) && !normalizar(t.texto).includes(nomeCidade)) return;
+      if (t && (!melhor || t.nota > melhor.nota || (t.nota === melhor.nota && ordem < melhor.ordem))) melhor = { ...t, titulo, ordem };
+    });
+    const v = melhor ? { texto: melhor.texto, titulo: melhor.titulo, url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(melhor.titulo.replace(/ /g, '_'))}` } : null;
+    cache.guardar(chave, v);
+    return v;
   }
 
   /** Pacote de pontos ao redor de (lat, lng). `nome` opcional (vem da busca). */
   async function gerarPacote({ lat, lng, nome }) {
-    const chave = `p2:${lat.toFixed(3)},${lng.toFixed(3)}`;
+    const chave = `p3:${lat.toFixed(3)},${lng.toFixed(3)}`;
     const c = cache.obter(chave); if (c) return c;
     const centro = { lat: +lat.toFixed(6), lng: +lng.toFixed(6) };
     // As duas fontes em paralelo; uma pode falhar sem derrubar a outra.
@@ -298,7 +461,7 @@ export function criarDescoberta({ fetchImpl = fetch } = {}) {
     const comArtigo = itens.filter((i) => i.artigo).map((i) => i.artigo);
     if (comArtigo.length) { try { textos = await resumosPorTitulo(comArtigo.slice(0, 60)); } catch { /* fica com a descrição do Wikidata */ } }
     const doWikidata = itens.map((i) => pontoDeItem(i, i.artigo ? textos.get(i.artigo) : null));
-    const titulos = new Set(itens.flatMap((i) => [i.nome, i.artigo].filter(Boolean).map((t) => t.toLowerCase())));
+    const titulos = new Set(itens.flatMap((i) => [i.nome, i.artigo].filter(Boolean).flatMap((t) => [t, nomeDeExibicao(t)]).map((t) => t.toLowerCase())));
     const daWikipedia = (wp.status === 'fulfilled' ? wp.value : []).filter((p) => !titulos.has(p.nome.toLowerCase()));
     // Mesmo lugar nas duas fontes (ou dois itens no mesmo prédio, a menos de 15 m e com o mesmo nome): fica um.
     const pois = [];
@@ -309,6 +472,14 @@ export function criarDescoberta({ fetchImpl = fetch } = {}) {
       if (pois.length >= MAX_PONTOS) break;
     }
     if (pois.length < 2) throw new ErroDescoberta('Não encontrei pontos turísticos registrados perto daqui. Tente uma cidade próxima ou busque pelo nome.');
+    // Texto completo dos artigos dos pontos mais perto: seções viram narração, curiosidades e perguntas prontas.
+    const comArtigoCompleto = pois.filter((p) => p._artigo).slice(0, MAX_ARTIGOS_COMPLETOS);
+    const completos = await textosCompletos(comArtigoCompleto.map((p) => p._artigo));
+    for (let i = 0; i < pois.length; i++) {
+      const { _artigo, ...p } = pois[i];
+      const rico = _artigo && completos.get(_artigo) ? enriquecerComArtigo(p, completos.get(_artigo)) : p;
+      pois[i] = pontoValido(rico) ? rico : p;
+    }
     const lugar = await nomeDoLugar(lat, lng);
     // Roteiro de demonstração: do mais perto do centro, sempre para o vizinho mais próximo ainda não visitado.
     const rota = []; const resto = [...pois]; let atual = centro;
@@ -339,5 +510,5 @@ export function criarDescoberta({ fetchImpl = fetch } = {}) {
     return pacote;
   }
 
-  return { buscarLugares, nomeDoLugar, ondeEstou, gerarPacote };
+  return { buscarLugares, nomeDoLugar, ondeEstou, gerarPacote, pesquisar };
 }
