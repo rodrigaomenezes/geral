@@ -4,6 +4,9 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { criarServidor, criarLimitador } from '../server/server.js';
+import { criarDescoberta } from '../server/descoberta.js';
+// Testes não usam a rede: a pesquisa na Wikipédia (G-019) falha e a conversa segue como sem ela.
+const SEM_REDE = criarDescoberta({ fetchImpl: async () => { throw new Error('testes sem rede'); } });
 
 const silencio = { info() {}, error() {} };
 const FOTO = 'data:image/jpeg;base64,' + Buffer.from('falsa').toString('base64');
@@ -11,7 +14,7 @@ const TERREIRO = { lat: -12.97415, lng: -38.51045 };
 
 async function subir(opcoes) {
   const dados = mkdtempSync(join(tmpdir(), 'guia-'));
-  const { servidor } = await criarServidor({ pastaDados: dados, log: silencio, ...opcoes });
+  const { servidor } = await criarServidor({ pastaDados: dados, log: silencio, descoberta: SEM_REDE, ...opcoes });
   await new Promise((r) => servidor.listen(0, r));
   const base = `http://127.0.0.1:${servidor.address().port}`;
   const chamar = async (caminho, corpo, headers = {}) => {
