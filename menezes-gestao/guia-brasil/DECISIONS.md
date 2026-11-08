@@ -144,3 +144,32 @@ fica com 47 de 57 itens (mercado, Painéis do MAP, igrejas, coretos, museu, monu
 O Overpass (OpenStreetMap) foi considerado e descartado: respondeu "sem capacidade" (502) e passou de 25 s no teste.
 **Limites:** inventários municipais entram inteiros (ex.: um clube num prédio de interesse histórico); destinos
 gerados antes desta versão continuam no aparelho até tocar de novo em *Guia de onde estou* ou buscar a cidade.
+
+# G-019 — Mais conteúdo e respostas fora do roteiro: artigo completo, pesquisa na Wikipédia e busca na web da IA
+**Decisão:**
+1. **Destino gerado com o artigo inteiro.** Até 50 pontos (antes 30; o raio só amplia se houver menos de 15). Para os
+   40 mais perto com artigo, o servidor baixa o texto completo (um pedido por artigo, 6 de cada vez, cache de 24 h):
+   as seções viram narração longa (até 1.600 caracteres), até 4 curiosidades e uma pergunta pronta por seção
+   ("Qual a história de...?", "Como é a arquitetura de...?"), com as palavras que as pessoas usam para perguntar.
+   Isso funciona também sem internet, porque fica no destino guardado. Nome sem o parêntese da Wikipédia.
+2. **Pergunta em destino gerado chega ao servidor.** O destino gerado só existe no aparelho; o servidor respondia
+   404 "Pacote não encontrado" a toda pergunta, foto e avaliação feita nele (e o app mostrava isso como resposta).
+   Agora o id (`lugar-m12-255-m38-966`) dá o centro e o servidor monta o destino de novo, quase sempre vindo do cache.
+3. **Sem IA, pesquisa na Wikipédia.** Quando o roteiro não tem pergunta pronta que responda, o servidor procura o
+   trecho que responde no artigo do ponto em foco, no artigo da cidade e nos 3 primeiros da busca da Wikipédia (só
+   os que citam a cidade no título ou no trecho). Vence o trecho com mais palavras da pergunta, com sinônimos de
+   turismo (comida/culinária, festa/festival, fundou/fundação, construiu/construção) e sem palavras genéricas
+   ("cidade", "lugar"). A resposta diz "Pesquisei na Wikipédia (artigo ...)" e traz o link. Sem trecho bom, não inventa.
+4. **Com IA, busca na web.** Claude do servidor usa a ferramenta `web_search_20250305` (até 3 buscas por pergunta,
+   localizada na cidade do destino; US$ 10 por 1.000 buscas, além dos tokens). A IA da pessoa (OpenRouter) usa o
+   plugin `web` (até 4 resultados; cobrado dos créditos dela). As fontes citadas aparecem como links na conversa.
+**Por quê:** teste em campo: "os pontos que ele carrega são poucos, ele não responde perguntas e as informações sobre
+os pontos são poucas"; pediu mais informação "mesmo que pesquisando no Google". Busca do Google por API exige chave e
+cobrança à parte; a busca na web das próprias IAs já está nas contas que o app usa, e a Wikipédia serve sem IA.
+Conferido com a Wikipédia real em 08/11/2026: o artigo do Mercado Municipal de Feira de Santana tem 3 seções
+(História, Arquitetura, Tombamento); a pesquisa sem IA respondeu "quem construiu o mercado", "quando foi tombado",
+"quem foi Tiradentes" (Ouro Preto), "quem fundou" e "comida típica" (Salvador), e recusou um trecho de Olinda para Ouro
+Preto.
+**Limites:** sem IA a pesquisa só acha o que a Wikipédia diz com palavras parecidas com as da pergunta ("quem fundou
+Feira de Santana" ainda pega uma frase ruim); a IA no servidor depende de criar a variável `ANTHROPIC_API_KEY`.
+Destino gerado agora pesa até ~300 KB no aparelho (10 lugares guardados ≈ 3 MB do localStorage).
