@@ -23,6 +23,7 @@ const vip = require('../clientes/vip');
 const saudeCanais = require('./saude-canais');
 const pontoFocalSaude = require('../clientes/ponto-focal-saude');
 const anexos = require('../ocorrencias/anexos');
+const comunicacao = require('../comunicacao/servico');
 
 const INTERVALO_MS = 60e3;
 const HEARTBEAT_MAX_MS = 3 * 60e3;
@@ -96,9 +97,11 @@ async function jobVarrer(c, ctx) {
   resumo.vipAvisos = vipVal.avisos; resumo.vipExpirados = vipVal.expirados;
   // INT-009: retenção de anexos (só com política configurada).
   resumo.anexosExpurgados = await anexos.aplicarRetencao(c, ctx);
+  // R-20: envio que começou e não foi confirmado vira "incerta" e tarefa de conferência (nunca reenvio automático).
+  resumo.enviosIncertos = await comunicacao.verificarEnviosIncertos(c, ctx, { criarTarefa: (t) => tarefas.criar(c, ctx, t) });
   // SUP-002: canal em silêncio, entrada parada e rotina parada.
   Object.assign(resumo, await saudeCanais.verificarCanais(c, ctx, { carregarCalendario: ocorrencias.carregarCalendario, criarTarefa: (t) => tarefas.criar(c, ctx, t) }));
-  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados || resumo.pedidosAoCliente || resumo.pontosFocaisInvalidos) {
+  if (resumo.handoffsExpirados || resumo.reatribuidas || resumo.escalonadas || resumo.lotesSemConfirmacao || resumo.checklistAtrasados || resumo.credenciaisVencendo || resumo.reincidencias || resumo.contasSemUso || resumo.delegacoesExpiradas || resumo.vipAvisos || resumo.vipExpirados || resumo.canaisEmSilencio || resumo.entradasParadas || resumo.rotinasParadas || resumo.anexosExpurgados || resumo.pedidosAoCliente || resumo.pontosFocaisInvalidos || resumo.enviosIncertos) {
     await publicar(c, ctx, { tipo: 'supervisor.varredura', agregado: 'tenant', agregadoId: ctx.tenantId, payload: resumo });
   }
   return { proximaEm: new Date(relogio.agora().getTime() + INTERVALO_MS) };
@@ -107,6 +110,15 @@ async function jobVarrer(c, ctx) {
 /** Varredura global (sem organização): heartbeat e jobs presos. */
 async function varreduraGlobal(db) {
   await db.sistema(async (c) => {
+    // Job que travou ou derrubou o processo volta à fila; se já esgotou as tentativas, vai para a fila de falhas
+    // (senão um job que derruba o processo voltaria para sempre).
+    const mortos = (await c.query(`UPDATE jobs SET estado = 'morto', concluido_em = now(),
+        ultimo_erro = 'Execução interrompida várias vezes (reinício ou travamento): fila de falhas'
+      WHERE estado = 'executando' AND bloqueado_em < now() - interval '5 minutes' AND tentativas >= max_tentativas RETURNING id, tenant_id, tipo`)).rows;
+    for (const j of mortos) {
+      await c.query(`INSERT INTO auditoria (tenant_id, ator_nome, acao, entidade, entidade_id, depois, motivo)
+        VALUES ($1, 'supervisor', 'job.fila_de_falhas', 'job', $2, $3, 'Execução interrompida em todas as tentativas')`, [j.tenant_id, String(j.id), JSON.stringify({ tipo: j.tipo })]);
+    }
     await c.query(`UPDATE jobs SET estado = 'pendente', ultimo_erro = 'Execução interrompida (reinício ou travamento); devolvido à fila'
       WHERE estado = 'executando' AND bloqueado_em < now() - interval '5 minutes'`);
     await c.query(`INSERT INTO sistema (chave, valor, atualizado_em) VALUES ('heartbeat', $1, now())

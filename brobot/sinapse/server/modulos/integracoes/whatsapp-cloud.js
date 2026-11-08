@@ -48,7 +48,14 @@ async function enviar(numero, para, { texto, template }) {
   } else {
     Object.assign(corpo, { type: 'text', text: { body: texto, preview_url: false } });
   }
-  const r = await graph(token, `${numero.phone_number_id}/messages`, { method: 'POST', body: corpo });
+  let r;
+  try {
+    r = await graph(token, `${numero.phone_number_id}/messages`, { method: 'POST', body: corpo });
+  } catch (e) {
+    // R-20: tempo esgotado = o pedido pode ter chegado à Meta. Não é "não saiu": o envio fica para conferência humana.
+    if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) throw Object.assign(new Error('Tempo esgotado esperando a Meta: a mensagem pode ter saído.'), { integracao: 'whatsapp', envioIncerto: true });
+    throw e;
+  }
   return { idExterno: r.messages?.[0]?.id || null, status: 'enviada' };
 }
 

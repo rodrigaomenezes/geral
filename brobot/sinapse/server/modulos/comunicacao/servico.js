@@ -61,10 +61,13 @@ async function programarEnvio(c, ctx, { contaId, ocorrenciaId = null, pontoFocal
   return it;
 }
 
-/** Handler do job `comunicacao.enviar`. */
-async function jobEnviar(c, ctx, { interacaoId, pontoFocalId, fallback, contatoProgramadoId }, job) {
-  const it = uma(await c.query('SELECT * FROM interacoes WHERE id = $1', [interacaoId]));
-  if (!it || it.status_entrega !== 'enfileirada') return {}; // já enviada ou cancelada: idempotente
+/** Handler do job `comunicacao.enviar`. Envio em duas fases (R-20): nesta transação a interação passa a "enviando"
+ *  (confirmada antes de qualquer chamada ao provedor); o envio e a confirmação "enviada" rodam depois, em transação
+ *  própria. Provedor recusou (erro) → volta a "enfileirada" e o job tenta de novo. Processo caiu entre o envio e a
+ *  confirmação → fica "enviando" e o supervisor marca "incerta" (nunca reenvia sozinho: o cliente receberia duas vezes). */
+async function jobEnviar(c, ctx, { interacaoId, pontoFocalId, fallback, contatoProgramadoId }, job, { db } = {}) {
+  const it = uma(await c.query('SELECT * FROM interacoes WHERE id = $1 FOR UPDATE', [interacaoId]));
+  if (!it || it.status_entrega !== 'enfileirada') return {}; // já enviada, em envio, incerta ou cancelada: idempotente
   const adiar = proximaJanela(relogio.agora());
   if (adiar) return { adiarPara: adiar };
   let { canal, destinatario } = it;
@@ -78,16 +81,52 @@ async function jobEnviar(c, ctx, { interacaoId, pontoFocalId, fallback, contatoP
         antes: { canal: 'whatsapp' }, depois: { canal: 'email' }, motivo: `WhatsApp falhou ${job.tentativas - 1} vezes` });
     }
   }
-  const r = await mensageria.enviar(c, canal, { para: destinatario, texto: it.texto, template: canal === 'whatsapp' ? it.variaveis?.template : undefined });
-  await c.query("UPDATE interacoes SET status_entrega = 'enviada', id_externo = $2, canal = $3, destinatario = $4 WHERE id = $1",
-    [it.id, r.idExterno, canal, destinatario]);
-  if (contatoProgramadoId) {
-    await c.query("UPDATE contatos_programados SET estado = 'enviado', interacao_id = $2, atualizado_em = now() WHERE id = $1 AND estado = 'programado'",
-      [contatoProgramadoId, it.id]);
+  await c.query("UPDATE interacoes SET status_entrega = 'enviando', envio_iniciado_em = $2, canal = $3, destinatario = $4 WHERE id = $1",
+    [it.id, relogio.agora(), canal, destinatario]);
+  if (!db) throw new Error('Envio sem acesso ao banco para a segunda fase.');
+  return { depois: () => enviarAgora(db, ctx, { it, canal, destinatario, contatoProgramadoId }) };
+}
+
+/** Segunda fase: chama o provedor e, na mesma transação, confirma "enviada". Erro do provedor = não saiu. */
+async function enviarAgora(db, ctx, { it, canal, destinatario, contatoProgramadoId }) {
+  try {
+    await db.comoTenant(ctx.tenantId, async (c) => {
+      const r = await mensageria.enviar(c, canal, { para: destinatario, texto: it.texto, template: canal === 'whatsapp' ? it.variaveis?.template : undefined });
+      await c.query("UPDATE interacoes SET status_entrega = 'enviada', id_externo = $2 WHERE id = $1 AND status_entrega = 'enviando'", [it.id, r.idExterno]);
+      if (contatoProgramadoId) {
+        await c.query("UPDATE contatos_programados SET estado = 'enviado', interacao_id = $2, atualizado_em = now() WHERE id = $1 AND estado = 'programado'",
+          [contatoProgramadoId, it.id]);
+      }
+      await publicar(c, ctx, { tipo: 'mensagem.enviada', agregado: 'interacao', agregadoId: it.id, chave: `mensagem.enviada:${it.id}`,
+        payload: { canal, modelo: it.modelo, ocorrenciaId: it.ocorrencia_id } });
+    });
+  } catch (e) {
+    if (e && e.envioIncerto) throw e; // o provedor pode ter recebido: fica "enviando" para o supervisor tratar
+    await db.comoTenant(ctx.tenantId, (c) => c.query(
+      "UPDATE interacoes SET status_entrega = 'enfileirada', envio_iniciado_em = NULL, erro_entrega = $2 WHERE id = $1 AND status_entrega = 'enviando'",
+      [it.id, String(e && e.message ? e.message : e).slice(0, 300)]));
+    throw e; // o worker reprograma o job (com backoff, canal alternativo e fila de falhas)
   }
-  await publicar(c, ctx, { tipo: 'mensagem.enviada', agregado: 'interacao', agregadoId: it.id, chave: `mensagem.enviada:${it.id}`,
-    payload: { canal, modelo: it.modelo, ocorrenciaId: it.ocorrencia_id } });
-  return {};
+}
+
+const ENVIO_INCERTO_MINUTOS = 10;
+
+/** Supervisor (R-20): envio que começou e não foi confirmado vira "incerta" e uma tarefa para alguém conferir no canal.
+ *  Nada é reenviado sozinho. */
+async function verificarEnviosIncertos(c, ctx, { criarTarefa }) {
+  const presos = (await c.query(`SELECT i.id, i.canal, i.destinatario, i.ocorrencia_id, i.modelo, ct.nome AS conta FROM interacoes i
+    LEFT JOIN contas ct ON ct.id = i.conta_id
+    WHERE i.status_entrega = 'enviando' AND i.envio_iniciado_em < $1::timestamptz - make_interval(mins => $2) LIMIT 100`,
+  [relogio.agora(), ENVIO_INCERTO_MINUTOS])).rows;
+  for (const p of presos) {
+    await c.query("UPDATE interacoes SET status_entrega = 'incerta', erro_entrega = 'Envio iniciado sem confirmação do provedor' WHERE id = $1 AND status_entrega = 'enviando'", [p.id]);
+    await auditar(c, ctx, { acao: 'mensagem.envio_incerto', entidade: 'interacao', entidadeId: p.id, motivo: 'O envio começou e não foi confirmado (queda ou falha no meio)',
+      depois: { canal: p.canal, modelo: p.modelo } });
+    await criarTarefa({ tipo: 'geral', equipeCodigo: 'supervisao', ocorrenciaId: p.ocorrencia_id || null, chave: `msg-incerta:${p.id}`,
+      titulo: `Conferir se a mensagem (${p.canal}) para ${p.conta || p.destinatario} chegou; reenviar só se não chegou`,
+      prazoEm: new Date(relogio.agora().getTime() + 2 * HORA) });
+  }
+  return presos.length;
 }
 
 /** Quando o envio esgota as tentativas (fila de falhas): marca a interação e o contato como falhos. */
@@ -99,4 +138,4 @@ async function aoFalharEnvio(c, payload) {
   }
 }
 
-module.exports = { escolherCanal, proximaJanela, programarEnvio, jobEnviar, aoFalharEnvio, HORA };
+module.exports = { escolherCanal, proximaJanela, programarEnvio, jobEnviar, enviarAgora, verificarEnviosIncertos, aoFalharEnvio, ENVIO_INCERTO_MINUTOS, HORA };

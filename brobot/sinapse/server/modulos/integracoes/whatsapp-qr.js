@@ -161,7 +161,13 @@ async function enviar(numero, para, { texto }) {
     const [r] = await s.sock.onWhatsApp(jid);
     if (r && r.exists) jid = r.jid; else throw Object.assign(new Error('Esse número não tem WhatsApp.'), { integracao: 'whatsapp', semWhatsapp: true });
   } catch (e) { if (e.semWhatsapp) throw e; jid = `${jid}@s.whatsapp.net`; }
-  const r = await s.sock.sendMessage(jid, { text: texto || '' });
+  let r;
+  try {
+    r = await s.sock.sendMessage(jid, { text: texto || '' });
+  } catch (e) {
+    // R-20: a conexão pode ter levado a mensagem antes de falhar; não reenviar sozinho.
+    throw Object.assign(new Error(`O WhatsApp por QR falhou no meio do envio: a mensagem pode ter saído (${String(e?.message || e).slice(0, 120)}).`), { integracao: 'whatsapp', envioIncerto: true });
+  }
   if (r?.key?.id) { s.doSistema.add(r.key.id); if (s.doSistema.size > 500) s.doSistema.delete(s.doSistema.values().next().value); }
   return { idExterno: r?.key?.id || null, status: 'enviada' };
 }
