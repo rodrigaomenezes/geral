@@ -13,7 +13,7 @@ vídeo (RF04), diário (RF08), roteiros (RF09), contas e pagamento (RF11), afili
 cd menezes-gestao/guia-brasil
 npm install        # só instala o pacote opcional da IA
 npm start          # http://localhost:3000
-npm test           # 39 testes (núcleo, companheiro, servidor, Sua IA e qualquer lugar)
+npm test           # 51 testes (núcleo, companheiro, servidor, Sua IA, qualquer lugar e conteúdo)
 ```
 
 Sem chave de IA o app funciona no **modo local**: narração, perguntas frequentes e identificação de foto por GPS
@@ -72,8 +72,9 @@ Use sempre a mesma chave de assinatura (`GUIA_KEYSTORE`/`GUIA_KEYPASS`) para o A
    avisa e notifica, só avisa com o app aberto ou fica desligado, além da frequência e de um limite por hora.
    Fora de Salvador: marque **Simular caminhada** e use *Andar até o próximo ponto* (11 pontos, do Mercado Modelo
    ao Pelourinho).
-3. **Conversa**: pergunte por texto ou voz ("quem fundou Salvador?", "o que é acarajé?"). Para perguntas livres,
-   conecte sua IA em *Viagem → Sua IA*.
+3. **Conversa**: pergunte por texto ou voz ("quem fundou Salvador?", "quem construiu o mercado?"). Sem IA, o guia
+   responde com o conteúdo do destino e, se não tiver, pesquisa na Wikipédia e mostra a fonte. Com IA (a sua, em
+   *Viagem → Sua IA*, ou a do servidor), responde qualquer pergunta e pesquisa na web quando precisa, com os links.
 4. **Foto**: fotografe qualquer coisa. Com IA, ela explica o que for; sem IA, reconhece os pontos do pacote pela
    posição e direção da câmera.
 5. **Offline**: ative o modo avião. O app abre, narra, responde o que está no pacote e guarda o resto; ao voltar

@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { traduzirPedido, traduzirResposta, clienteOpenRouter, chaveValida, ErroIaUsuario } from '../server/openrouter.js';
 import { criarServidor } from '../server/server.js';
 import { desafioS256, urlDeLogin, concluirLogin, conexao, cabecalhos, desconectar, definirModelo, ehRetornoDeLogin } from '../public/js/minhaia.js';
+import { criarDescoberta } from '../server/descoberta.js';
+// Testes não usam a rede: a pesquisa na Wikipédia (G-019) falha e a conversa segue como sem ela.
+const SEM_REDE = criarDescoberta({ fetchImpl: async () => { throw new Error('testes sem rede'); } });
 
 const CHAVE = 'sk-or-v1-0123456789abcdef0123456789abcdef';
 
@@ -86,7 +89,7 @@ test('servidor: usa a IA da pessoa quando o app manda a conexão, sem registrar 
     if (status !== 200) return { ok: false, status, json: async () => ({ error: { message: 'erro' } }) };
     return { ok: true, json: async () => ({ model: corpo.model, choices: [{ finish_reason: 'stop', message: { content: 'Resposta da IA da pessoa.' } }] }) };
   };
-  const { servidor } = await criarServidor({ pastaDados: dados, log, cliente: null, fetchIA });
+  const { servidor } = await criarServidor({ pastaDados: dados, log, cliente: null, fetchIA, descoberta: SEM_REDE });
   await new Promise((r) => servidor.listen(0, r));
   const base = `http://127.0.0.1:${servidor.address().port}`;
   const perguntar = (headers) => fetch(`${base}/api/conversa`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers },

@@ -49,15 +49,32 @@ const pos = (p) => (p && posicaoValida({ lat: +p.lat, lng: +p.lng }) ? { lat: +p
 
 /** Destino é opcional na conversa e na foto: sem ele, a IA responde pelo conhecimento geral e pela posição.
  *  Um destino informado que não existe continua sendo erro (404). */
-function pacoteDoPedido(b, pacotes) {
-  if (b.pacoteId == null || b.pacoteId === '') return { pacote: SEM_DESTINO };
-  const reg = pacotes.get(b.pacoteId);
-  if (!reg) throw new ErroHttp(404, 'Pacote não encontrado.');
-  return reg;
+/** Destino gerado (G-017): o id guarda o centro ("lugar-m12-255-m38-966" = -12,255; -38,966). */
+export function centroDoIdGerado(id) {
+  const m = /^lugar-(m?)(\d{1,2})-(\d{3})-(m?)(\d{1,3})-(\d{3})$/.exec(String(id || ''));
+  if (!m) return null;
+  const lat = (m[1] ? -1 : 1) * +`${m[2]}.${m[3]}`;
+  const lng = (m[4] ? -1 : 1) * +`${m[5]}.${m[6]}`;
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
 }
 
-export function validarConversa(b, pacotes) {
-  const reg = pacoteDoPedido(b, pacotes);
+/**
+ * Pacote do pedido: curado (em memória), gerado (o app só tem o id: o servidor monta de novo pelo centro, quase sempre
+ * vindo do cache de 24 h, G-019) ou nenhum. Sem isso, toda pergunta feita num destino gerado voltava 404.
+ */
+async function pacoteDoPedido(b, pacotes, descoberta) {
+  if (b.pacoteId == null || b.pacoteId === '') return { pacote: SEM_DESTINO };
+  const reg = pacotes.get(b.pacoteId);
+  if (reg) return reg;
+  const centro = descoberta && centroDoIdGerado(b.pacoteId);
+  if (centro) {
+    try { return { pacote: await descoberta.gerarPacote(centro) }; } catch { return { pacote: SEM_DESTINO }; }
+  }
+  throw new ErroHttp(404, 'Pacote não encontrado.');
+}
+
+export async function validarConversa(b, pacotes, descoberta) {
+  const reg = await pacoteDoPedido(b, pacotes, descoberta);
   const mensagem = texto(b.mensagem, 600);
   if (!mensagem) throw new ErroHttp(400, 'Escreva uma pergunta.');
   const historico = Array.isArray(b.historico) ? b.historico.slice(-8).map((h) => ({ papel: h && h.papel === 'guia' ? 'guia' : 'usuario', texto: texto(h && h.texto, 1500) })).filter((h) => h.texto) : [];
@@ -65,8 +82,8 @@ export function validarConversa(b, pacotes) {
   return { pacote: reg.pacote, mensagem, pos: pos(b.pos), poiId, historico, nivel: NIVEIS.includes(b.nivel) ? b.nivel : 'medio' };
 }
 
-export function validarFoto(b, pacotes) {
-  const reg = pacoteDoPedido(b, pacotes);
+export async function validarFoto(b, pacotes, descoberta) {
+  const reg = await pacoteDoPedido(b, pacotes, descoberta);
   const m = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(typeof b.imagem === 'string' ? b.imagem : '');
   if (!m || !MIMES_IMAGEM.has(m[1])) throw new ErroHttp(400, 'Envie uma foto JPEG, PNG ou WebP.');
   if (m[2].length > LIMITE_IMAGEM_B64) throw new ErroHttp(413, 'Foto grande demais.');
@@ -75,7 +92,7 @@ export function validarFoto(b, pacotes) {
 }
 
 export function validarFeedback(b, pacotes) {
-  if (!pacotes.has(b.pacoteId)) throw new ErroHttp(404, 'Pacote não encontrado.');
+  if (!pacotes.has(b.pacoteId) && !centroDoIdGerado(b.pacoteId)) throw new ErroHttp(404, 'Pacote não encontrado.');
   if (!['util', 'errado'].includes(b.tipo)) throw new ErroHttp(400, 'tipo deve ser util ou errado.');
   const id = texto(b.id, 64);
   if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) throw new ErroHttp(400, 'id inválido.');
@@ -152,7 +169,9 @@ export async function criarServidor({ pastaPacotes = join(RAIZ, 'pacotes'), past
       const corpo = await lerCorpo(req);
       const inicio = Date.now();
       const motorIa = iaDoPedido(req) || ia;
-      const r = p === '/api/conversa' ? await conversar(validarConversa(corpo, pacotes), motorIa) : await explicarFoto(validarFoto(corpo, pacotes), motorIa);
+      const r = p === '/api/conversa'
+        ? await conversar(await validarConversa(corpo, pacotes, descoberta), motorIa, { pesquisar: descoberta.pesquisar })
+        : await explicarFoto(await validarFoto(corpo, pacotes, descoberta), motorIa);
       // Nunca registrar a chave da pessoa: só o provedor e o resultado.
       log.info(JSON.stringify({ rota: p, motor: r.motor, provedor: r.provedor, ms: Date.now() - inicio, erroIa: r.erroIa || undefined }));
       return json(res, 200, r);

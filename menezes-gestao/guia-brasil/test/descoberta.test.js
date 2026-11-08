@@ -65,7 +65,7 @@ test('frases e ponto de artigo: corta em níveis, usa a 2ª frase como chamada e
   assert.equal(p.id, 'w101');
   assert.match(p.narrativa.curto, /^O Convento/);
   assert.match(p.teaser, /alto de um morro/);
-  assert.equal(p.fonte.url, 'https://pt.wikipedia.org/?curid=101');
+  assert.equal(p.fonte.url, 'https://pt.wikipedia.org/wiki/Convento_da_Penha');
   assert.equal(pontoDeArtigo(ARTIGOS[2]), null);
 });
 
@@ -139,8 +139,8 @@ test('Feira de Santana: o mercado e o patrimônio do centro entram, as emissoras
   const pac = await d.gerarPacote({ lat: -12.2548, lng: -38.9661 });
   assert.deepEqual(validarPacote(pac), []);
   const nomes = pac.pois.map((p) => p.nome);
-  assert.equal(nomes[0], 'Prédio Mercado Municipal (Feira de Santana)'); // o mais perto primeiro
-  assert.ok(nomes.includes('Prédio Mercado Municipal (Feira de Santana)'));
+  assert.equal(nomes[0], 'Prédio Mercado Municipal'); // o mais perto primeiro (sem o parêntese da Wikipédia)
+  assert.ok(nomes.includes('Prédio Mercado Municipal'));
   assert.ok(!nomes.some((n) => /TV|Shopping/.test(n)));
   const mercado = pac.pois.find((p) => p.id === 'q1001');
   assert.equal(mercado.categoria, 'mercado');

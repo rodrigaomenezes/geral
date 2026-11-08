@@ -26,8 +26,8 @@ Celular (PWA)                                      Servidor (Node, sem framework
 | `android/` | APK: WebView do app + serviço de GPS em primeiro plano, voz e notificação nativas (ponte `GuiaNativo`) | Regras (entrega posições ao JavaScript) |
 | `public/sw.js` | Guarda a casca do app para abrir offline | Guardar POST, pacotes |
 | `server/pacotes.js` | Carrega e valida pacotes, ETag | — |
-| `server/descoberta.js` | Busca de lugares e "onde estou" (Nominatim); destino gerado ao redor de uma coordenada com os pontos turísticos do Wikidata e da Wikipédia (filtro por tipo, G-018), com cache | Curadoria |
-| `server/guia.js` | Conversa e foto: motor `ia` (Claude) com queda para `local` | HTTP |
+| `server/descoberta.js` | Busca de lugares e "onde estou" (Nominatim); destino gerado ao redor de uma coordenada com os pontos turísticos do Wikidata e da Wikipédia (filtro por tipo, G-018) e o artigo completo de cada um (G-019); pesquisa na Wikipédia para perguntas fora do roteiro; com cache | Curadoria |
+| `server/guia.js` | Conversa e foto: motor `ia` (Claude, com busca na web) com queda para `local` e, na conversa, para a pesquisa na Wikipédia | HTTP |
 | `server/server.js` | Rotas, validação de entrada, limite por IP, arquivos estáticos | Regras de guia |
 
 O núcleo é o **mesmo arquivo** no app e no servidor: o que o app responde offline é o que o servidor responde sem IA,
@@ -50,15 +50,20 @@ Validado ao subir o servidor (`validarPacote`); pacote inválido impede o boot. 
 | `GET /api/health` | — | `{ ok, ia, modelo, pacotes }` |
 | `GET /api/pacotes` | — | `[{ id, nome, cidade, pais, idioma, atualizadoEm, pontos, bytes, versao }]` |
 | `GET /api/pacotes/:id` | `If-None-Match` | pacote (ETag) ou 304 |
-| `POST /api/conversa` | `{ pacoteId?, mensagem ≤600, pos?, poiId?, historico? ≤8, nivel? }` | `{ texto, poiId, motor:'ia'|'local', modelo?, confianca?, semResposta?, erroIa? }` |
+| `POST /api/conversa` | `{ pacoteId?, mensagem ≤600, pos?, poiId?, historico? ≤8, nivel? }` | `{ texto, poiId, motor:'ia'|'pesquisa'|'local', modelo?, confianca?, semResposta?, erroIa?, fontes?:[{titulo,url https}] ≤3 }` |
 | `POST /api/foto` | `{ pacoteId?, imagem: dataURL jpeg/png/webp ≤5 MB, pos?, direcao?, pergunta? }` | `{ identificado, poiId, titulo, explicacao, curiosidades[≤3], alternativas, motor, erroIa? }` |
 | `GET /api/lugares?q=` | nome (2–80) | `[{ nome, detalhe, lat, lng }]` (até 6) |
 | `GET /api/perto?lat=&lng=&nome?` | coordenada | pacote gerado (`gerado: true`, pontos com `fonte` Wikipédia ou Wikidata) ou 502 com motivo |
 | `GET /api/onde?lat=&lng=` | coordenada | `{ lugar?, rua?, bairro?, cidade, estado?, texto }` ("Mercado de Arte Popular · Centro · Feira de Santana") |
 | `POST /api/feedback` | `{ id (idempotência), pacoteId, tipo:'util'|'errado', poiId?, motor?, resposta?, comentario? }` | 204 |
 
-`pacoteId` é opcional em conversa e foto (G-016): sem ele, a IA responde pelo conhecimento geral e pela posição; um
-`pacoteId` que não existe continua 404.
+`pacoteId` é opcional em conversa e foto (G-016): sem ele, a IA responde pelo conhecimento geral e pela posição. Um id
+de destino gerado (`lugar-…`) é aceito em conversa, foto e avaliação: o servidor monta o destino pelo centro guardado no
+id (G-019). Outro `pacoteId` que não existe continua 404.
+
+**Respostas (G-019):** ordem na conversa: IA da pessoa > IA do servidor (as duas podem buscar na web e devolvem
+`fontes`) > pergunta pronta do destino > pesquisa na Wikipédia (`motor: 'pesquisa'`, com a fonte) > narração do ponto >
+"não sei" com sugestões.
 
 Erros: `{ erro }` com 400 (entrada), 404, 413 (tamanho), 429 (limite por IP: 40 chamadas de IA a cada 10 min).
 

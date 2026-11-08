@@ -6,6 +6,7 @@
 export const URL_OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
 export const MODELO_PADRAO_USUARIO = 'openrouter/auto';
 const TEMPO_MAX_MS = 45000;
+const MAX_RESULTADOS_WEB = 4;
 
 /** Erro com status HTTP da OpenRouter: 401 = conexão inválida, 402 = sem créditos. */
 export class ErroIaUsuario extends Error {
@@ -35,6 +36,9 @@ export function traduzirPedido(req, modelo) {
       ...req.messages.map((m) => ({ role: m.role, content: converterConteudo(m.content) })),
     ],
   };
+  // Busca na web (G-019): a ferramenta da Anthropic vira o plugin "web" da OpenRouter, cobrado da conta da pessoa.
+  const web = (req.tools || []).find((t) => t.name === 'web_search');
+  if (web) corpo.plugins = [{ id: 'web', max_results: MAX_RESULTADOS_WEB }];
   const formato = req.output_config && req.output_config.format;
   if (formato && formato.type === 'json_schema') {
     corpo.response_format = { type: 'json_schema', json_schema: { name: 'resposta', strict: true, schema: formato.schema } };
@@ -50,10 +54,15 @@ export function traduzirResposta(r) {
   if (Array.isArray(texto)) texto = texto.map((p) => p.text || '').join('');
   // Alguns modelos embrulham o JSON em ```json ... ```: tiramos para o guia conseguir ler.
   texto = String(texto || '').trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/, '$1');
+  // Fontes da busca na web: anotações url_citation (formato da OpenRouter) viram a lista `fontes` que o guia lê.
+  const fontes = ((escolha.message && escolha.message.annotations) || [])
+    .filter((a) => a && a.type === 'url_citation' && a.url_citation && a.url_citation.url)
+    .map((a) => ({ titulo: a.url_citation.title || a.url_citation.url, url: a.url_citation.url }));
   return {
     model: r.model || '',
     stop_reason: escolha.finish_reason === 'content_filter' ? 'refusal' : 'end_turn',
     content: [{ type: 'text', text: texto }],
+    ...(fontes.length ? { fontes } : {}),
   };
 }
 
