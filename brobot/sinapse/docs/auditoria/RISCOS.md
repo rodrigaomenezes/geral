@@ -41,3 +41,12 @@ no banco; `npm audit` sem vulnerabilidades.
   inatividade), R-11 parcial (exportação e anonimização do titular; retenção automática segue em aberto).
 - **Mitigado em parte em 06/11 (F16, com teste):** R-12 — anexos com lista fechada de tipos conferidos pelo conteúdo,
   10 MB, download sempre como anexo com CSP `sandbox`; falta antivírus no servidor.
+- **Auditoria de 08/11 (Prompt Mestre, ver `DIAGNOSTICO_2026-11-08.md`):**
+  - **R-20 confirmado e mitigado, com teste.** Envio em duas fases (026): `enviando` confirmado antes do provedor. Recusa do
+    provedor volta à fila. Queda ou tempo esgotado vira `incerta` com tarefa de conferência; não há reenvio automático.
+  - **R-21 (novo) mitigado, com teste.** Um job que derrubava o processo em toda tentativa voltava à fila para sempre.
+    Agora, esgotadas as tentativas, vai para a fila de falhas com auditoria.
+  - **R-22 (novo) em aberto.** Arquivo CSV esperado que não chega não gera alerta (P1-1; frequência a definir com a
+    Brobot).
+  - **R-23 (novo) em aberto.** Arquivo só com cabeçalho é recusado sem registro no histórico (P1-2).
+

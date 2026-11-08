@@ -32,7 +32,7 @@ server/http/servidor.js — rotas, sessão, permissão por rota, CSRF (origem), 
         ├─ modulos/integracoes   Platform e OMIE (demonstração + CSV), WhatsApp oficial (Meta Cloud API, webhook assinado) ou por QR Code (Baileys, sessão no Volume), e-mail (demonstração)
         └─ modulos/demo          dados fictícios, vitrine /demo e simulador (só com SINAPSE_DEMO ligado)
         │
-server/jobs/fila.js — fila durável no PostgreSQL (FOR UPDATE SKIP LOCKED), backoff, fila de falhas, recorrentes
+server/jobs/fila.js — fila durável no PostgreSQL (FOR UPDATE SKIP LOCKED), backoff, fila de falhas, recorrentes; efeito externo em duas fases (T-052)
 server/db — adaptador pg | PGlite, `comoTenant` (RLS) / `sistema`, migrações versionadas com volta
 ```
 

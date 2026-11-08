@@ -460,3 +460,20 @@ simultâneos; sai com erro se o P95 passar de 2 s.
 **Resultado medido (07/11, banco embutido, 4 núcleos):** 20 usuários P95 ≈ 0,2 s; 50 usuários P95 ≤ 0,73 s; cerca de
 130 pedidos/s (limite do processo único). Repetir no ambiente de produção quando ele for dimensionado (R-06/R-07).
 
+# T-052 — Envio em duas fases e job sem fim (auditoria de 08/11, R-20, R-21)
+**Contexto:** o job `comunicacao.enviar` chamava o provedor dentro da própria transação. Uma falha entre o envio e o
+commit desfazia a confirmação e o job reenviava. Pela política "não presumir entrega exatamente uma vez", isso é efeito
+duplicado ao cliente.
+**Decisão:**
+- **Fase 1, na transação do job:** a interação passa a `enviando` (com `envio_iniciado_em`).
+- **Fase 2, em transação própria (`depois`):** chama o provedor e confirma `enviada`. O worker agora entrega `{ db }` ao
+  handler só para esse uso.
+- **Provedor recusou** (erro comum): volta a `enfileirada` e o job retenta.
+- **Pode ter saído** (`envioIncerto`: tempo esgotado na Meta, falha no meio pelo QR) ou queda do processo: fica
+  `enviando`. Depois de 10 minutos o supervisor marca `incerta`, audita e cria a tarefa "conferir se chegou; reenviar
+  só se não chegou". Nenhum reenvio automático.
+- **Job sem fim:** na devolução de jobs presos, quem já esgotou as tentativas vai para a fila de falhas, com auditoria.
+
+**Consequência:** em caso de dúvida, o sistema prefere pedir conferência humana a arriscar a duplicidade. A migração
+026 é aditiva; a volta converte `enviando`/`incerta` em `falhou` com o motivo.
+

@@ -52,7 +52,7 @@ function criarWorker(db, handlers, { log = () => {}, lote = 10 } = {}) {
     const ctx = ctxSistema(job.tenant_id, `rotina ${job.tipo}`);
     try {
       if (!handler) throw new Error(`Nenhum handler para o job "${job.tipo}".`);
-      const res = (await db.comoTenant(job.tenant_id, (c) => handler(c, ctx, job.payload, job))) || {};
+      const res = (await db.comoTenant(job.tenant_id, (c) => handler(c, ctx, job.payload, job, { db }))) || {};
       if (res.proximaEm) {
         // Job recorrente: a mesma linha volta para a fila.
         await db.query("UPDATE jobs SET estado = 'pendente', executar_em = $2, tentativas = 0, ultimo_erro = NULL WHERE id = $1",
